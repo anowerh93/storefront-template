@@ -7,3 +7,7 @@ dist
 .env*.local
 *.log
 .DS_Store
+# TypeScript incremental build cache — should never be committed
+*.tsbuildinfo
+# Next.js auto-generates this on every dev/build run
+next-env.d.ts
