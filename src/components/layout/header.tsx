@@ -1,0 +1,179 @@
+'use client';
+
+import Link from 'next/link';
+import Image from 'next/image';
+import { useState } from 'react';
+import { ChevronDown, Heart, MapPin, Menu, Search, User, X } from 'lucide-react';
+import type { StorefrontMeta, Category } from '../../lib/types';
+import { Button } from '../ui/button';
+
+/**
+ * Two-row header inspired by the Omerce design:
+ *   Row 1 — logo · location · big search · account/wishlist
+ *   Row 2 — "Browse all categories" mega dropdown · primary nav · phone/messenger CTA
+ *
+ * The cart icon was intentionally removed — this storefront uses a direct
+ * order-on-PDP funnel rather than a multi-product cart.
+ */
+export function Header({
+  meta,
+  categories = [],
+}: {
+  meta: StorefrontMeta;
+  categories?: Category[];
+}) {
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [catsOpen, setCatsOpen] = useState(false);
+
+  return (
+    <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
+      {/* ───────────────────── Row 1 ───────────────────── */}
+      <div className="border-b border-slate-100">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
+          <div className="flex h-16 items-center gap-4">
+            {/* Logo */}
+            <Link href="/" className="flex items-center gap-2 shrink-0">
+              {meta.logo_url ? (
+                <Image src={meta.logo_url} alt={meta.name} width={36} height={36}
+                       className="h-9 w-9 rounded-lg object-cover" />
+              ) : (
+                <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">
+                  {meta.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="font-bold text-slate-900 text-lg sm:text-xl tracking-tight hidden sm:inline">
+                {meta.name}
+              </span>
+            </Link>
+
+            {/* Location pill — desktop only */}
+            <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer shrink-0">
+              <MapPin className="w-3.5 h-3.5 text-slate-400" />
+              <span className="text-slate-500">Deliver to</span>
+              <span className="font-semibold text-slate-900">Bangladesh</span>
+            </div>
+
+            {/* Search bar — flex-1 hero */}
+            <form action="/products" method="get" className="flex-1 max-w-2xl">
+              <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
+                <select className="bg-amber-300 text-slate-900 text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
+                  <option>All Categories</option>
+                  {categories.map((c) => <option key={c.slug}>{c.name}</option>)}
+                </select>
+                <input
+                  type="search"
+                  name="search"
+                  placeholder="Type and search products..."
+                  className="flex-1 px-3 text-sm border-0 focus:outline-none placeholder:text-slate-400"
+                />
+                <button type="submit" className="px-4 bg-slate-900 hover:bg-slate-800 text-white" aria-label="Search">
+                  <Search className="h-4 w-4" />
+                </button>
+              </div>
+            </form>
+
+            {/* Right cluster: account, wishlist, mobile menu */}
+            <div className="flex items-center gap-1 shrink-0">
+              <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm">
+                <User className="h-5 w-5 text-slate-600" />
+                <div className="text-left hidden xl:block">
+                  <div className="text-[10px] text-slate-500 leading-none">Track</div>
+                  <div className="text-xs font-semibold text-slate-900">My Order</div>
+                </div>
+              </button>
+              <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm">
+                <Heart className="h-5 w-5 text-slate-600" />
+                <span className="text-xs font-semibold text-slate-900 hidden xl:inline">Wishlist</span>
+              </button>
+
+              <button
+                onClick={() => setMobileOpen((v) => !v)}
+                className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+                aria-label="Open menu"
+              >
+                {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* ───────────────────── Row 2 ───────────────────── */}
+      <div className="hidden md:block">
+        <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
+          <div className="flex h-12 items-center gap-2">
+            {/* Categories mega-dropdown trigger */}
+            <div className="relative">
+              <button
+                onClick={() => setCatsOpen((v) => !v)}
+                onBlur={() => setTimeout(() => setCatsOpen(false), 200)}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition"
+              >
+                <Menu className="h-4 w-4" />
+                Browse All Categories
+                <ChevronDown className={`h-4 w-4 transition-transform ${catsOpen ? 'rotate-180' : ''}`} />
+              </button>
+
+              {catsOpen && categories.length > 0 && (
+                <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-40">
+                  {categories.map((c) => (
+                    <Link
+                      key={c.slug}
+                      href={`/categories/${c.slug}`}
+                      className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 text-sm text-slate-700"
+                    >
+                      <span>{c.name}</span>
+                      <span className="text-xs text-slate-400">{c.product_count}</span>
+                    </Link>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Primary nav */}
+            <nav className="flex items-center gap-1 text-sm ml-2">
+              <NavLink href="/">Home</NavLink>
+              <NavLink href="/products">Shop</NavLink>
+              <NavLink href="/categories">Categories</NavLink>
+              <NavLink href="/about">About</NavLink>
+              <NavLink href="/order/lookup">Track Order</NavLink>
+            </nav>
+
+            {/* Right side — featured/promo (optional) */}
+            <div className="ml-auto hidden lg:block">
+              {meta.whatsapp && (
+                <a
+                  href={`https://wa.me/${meta.whatsapp.replace(/\D/g, '')}`}
+                  target="_blank"
+                  rel="noopener"
+                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition"
+                >
+                  Need help? +{meta.whatsapp}
+                </a>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileOpen && (
+        <div className="md:hidden border-t border-slate-100 px-4 py-3 space-y-1 text-sm">
+          <Link onClick={() => setMobileOpen(false)} href="/" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Home</Link>
+          <Link onClick={() => setMobileOpen(false)} href="/products" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Shop</Link>
+          <Link onClick={() => setMobileOpen(false)} href="/categories" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Categories</Link>
+          <Link onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</Link>
+          <Link onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</Link>
+        </div>
+      )}
+    </header>
+  );
+}
+
+function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <Link href={href} className="px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium transition">
+      {children}
+    </Link>
+  );
+}

@@ -1,0 +1,262 @@
+'use client';
+
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { z } from 'zod';
+import { Minus, Plus, ShoppingBag, Truck, ShieldCheck, MessageCircle } from 'lucide-react';
+import type { ProductDetail, ProductVariant, StorefrontMeta } from '../../lib/types';
+import { submitOrder } from '../../lib/api';
+import { formatBDT } from '../../lib/format';
+import { pixel } from '../../lib/pixel';
+import { Input } from '../ui/input';
+import { Label } from '../ui/label';
+import { Textarea } from '../ui/textarea';
+import { Button } from '../ui/button';
+import { RadioGroup, RadioGroupItem } from '../ui/radio-group';
+import { Separator } from '../ui/separator';
+
+/**
+ * Inline "Order Now" form on the PDP. Replaces the legacy cart → checkout
+ * flow: customer picks variant + qty + fills name/phone/address/zone,
+ * submits directly to POST /orders, redirects to the order status page.
+ *
+ * No cart, no /checkout page. One product per order, one click to order.
+ */
+const schema = z.object({
+  customer_name:    z.string().min(2, 'Please enter your name'),
+  customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
+  customer_address: z.string().min(10, 'Please enter your full delivery address'),
+  shipping_zone:    z.string().min(1, 'Choose a delivery zone'),
+  notes:            z.string().max(500).optional(),
+});
+type FormData = z.infer<typeof schema>;
+
+export function OrderNowForm({
+  product,
+  meta,
+}: {
+  product: ProductDetail;
+  meta: StorefrontMeta;
+}) {
+  const router = useRouter();
+  const [variant, setVariant] = useState<ProductVariant | null>(product.variants[0] ?? null);
+  const [qty, setQty] = useState(1);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const zones = meta.shipping?.zones ?? [];
+  const defaultZone = zones[0]?.code ?? '';
+  const form = useForm<FormData>({
+    resolver: zodResolver(schema),
+    defaultValues: { shipping_zone: defaultZone },
+  });
+
+  const unitPrice = variant?.price ?? product.price;
+  const inStock   = variant ? variant.in_stock : product.in_stock;
+
+  const selectedZone = form.watch('shipping_zone');
+  const zone = zones.find((z) => z.code === selectedZone);
+  const subtotal = unitPrice * qty;
+  const threshold = meta.shipping?.free_shipping_threshold ?? null;
+  const shippingFee = !meta.shipping?.enabled
+    ? 0
+    : threshold && subtotal >= threshold
+    ? 0
+    : zone?.fee ?? 0;
+  const total = subtotal + shippingFee;
+
+  async function onSubmit(values: FormData) {
+    setSubmitting(true);
+    setError(null);
+    try {
+      pixel.initiateCheckout({ value: subtotal, numItems: qty });
+
+      // The API expects `variant_index` (position in the variants array),
+      // not the variant's database ID. Compute it here.
+      const variantIdx = variant
+        ? product.variants.findIndex((v) => v.id === variant.id)
+        : -1;
+
+      const order = await submitOrder({
+        customer_name:  values.customer_name,
+        customer_phone: values.customer_phone,
+        address:        values.customer_address,
+        shipping_zone:  values.shipping_zone || undefined,
+        notes:          values.notes,
+        product_id:     product.id,
+        variant_index:  variantIdx >= 0 ? variantIdx : null,
+        quantity:       qty,
+        funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+      });
+
+      pixel.purchase({
+        orderNumber: order.order_number,
+        value: order.total,
+        numItems: qty,
+        contentIds: [product.id.toString()],
+      });
+
+      router.push(`/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+      {/* ── Variant + quantity row (always visible at top of form) ── */}
+      {product.variants.length > 0 && (
+        <div className="space-y-2">
+          <Label>Choose option</Label>
+          <RadioGroup
+            value={variant?.id.toString()}
+            onValueChange={(v) => setVariant(product.variants.find((x) => x.id.toString() === v) ?? null)}
+            className="grid grid-cols-2 sm:grid-cols-3 gap-2"
+          >
+            {product.variants.map((v) => (
+              <label
+                key={v.id}
+                className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition
+                  ${variant?.id === v.id ? 'border-brand-500 bg-brand-50' : 'border-slate-300 hover:border-slate-400'}
+                  ${!v.in_stock ? 'opacity-50 cursor-not-allowed' : ''}`}
+              >
+                <RadioGroupItem value={v.id.toString()} disabled={!v.in_stock} />
+                <span className="text-sm font-medium text-slate-900">{v.name}</span>
+              </label>
+            ))}
+          </RadioGroup>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        <Label>Quantity</Label>
+        <div className="inline-flex items-center rounded-xl border border-slate-300">
+          <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} className="p-2.5 text-slate-600 hover:text-slate-900" aria-label="Decrease"><Minus className="h-4 w-4" /></button>
+          <span className="px-4 py-2 text-sm font-semibold tabular-nums min-w-[3ch] text-center">{qty}</span>
+          <button type="button" onClick={() => setQty(qty + 1)} className="p-2.5 text-slate-600 hover:text-slate-900" aria-label="Increase"><Plus className="h-4 w-4" /></button>
+        </div>
+      </div>
+
+      {/* ── Customer details ── */}
+      <Separator />
+
+      {error && (
+        <div className="rounded-xl bg-rose-50 border border-rose-200 text-rose-800 px-4 py-3 text-sm">
+          {error}
+        </div>
+      )}
+
+      <div>
+        <Label htmlFor="order-name">Your name</Label>
+        <Input id="order-name" {...form.register('customer_name')} className="mt-1.5" />
+        {form.formState.errors.customer_name && (
+          <p className="text-xs text-rose-600 mt-1">{form.formState.errors.customer_name.message}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="order-phone">Mobile number</Label>
+        <Input id="order-phone" placeholder="01XXXXXXXXX" inputMode="tel" {...form.register('customer_phone')} className="mt-1.5" />
+        {form.formState.errors.customer_phone && (
+          <p className="text-xs text-rose-600 mt-1">{form.formState.errors.customer_phone.message}</p>
+        )}
+      </div>
+
+      <div>
+        <Label htmlFor="order-address">Full delivery address</Label>
+        <Textarea id="order-address" placeholder="House/road, area, district…" {...form.register('customer_address')} className="mt-1.5" />
+        {form.formState.errors.customer_address && (
+          <p className="text-xs text-rose-600 mt-1">{form.formState.errors.customer_address.message}</p>
+        )}
+      </div>
+
+      {/* ── Delivery zone ── */}
+      {meta.shipping?.enabled && zones.length > 0 && (
+        <div className="space-y-2">
+          <Label>Delivery zone</Label>
+          <RadioGroup
+            value={selectedZone}
+            onValueChange={(v) => form.setValue('shipping_zone', v)}
+            className="space-y-2"
+          >
+            {zones.map((z) => (
+              <label
+                key={z.code}
+                className={`flex items-center justify-between gap-3 px-4 py-3 rounded-xl border cursor-pointer transition
+                  ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}
+              >
+                <div className="flex items-center gap-3">
+                  <RadioGroupItem value={z.code} />
+                  <span className="text-sm font-medium text-slate-900">{z.label}</span>
+                </div>
+                <span className="text-sm font-semibold text-slate-900">
+                  {z.fee === 0 ? 'Free' : formatBDT(z.fee)}
+                </span>
+              </label>
+            ))}
+          </RadioGroup>
+          {form.formState.errors.shipping_zone && (
+            <p className="text-xs text-rose-600 mt-1">{form.formState.errors.shipping_zone.message}</p>
+          )}
+        </div>
+      )}
+
+      {/* ── COD reassurance + price summary ── */}
+      <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
+        <Truck className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+        <div className="flex-1">
+          <p className="text-sm font-semibold text-emerald-900">Cash on Delivery</p>
+          <p className="text-xs text-emerald-700">Pay when your order arrives. No upfront payment.</p>
+        </div>
+      </div>
+
+      <div className="rounded-2xl bg-slate-50 p-4 space-y-1.5 text-sm">
+        <div className="flex justify-between text-slate-600">
+          <span>Subtotal ({qty} × {formatBDT(unitPrice)})</span>
+          <span>{formatBDT(subtotal)}</span>
+        </div>
+        {meta.shipping?.enabled && (
+          <div className="flex justify-between text-slate-600">
+            <span>Shipping</span>
+            <span>{shippingFee === 0 ? <span className="text-emerald-600 font-semibold">Free</span> : formatBDT(shippingFee)}</span>
+          </div>
+        )}
+        <Separator />
+        <div className="flex items-baseline justify-between pt-1">
+          <span className="font-semibold text-slate-900">Total</span>
+          <span className="text-2xl font-bold text-slate-900">{formatBDT(total)}</span>
+        </div>
+      </div>
+
+      <Button
+        type="submit"
+        variant="brand"
+        size="lg"
+        className="w-full shadow-md"
+        disabled={!inStock || submitting}
+      >
+        <ShoppingBag className="h-4 w-4" />
+        {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : `Order Now — ${formatBDT(total)}`}
+      </Button>
+
+      {/* Trust strip */}
+      <div className="grid grid-cols-3 gap-2 pt-1 text-[10px] text-slate-500">
+        <Trust icon={Truck} label="Cash on Delivery" />
+        <Trust icon={ShieldCheck} label="100% genuine" />
+        <Trust icon={MessageCircle} label="Easy support" />
+      </div>
+    </form>
+  );
+}
+
+function Trust({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
+  return (
+    <div className="flex flex-col items-center gap-1 text-center">
+      <Icon className="h-4 w-4 text-emerald-600" />
+      <span>{label}</span>
+    </div>
+  );
+}
