@@ -1,6 +1,6 @@
 {
   "name": "@replybd/storefront-template",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Reply.BD headless storefront template — Next.js 15 + Tailwind v4 + shadcn/ui. Consumes the Reply.BD storefront API (https://reply.bd) and ships every tenant page (home, products, PDP, categories, order tracking) as a single npm dep.",
   "keywords": [
     "nextjs",
