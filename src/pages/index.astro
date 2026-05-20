@@ -1,0 +1,114 @@
+---
+/**
+ * Homepage — Phase 1 minimal proof.
+ *
+ * Goal of this file in Phase 1: prove the Astro+Cloudflare build pipeline
+ * works end-to-end against the Reply.BD storefront API.
+ *   ✓ Fetches storefront meta + product list at build time
+ *   ✓ Renders into static HTML
+ *   ✓ Surfaces brand color, tenant name, product cards
+ *
+ * Phase 2 replaces this stub with the full HomePage component ported from
+ * `src/views/home.tsx` — 12 home sections (hero, categories, feature_products,
+ * promo_row, etc.) plus Header / Footer / MessengerCTA chrome. The component
+ * code is already written; Phase 2 just needs to swap `next/link` for `<a>`
+ * and `next/image` for `<img>` so the React tree runs as Astro islands.
+ */
+import Base from '../layouts/Base.astro';
+import { getStorefront, getProducts, getCategories } from '../lib/api';
+
+// Build-time data fetch. If any of these throw, Astro logs the error and
+// bakes a blank page — same graceful-degradation behaviour as the Next.js
+// original. The build no longer hangs at 60s like the old NEXT_PUBLIC trap.
+const [meta, productsRes, categories] = await Promise.all([
+  getStorefront().catch(() => null),
+  getProducts({ perPage: 24 }).catch(() => ({ data: [], meta: null })),
+  getCategories().catch(() => []),
+]);
+
+const products = productsRes.data ?? [];
+const tenantName = meta?.name ?? 'Storefront';
+const tagline = meta?.about ?? '';
+---
+
+<Base>
+  <header class="border-b border-slate-200 bg-white">
+    <div class="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2">
+        {meta?.logo_url && (
+          <img src={meta.logo_url} alt={tenantName} class="h-8 w-8 rounded" />
+        )}
+        <span class="text-lg font-semibold text-slate-900">{tenantName}</span>
+      </a>
+      <nav class="hidden sm:flex items-center gap-6 text-sm text-slate-600">
+        <a href="/products" class="hover:text-slate-900">Products</a>
+        <a href="/categories" class="hover:text-slate-900">Categories</a>
+        <a href="/order/lookup" class="hover:text-slate-900">Track order</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-7xl px-4 py-8">
+    {tagline && (
+      <section class="mb-10 text-center">
+        <p class="text-slate-600 max-w-2xl mx-auto">{tagline}</p>
+      </section>
+    )}
+
+    {categories.length > 0 && (
+      <section class="mb-10">
+        <h2 class="text-lg font-semibold text-slate-900 mb-3">Shop by category</h2>
+        <div class="flex flex-wrap gap-2">
+          {categories.map((c) => (
+            <a
+              href={`/categories/${c.slug}`}
+              class="rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:border-brand-500 hover:text-brand-600"
+            >
+              {c.name}
+            </a>
+          ))}
+        </div>
+      </section>
+    )}
+
+    <section>
+      <h2 class="text-lg font-semibold text-slate-900 mb-4">Latest products</h2>
+
+      {products.length === 0 ? (
+        <p class="text-slate-500">No products yet — check back soon.</p>
+      ) : (
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+          {products.map((p) => (
+            <a
+              href={`/products/${p.slug}`}
+              class="group block rounded-lg border border-slate-200 bg-white overflow-hidden hover:border-brand-300 hover:shadow-md transition"
+            >
+              {p.image_url ? (
+                <img
+                  src={p.image_url}
+                  alt={p.name}
+                  loading="lazy"
+                  class="aspect-square w-full object-cover group-hover:scale-[1.02] transition"
+                />
+              ) : (
+                <div class="aspect-square w-full bg-slate-100" />
+              )}
+              <div class="p-3">
+                <h3 class="text-sm font-medium text-slate-900 line-clamp-2">{p.name}</h3>
+                <p class="mt-1 text-sm font-semibold text-brand-600">
+                  ৳{p.price}
+                </p>
+              </div>
+            </a>
+          ))}
+        </div>
+      )}
+    </section>
+  </main>
+
+  <footer class="border-t border-slate-200 bg-slate-50 mt-12">
+    <div class="mx-auto max-w-7xl px-4 py-6 text-sm text-slate-500 text-center">
+      © {new Date().getFullYear()} {tenantName}. Powered by Reply.BD.
+    </div>
+  </footer>
+</Base>

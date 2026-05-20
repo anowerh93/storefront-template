@@ -1,0 +1,97 @@
+---
+/**
+ * Base layout for every storefront page.
+ *
+ * Fetches storefront metadata once per build so the brand color, fonts,
+ * Meta Pixel script, and SEO tags are baked into every static page. Replaces
+ * the Next.js `src/layout.tsx` — the React-based one couldn't port directly
+ * because Astro doesn't have the App Router's root-layout pattern.
+ *
+ * Per-page metadata override: pass `title`, `description`, `ogImage` as
+ * props — this layout merges them on top of the storefront defaults.
+ */
+import '../styles.css';
+import { getStorefront } from '../lib/api';
+import { brandCssVars } from '../lib/theme';
+import type { StorefrontMeta } from '../lib/types';
+
+export interface Props {
+  title?: string;
+  description?: string;
+  ogImage?: string;
+}
+
+const { title, description, ogImage } = Astro.props;
+
+// Fetch tenant metadata. If it fails (API down, slug mis-set), render a
+// graceful skeleton rather than crashing the build — matches the Next.js
+// original's behaviour.
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[Base.astro] getStorefront() failed — rendering without tenant chrome:', err);
+}
+
+const finalTitle = title
+  ? (meta ? `${title} — ${meta.name}` : title)
+  : meta?.seo.title ?? meta?.name ?? 'Storefront';
+
+const finalDescription = description
+  ?? meta?.seo.description
+  ?? meta?.about
+  ?? meta?.name
+  ?? '';
+
+const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
+
+const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
+const pixelId = meta?.pixel?.id ?? null;
+const siteName = meta?.name ?? '';
+const favicon = meta?.logo_url ?? null;
+---
+
+<!doctype html>
+<html lang="en" class="font-sans">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{finalTitle}</title>
+    {finalDescription && <meta name="description" content={finalDescription} />}
+
+    {/* OpenGraph + Twitter — built-in defaults so social shares look right */}
+    <meta property="og:title" content={finalTitle} />
+    {finalDescription && <meta property="og:description" content={finalDescription} />}
+    {siteName && <meta property="og:site_name" content={siteName} />}
+    {finalOgImage && <meta property="og:image" content={finalOgImage} />}
+    <meta name="twitter:card" content={finalOgImage ? 'summary_large_image' : 'summary'} />
+
+    {favicon && <link rel="icon" href={favicon} />}
+
+    {/* Inter font, swap-loaded so first paint isn't blocked */}
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+    />
+
+    {/* Per-tenant brand color CSS variables — server-rendered, no flash on
+        first paint. Variables are read by Tailwind v4's @theme directive in
+        styles.css and propagate to every brand-* utility class. */}
+    {brandStyle && <style set:html={`:root { ${brandStyle} }`} />}
+
+    {/* Meta Pixel — fires PageView on initial load. Per-event firing is
+        done client-side in components via lib/pixel.ts. The is:inline tag
+        executes inline so the pixel is initialised before user-interaction
+        events fire. */}
+    {pixelId && (
+      <script is:inline define:vars={{ pixelId }}>
+        {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',pixelId);fbq('track','PageView');`}
+      </script>
+    )}
+  </head>
+  <body class="bg-white text-slate-900">
+    <slot />
+  </body>
+</html>

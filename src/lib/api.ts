@@ -1,16 +1,28 @@
 /**
- * Reply.BD storefront API client.
+ * Reply.BD storefront API client (Astro/Cloudflare Pages port).
  *
  * Two layers:
- *   1. `apiFetch()` — server-only fetch with Next.js cache + tag-based ISR.
- *      All read endpoints flow through here. The tag is used by the
- *      /api/revalidate route to invalidate specific paths in O(1).
- *   2. `clientPost()` — browser-only POST for order submission. Skips Next
- *      cache; talks straight to Laravel.
+ *   1. `apiFetch()` — server-side fetch used during Astro's static build AND
+ *      from any SSR route running as a Cloudflare Worker.
+ *   2. `submitOrder()` — browser-only POST for order placement. Skips cache;
+ *      talks straight to the Laravel API.
  *
- * Env vars expected:
- *   NEXT_PUBLIC_API_BASE       — Reply.BD API root (e.g. https://reply.bd)
- *   NEXT_PUBLIC_STOREFRONT_SLUG— this tenant's slug
+ * Env vars expected (Astro convention — `PUBLIC_*` is build-time inlined,
+ * server-only vars omit the prefix):
+ *   PUBLIC_API_BASE        — Reply.BD API root (e.g. https://reply.bd)
+ *   PUBLIC_STOREFRONT_SLUG — this tenant's slug
+ *
+ * Cache strategy difference vs. the Next.js original:
+ *   - The previous Next.js version used `fetch(url, { next: { tags, revalidate: 60 } })`
+ *     to opt into Next's ISR cache with tag-based invalidation. That whole
+ *     subsystem doesn't exist on Astro/CF. We drop the cache hint here and
+ *     rely on Astro's BUILD-TIME static generation: each page is fetched
+ *     once at `astro build`, baked into HTML, then served as a static asset
+ *     from Cloudflare's edge. Freshness happens via a full CF Pages rebuild
+ *     triggered by the Laravel revalidate webhook (see `pages/api/revalidate.ts`).
+ *   - The `tags` parameter is preserved in the API surface so callers don't
+ *     have to change shape, but it's a no-op now. We can wire it up to CF
+ *     KV-keyed cache invalidation later if rebuild latency becomes a pain.
  */
 
 import type {
@@ -23,13 +35,15 @@ import type {
   StorefrontMeta,
 } from './types';
 
-const API_BASE = (process.env.NEXT_PUBLIC_API_BASE ?? '').replace(/\/$/, '');
-export const STOREFRONT_SLUG = process.env.NEXT_PUBLIC_STOREFRONT_SLUG ?? '';
+const API_BASE = (import.meta.env.PUBLIC_API_BASE ?? '').replace(/\/$/, '');
+export const STOREFRONT_SLUG = import.meta.env.PUBLIC_STOREFRONT_SLUG ?? '';
 
 if (typeof window === 'undefined' && !API_BASE) {
-  // Server-side, log once. Don't throw — Next.js can still render a graceful
-  // error page for the user instead of crashing the build.
-  console.warn('[storefront-template] NEXT_PUBLIC_API_BASE is not set');
+  // Server-side, log once. Don't throw — Astro can still render a graceful
+  // error page for the visitor instead of crashing the build. Same behaviour
+  // as the Next.js original — Vercel build hangs were caused by the value
+  // being `undefined` AFTER the warning, not by this line.
+  console.warn('[storefront-template] PUBLIC_API_BASE is not set');
 }
 
 function buildUrl(path: string, params?: Record<string, string | number | undefined>): string {
@@ -48,7 +62,6 @@ async function apiFetch<T>(
 ): Promise<T> {
   const url = buildUrl(path, options.params);
   const res = await fetch(url, {
-    next: { tags: options.tags ?? [], revalidate: 60 },
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
@@ -64,7 +77,7 @@ async function apiFetch<T>(
 }
 
 // ──────────────────────────────────────────────────────────────
-// Read endpoints (server-side, ISR-cached)
+// Read endpoints (server-side at build time, or SSR'd on the edge)
 // ──────────────────────────────────────────────────────────────
 
 export function getStorefront() {
@@ -89,7 +102,7 @@ export function getProducts(opts: {
       sort: opts.sort,
     },
     tags: ['products', 'home'],
-    unwrap: false,   // paginated — keep both `data` (array) and `meta`
+    unwrap: false,
   });
 }
 
@@ -134,8 +147,8 @@ export function lookupOrder(orderNumber: string, phoneLast4: string) {
 
 /**
  * Submit a checkout. Called from the browser, so uses `cache: 'no-store'`
- * and reads the API base from window.__NEXT_DATA__ at runtime (already
- * inlined as NEXT_PUBLIC_*).
+ * and reads the API base from `import.meta.env.PUBLIC_*` (Vite inlines
+ * these at build time, same way Next.js inlined `NEXT_PUBLIC_*`).
  */
 export async function submitOrder(input: CreateOrderInput): Promise<OrderResponse> {
   const url = buildUrl('/orders');
