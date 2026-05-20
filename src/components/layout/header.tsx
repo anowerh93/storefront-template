@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
 import { useState } from 'react';
 import { ChevronDown, Heart, MapPin, Menu, Search, User, X } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
@@ -32,9 +30,9 @@ export function Header({
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
           <div className="flex h-16 items-center gap-4">
             {/* Logo */}
-            <Link href="/" className="flex items-center gap-2 shrink-0">
+            <a href="/" className="flex items-center gap-2 shrink-0">
               {meta.logo_url ? (
-                <Image src={meta.logo_url} alt={meta.name} width={36} height={36}
+                <img src={meta.logo_url} alt={meta.name} width={36} height={36}
                        className="h-9 w-9 rounded-lg object-cover" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">
@@ -44,7 +42,7 @@ export function Header({
               <span className="font-bold text-slate-900 text-lg sm:text-xl tracking-tight hidden sm:inline">
                 {meta.name}
               </span>
-            </Link>
+            </a>
 
             {/* Location pill — desktop only */}
             <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer shrink-0">
@@ -124,7 +122,7 @@ export function Header({
                     >
                       <span>{c.name}</span>
                       <span className="text-xs text-slate-400">{c.product_count}</span>
-                    </Link>
+                    </a>
                   ))}
                 </div>
               )}
@@ -159,11 +157,11 @@ export function Header({
       {/* Mobile menu */}
       {mobileOpen && (
         <div className="md:hidden border-t border-slate-100 px-4 py-3 space-y-1 text-sm">
-          <Link onClick={() => setMobileOpen(false)} href="/" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Home</Link>
-          <Link onClick={() => setMobileOpen(false)} href="/products" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Shop</Link>
-          <Link onClick={() => setMobileOpen(false)} href="/categories" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Categories</Link>
-          <Link onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</Link>
-          <Link onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</Link>
+          <a onClick={() => setMobileOpen(false)} href="/" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Home</a>
+          <a onClick={() => setMobileOpen(false)} href="/products" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Shop</a>
+          <a onClick={() => setMobileOpen(false)} href="/categories" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Categories</a>
+          <a onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</a>
+          <a onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</a>
         </div>
       )}
     </header>
@@ -172,8 +170,8 @@ export function Header({
 
 function NavLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium transition">
+    <a href={href} className="px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium transition">
       {children}
-    </Link>
+    </a>
   );
 }

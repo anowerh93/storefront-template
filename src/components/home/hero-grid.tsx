@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import type { ProductCard } from '../../lib/types';
 import { formatBDT } from '../../lib/format';
@@ -60,7 +58,7 @@ export function HeroGrid({
                 className="object-contain object-right p-8 group-hover:scale-105 transition-transform duration-700 mix-blend-luminosity opacity-90"
               />
             )}
-          </Link>
+          </a>
         ) : (
           <HeroPlaceholder />
         )}
@@ -134,7 +132,7 @@ function SmallCard({
           className="object-contain object-right p-4 group-hover:scale-105 transition-transform duration-500"
         />
       )}
-    </Link>
+    </a>
   );
 }
 

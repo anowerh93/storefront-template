@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -21,7 +20,7 @@ export async function AboutPage() {
         )}
 
         <div className="mt-10 flex flex-wrap gap-3">
-          <Link href="/products"><Button variant="brand">Shop our products</Button></Link>
+          <a href="/products"><Button variant="brand">Shop our products</Button></a>
           {meta.messenger?.url && (
             <a href={meta.messenger.url} target="_blank" rel="noopener">
               <Button variant="outline">Get in touch</Button>

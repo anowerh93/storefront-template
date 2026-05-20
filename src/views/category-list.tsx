@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { FolderOpen, ArrowRight } from 'lucide-react';
 import { getCategories, getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
@@ -28,9 +27,9 @@ export async function CategoryListPage() {
               Browse the full catalogue while we tidy things up.
             </p>
             <div className="mt-5">
-              <Link href="/products">
+              <a href="/products">
                 <Button variant="brand">View all products</Button>
-              </Link>
+              </a>
             </div>
           </div>
         ) : (
@@ -48,7 +47,7 @@ export async function CategoryListPage() {
                 <p className="text-xs text-slate-500 mt-1">
                   {c.product_count} {c.product_count === 1 ? 'product' : 'products'}
                 </p>
-              </Link>
+              </a>
             ))}
           </div>
         )}

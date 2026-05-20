@@ -1,5 +1,3 @@
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { CheckCircle2, Package, Truck, MessageCircle } from 'lucide-react';
 import { lookupOrder, getStorefront } from '../lib/api';
 import { formatBDT, relativeTime } from '../lib/format';
@@ -10,6 +8,7 @@ import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
+import { NotFoundPage } from './not-found';
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'brand' }> = {
   pending:   { label: 'Order received',  variant: 'brand' },
@@ -48,7 +47,8 @@ export async function OrderStatusPage({
   try {
     order = await lookupOrder(orderNumber, searchParams.phone);
   } catch {
-    notFound();
+    // notFound() → NotFoundPage render. See product-detail.tsx for rationale.
+    return <NotFoundPage />;
   }
 
   const justPlaced = searchParams.placed === '1';
@@ -125,9 +125,9 @@ export async function OrderStatusPage({
               </Button>
             </a>
           )}
-          <Link href="/products">
+          <a href="/products">
             <Button variant="brand">Continue shopping</Button>
-          </Link>
+          </a>
         </div>
       </main>
 

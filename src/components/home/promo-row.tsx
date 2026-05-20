@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { ArrowRight } from 'lucide-react';
 import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT } from '../../lib/format';
@@ -50,7 +48,7 @@ export function PromoRow({
                   className="object-contain object-right p-4 group-hover:scale-105 transition-transform duration-500"
                 />
               )}
-            </Link>
+            </a>
           );
         })}
       </div>

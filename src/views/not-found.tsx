@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Button } from '../components/ui/button';
 
 export function NotFoundPage() {
@@ -10,8 +9,8 @@ export function NotFoundPage() {
         The page you're looking for doesn't exist or may have been moved.
       </p>
       <div className="flex gap-3">
-        <Link href="/"><Button variant="brand">Go home</Button></Link>
-        <Link href="/products"><Button variant="outline">Browse products</Button></Link>
+        <a href="/"><Button variant="brand">Go home</Button></a>
+        <a href="/products"><Button variant="outline">Browse products</Button></a>
       </div>
     </div>
   );

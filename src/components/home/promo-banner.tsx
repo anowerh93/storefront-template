@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { HomepageConfig } from '../../lib/types';
 
@@ -44,7 +43,7 @@ export function PromoBanner({ config }: { config: HomepageConfig['promo_banner']
             {config.button_text} <ArrowRight className="h-3 w-3" />
           </span>
         </div>
-      </Link>
+      </a>
     </section>
   );
 }

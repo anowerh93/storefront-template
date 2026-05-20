@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { CreditCard } from 'lucide-react';
 import type { HomepageConfig } from '../../lib/types';
 
@@ -16,7 +15,7 @@ export function CardPaymentPromo({ config }: { config: HomepageConfig['card_paym
             className="mt-4 inline-flex items-center gap-2 bg-purple-700 hover:bg-purple-800 text-white font-semibold text-sm px-5 py-2 rounded-full transition"
           >
             {config.button_text}
-          </Link>
+          </a>
         </div>
 
         {/* Decorative card stack — visual flair, not configurable */}

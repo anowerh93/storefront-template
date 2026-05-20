@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ArrowRight, Apple, Cookie, Coffee, GlassWater, Package, Sandwich, Carrot, Leaf } from 'lucide-react';
 import type { Category } from '../../lib/types';
 
@@ -38,9 +37,9 @@ export function CategoryStrip({
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-10">
       <div className="flex items-end justify-between mb-4">
         <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{title}</h2>
-        <Link href="/categories" className="text-sm font-medium text-slate-600 hover:text-brand-600 inline-flex items-center gap-1">
+        <a href="/categories" className="text-sm font-medium text-slate-600 hover:text-brand-600 inline-flex items-center gap-1">
           View All <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        </a>
       </div>
 
       <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
@@ -55,7 +54,7 @@ export function CategoryStrip({
             >
               <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
               <span className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-1 text-center">{c.name}</span>
-            </Link>
+            </a>
           );
         })}
       </div>

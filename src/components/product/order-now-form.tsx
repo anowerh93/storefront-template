@@ -1,7 +1,4 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -40,7 +37,6 @@ export function OrderNowForm({
   product: ProductDetail;
   meta: StorefrontMeta;
 }) {
-  const router = useRouter();
   const [variant, setVariant] = useState<ProductVariant | null>(product.variants[0] ?? null);
   const [qty, setQty] = useState(1);
   const [submitting, setSubmitting] = useState(false);
@@ -98,7 +94,9 @@ export function OrderNowForm({
         contentIds: [product.id.toString()],
       });
 
-      router.push(`/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`);
+      // Full navigation — the /order/{number} route is SSR'd on Cloudflare
+      // Workers (prerender:false) so it sees the fresh order immediately.
+      window.location.href = `/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       setSubmitting(false);

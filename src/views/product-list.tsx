@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { Search, X, PackageX } from 'lucide-react';
 import { getProducts, getStorefront, getCategories, type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
@@ -87,7 +86,7 @@ export async function ProductListPage({
               >
                 Search: &ldquo;{search}&rdquo;
                 <X className="h-3 w-3" />
-              </Link>
+              </a>
             )}
             {activeCat && (
               <Link
@@ -96,14 +95,14 @@ export async function ProductListPage({
               >
                 Category: {activeCat.name}
                 <X className="h-3 w-3" />
-              </Link>
+              </a>
             )}
             <Link
               href="/products"
               className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2 ml-1"
             >
               Clear all
-            </Link>
+            </a>
           </div>
         )}
 
@@ -116,7 +115,7 @@ export async function ProductListPage({
               className={`block px-3 py-2 rounded-lg text-sm transition ${!category ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700 hover:bg-slate-100'}`}
             >
               All products
-            </Link>
+            </a>
             {categories.map((c) => (
               <Link
                 key={c.slug}
@@ -125,7 +124,7 @@ export async function ProductListPage({
               >
                 <span>{c.name}</span>
                 <span className="text-xs text-slate-400">{c.product_count}</span>
-              </Link>
+              </a>
             ))}
           </aside>
 
@@ -138,7 +137,7 @@ export async function ProductListPage({
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${!category ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
               >
                 All
-              </Link>
+              </a>
               {categories.map((c) => (
                 <Link
                   key={c.slug}
@@ -146,7 +145,7 @@ export async function ProductListPage({
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${category === c.slug ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
                 >
                   {c.name}
-                </Link>
+                </a>
               ))}
             </div>
 
@@ -159,9 +158,9 @@ export async function ProductListPage({
                   We couldn&rsquo;t find anything for that combination.
                 </p>
                 <div className="mt-5">
-                  <Link href="/products">
+                  <a href="/products">
                     <Button variant="brand">View all products</Button>
-                  </Link>
+                  </a>
                 </div>
               </div>
             ) : (
@@ -172,9 +171,9 @@ export async function ProductListPage({
             {lastPage > 1 && (
               <nav className="mt-10 flex items-center justify-center gap-1.5">
                 {page > 1 && (
-                  <Link href={buildHref({ page: page - 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  <a href={buildHref({ page: page - 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
                     ← Prev
-                  </Link>
+                  </a>
                 )}
                 {Array.from({ length: lastPage }, (_, i) => i + 1)
                   .filter((p) => p === 1 || p === lastPage || Math.abs(p - page) <= 1)
@@ -186,13 +185,13 @@ export async function ProductListPage({
                         className={`px-3 py-2 rounded-lg text-sm font-medium ${p === page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                       >
                         {p}
-                      </Link>
+                      </a>
                     </span>
                   ))}
                 {page < lastPage && (
-                  <Link href={buildHref({ page: page + 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  <a href={buildHref({ page: page + 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
                     Next →
-                  </Link>
+                  </a>
                 )}
               </nav>
             )}

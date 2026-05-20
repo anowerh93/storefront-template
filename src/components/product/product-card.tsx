@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { Star } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
@@ -61,6 +59,6 @@ export function ProductCard({ product }: { product: ProductCardType }) {
           )}
         </div>
       </div>
-    </Link>
+    </a>
   );
 }

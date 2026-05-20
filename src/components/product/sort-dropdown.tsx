@@ -1,6 +1,3 @@
-'use client';
-
-import { useRouter, useSearchParams } from 'next/navigation';
 import { ArrowUpDown } from 'lucide-react';
 
 const OPTIONS: { value: string; label: string }[] = [
@@ -11,16 +8,20 @@ const OPTIONS: { value: string; label: string }[] = [
 ];
 
 /**
- * Server-friendly sort dropdown. Updates the `sort` query string and
- * resets pagination back to page 1. Works on both /products and
- * /categories/[slug] without any extra wiring.
+ * Sort dropdown. Updates the `sort` query string and resets pagination
+ * to page 1. Works on both /products and /categories/[slug] without
+ * extra wiring.
+ *
+ * Astro+CF port: was using next/navigation's useRouter + useSearchParams.
+ * Since this component runs as a React island in the browser, we can
+ * read URL state straight off window.location and navigate via
+ * window.location.href — no router hook needed.
  */
 export function SortDropdown({ current, basePath }: { current?: string; basePath: string }) {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-
   function onChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const params = new URLSearchParams(searchParams?.toString());
+    const params = new URLSearchParams(
+      typeof window === 'undefined' ? '' : window.location.search,
+    );
     if (e.target.value && e.target.value !== 'newest') {
       params.set('sort', e.target.value);
     } else {
@@ -28,7 +29,7 @@ export function SortDropdown({ current, basePath }: { current?: string; basePath
     }
     params.delete('page');
     const qs = params.toString();
-    router.push(basePath + (qs ? `?${qs}` : ''));
+    window.location.href = basePath + (qs ? `?${qs}` : '');
   }
 
   return (

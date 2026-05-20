@@ -1,5 +1,3 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { Facebook, Instagram, Youtube, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
 
@@ -27,7 +25,7 @@ export function Footer({
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-3">
               {meta.logo_url ? (
-                <Image src={meta.logo_url} alt={meta.name} width={36} height={36} className="h-9 w-9 rounded-lg object-cover" />
+                <img src={meta.logo_url} alt={meta.name} width={36} height={36} className="h-9 w-9 rounded-lg object-cover" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
@@ -128,9 +126,9 @@ function FooterCol({ title, children }: { title: string; children: React.ReactNo
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <Link href={href} className="block py-1 text-sm text-emerald-200 hover:text-white transition">
+    <a href={href} className="block py-1 text-sm text-emerald-200 hover:text-white transition">
       {children}
-    </Link>
+    </a>
   );
 }
 

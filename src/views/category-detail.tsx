@@ -1,5 +1,3 @@
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { PackageX } from 'lucide-react';
 import { getCategory, getStorefront, getCategories, type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
@@ -8,6 +6,7 @@ import { MessengerCTA } from '../components/layout/messenger-cta';
 import { ProductGrid } from '../components/product/product-grid';
 import { SortDropdown } from '../components/product/sort-dropdown';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
 
 export async function CategoryDetailPage({
   slug,
@@ -23,7 +22,8 @@ export async function CategoryDetailPage({
   try {
     res = await getCategory(slug, { sort, page });
   } catch {
-    notFound();
+    // notFound() → NotFoundPage render. See product-detail.tsx for rationale.
+    return <NotFoundPage />;
   }
   const [meta, categories] = await Promise.all([getStorefront(), getCategories().catch(() => [])]);
   const { category, products } = res;
@@ -33,9 +33,9 @@ export async function CategoryDetailPage({
       <Header meta={meta} categories={categories} />
       <main className="mx-auto max-w-[1200px] px-4 sm:px-6 py-6 sm:py-10">
         <nav className="text-xs text-slate-500 mb-4">
-          <Link href="/" className="hover:text-brand-600">Home</Link>
+          <a href="/" className="hover:text-brand-600">Home</a>
           <span className="mx-2">/</span>
-          <Link href="/categories" className="hover:text-brand-600">Categories</Link>
+          <a href="/categories" className="hover:text-brand-600">Categories</a>
           <span className="mx-2">/</span>
           <span className="text-slate-700">{category.name}</span>
         </nav>
@@ -60,9 +60,9 @@ export async function CategoryDetailPage({
               We&rsquo;re still adding products to this category.
             </p>
             <div className="mt-5">
-              <Link href="/products">
+              <a href="/products">
                 <Button variant="brand">Browse all products</Button>
-              </Link>
+              </a>
             </div>
           </div>
         ) : (

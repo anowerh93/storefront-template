@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import type { ProductCard } from '../../lib/types';
@@ -93,7 +91,7 @@ export function DealsOfDay({
           </div>
 
           <CountdownTimer />
-        </Link>
+        </a>
 
         {/* Right mini products */}
         <div className="grid grid-rows-3 gap-3">
@@ -112,14 +110,14 @@ function MiniDealCard({ product }: { product: ProductCard }) {
     >
       <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-50 overflow-hidden shrink-0">
         {product.image_url && (
-          <Image src={product.image_url} alt={product.name} fill sizes="80px" className="object-contain p-1" />
+          <img src={product.image_url} alt={product.name} fill sizes="80px" className="object-contain p-1" />
         )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs sm:text-sm font-medium text-slate-900 line-clamp-2 group-hover:text-brand-600">{product.name}</p>
         <p className="text-sm font-bold text-slate-900 mt-1">{formatBDT(product.price)}</p>
       </div>
-    </Link>
+    </a>
   );
 }
 

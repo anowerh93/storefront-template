@@ -1,6 +1,3 @@
-import { notFound } from 'next/navigation';
-import Image from 'next/image';
-import Link from 'next/link';
 import { Star, Truck, ShieldCheck, MessageCircle } from 'lucide-react';
 import { getProduct, getStorefront } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
@@ -13,13 +10,18 @@ import { Badge } from '../components/ui/badge';
 import { Separator } from '../components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import { OrderNowForm } from '../components/product/order-now-form';
+import { NotFoundPage } from './not-found';
 
 export async function ProductDetailPage({ slug }: { slug: string }) {
   let product;
   try {
     product = await getProduct(slug);
   } catch {
-    notFound();
+    // Astro+CF port: was next/navigation's notFound() — Next caught
+    // it and rendered the app's 404 route. Astro has no equivalent
+    // throw-and-catch mechanism, so we self-render the NotFoundPage
+    // component instead. Same UX, no framework magic.
+    return <NotFoundPage />;
   }
   const meta = await getStorefront();
   const isFunnel = !!product.funnel;
@@ -34,9 +36,9 @@ export async function ProductDetailPage({ slug }: { slug: string }) {
         <main className="mx-auto max-w-[1200px] px-4 sm:px-6 pt-6 pb-16">
           {/* Breadcrumb */}
           <nav className="text-xs text-slate-500 mb-4">
-            <Link href="/" className="hover:text-brand-600">Home</Link>
+            <a href="/" className="hover:text-brand-600">Home</a>
             <span className="mx-2">/</span>
-            <Link href="/products" className="hover:text-brand-600">Shop</Link>
+            <a href="/products" className="hover:text-brand-600">Shop</a>
             <span className="mx-2">/</span>
             <span className="text-slate-700">{product.name}</span>
           </nav>
@@ -238,9 +240,9 @@ export async function ProductDetailPage({ slug }: { slug: string }) {
 
           {/* Final CTA */}
           <section className="mx-auto max-w-3xl px-4 sm:px-6 my-14 text-center">
-            <Link href="#top" className="inline-block">
+            <a href="#top" className="inline-block">
               <span className="text-sm font-medium text-brand-600 hover:underline">Order yours now ↑</span>
-            </Link>
+            </a>
           </section>
         </main>
       )}
@@ -263,14 +265,14 @@ function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getPro
     <div className="space-y-3">
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100">
         {urls[0] && (
-          <Image src={urls[0]} alt={product.name} fill priority sizes="(max-width: 1024px) 100vw, 600px" className="object-cover" />
+          <img src={urls[0]} alt={product.name} fill priority sizes="(max-width: 1024px) 100vw, 600px" className="object-cover" />
         )}
       </div>
       {urls.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
           {urls.slice(0, 4).map((src, i) => (
             <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 ring-1 ring-slate-200">
-              <Image src={src} alt={product.name} fill sizes="120px" className="object-cover" />
+              <img src={src} alt={product.name} fill sizes="120px" className="object-cover" />
             </div>
           ))}
         </div>

@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { MessageCircle, ShieldCheck, Truck, HelpCircle } from 'lucide-react';
 import { getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
@@ -57,9 +56,9 @@ export async function OrderLookupPage() {
                 </Button>
               </a>
             )}
-            <Link href="/products">
+            <a href="/products">
               <Button variant="outline" size="sm">Continue shopping</Button>
-            </Link>
+            </a>
           </div>
         </div>
       </main>
