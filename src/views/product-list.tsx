@@ -80,7 +80,7 @@ export async function ProductListPage({
           <div className="mb-5 flex items-center gap-2 flex-wrap text-sm">
             <span className="text-xs text-slate-500 font-medium">Filters:</span>
             {search && (
-              <Link
+              <a
                 href={buildHref({ search: '' })}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-xs font-medium"
               >
@@ -89,7 +89,7 @@ export async function ProductListPage({
               </a>
             )}
             {activeCat && (
-              <Link
+              <a
                 href={buildHref({ category: '' })}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-100 text-brand-700 hover:bg-brand-200 transition text-xs font-medium"
               >
@@ -97,7 +97,7 @@ export async function ProductListPage({
                 <X className="h-3 w-3" />
               </a>
             )}
-            <Link
+            <a
               href="/products"
               className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2 ml-1"
             >
@@ -110,14 +110,14 @@ export async function ProductListPage({
           {/* Categories sidebar (desktop) */}
           <aside className="hidden lg:block space-y-1">
             <p className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3">Categories</p>
-            <Link
+            <a
               href={buildHref({ category: '' })}
               className={`block px-3 py-2 rounded-lg text-sm transition ${!category ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700 hover:bg-slate-100'}`}
             >
               All products
             </a>
             {categories.map((c) => (
-              <Link
+              <a
                 key={c.slug}
                 href={buildHref({ category: c.slug })}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition ${category === c.slug ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700 hover:bg-slate-100'}`}
@@ -132,14 +132,14 @@ export async function ProductListPage({
           <div>
             {/* Mobile category chips */}
             <div className="lg:hidden mb-4 flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
-              <Link
+              <a
                 href={buildHref({ category: '' })}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${!category ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
               >
                 All
               </a>
               {categories.map((c) => (
-                <Link
+                <a
                   key={c.slug}
                   href={buildHref({ category: c.slug })}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${category === c.slug ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
@@ -180,7 +180,7 @@ export async function ProductListPage({
                   .map((p, idx, arr) => (
                     <span key={p} className="contents">
                       {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-slate-400">…</span>}
-                      <Link
+                      <a
                         href={buildHref({ page: p })}
                         className={`px-3 py-2 rounded-lg text-sm font-medium ${p === page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                       >

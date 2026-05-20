@@ -115,7 +115,7 @@ export function Header({
               {catsOpen && categories.length > 0 && (
                 <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-slate-200 rounded-xl shadow-xl py-2 z-40">
                   {categories.map((c) => (
-                    <Link
+                    <a
                       key={c.slug}
                       href={`/categories/${c.slug}`}
                       className="flex items-center justify-between px-4 py-2 hover:bg-slate-50 text-sm text-slate-700"

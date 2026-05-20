@@ -1,114 +1,182 @@
 ---
 /**
- * Homepage — Phase 1 minimal proof.
+ * Homepage — full Astro port of views/home.tsx.
  *
- * Goal of this file in Phase 1: prove the Astro+Cloudflare build pipeline
- * works end-to-end against the Reply.BD storefront API.
- *   ✓ Fetches storefront meta + product list at build time
- *   ✓ Renders into static HTML
- *   ✓ Surfaces brand color, tenant name, product cards
+ * Architecture: Astro page does the API fetches in frontmatter (build-time),
+ * then renders the React component tree. The components themselves were
+ * cleaned of Next.js-specific imports in Phase 2a (next/link → <a>,
+ * next/image → <img>, etc.), so they render fine as Astro React islands.
  *
- * Phase 2 replaces this stub with the full HomePage component ported from
- * `src/views/home.tsx` — 12 home sections (hero, categories, feature_products,
- * promo_row, etc.) plus Header / Footer / MessengerCTA chrome. The component
- * code is already written; Phase 2 just needs to swap `next/link` for `<a>`
- * and `next/image` for `<img>` so the React tree runs as Astro islands.
+ * Interactive bits (Header's mobile menu, DealsOfDay's carousel, the
+ * eventual cart) are marked `client:load` so they hydrate. Everything
+ * else stays as pure server-rendered HTML — gigantic perf win over Vercel
+ * because Bangladesh's mobile clients only pay for the JS they actually
+ * use (the carousel + dropdown, not the entire Next.js runtime).
  */
 import Base from '../layouts/Base.astro';
 import { getStorefront, getProducts, getCategories } from '../lib/api';
+import { Header } from '../components/layout/header';
+import { Footer } from '../components/layout/footer';
+import { MessengerCTA } from '../components/layout/messenger-cta';
+import { HeroGrid } from '../components/home/hero-grid';
+import { CategoryStrip } from '../components/home/category-strip';
+import { ProductRow } from '../components/home/product-row';
+import { PromoRow } from '../components/home/promo-row';
+import { BrandStrip } from '../components/home/brand-strip';
+import { PromoBanner } from '../components/home/promo-banner';
+import { CardPaymentPromo } from '../components/home/card-payment-promo';
+import { DealsOfDay } from '../components/home/deals-of-day';
+import { ServicesRow } from '../components/home/services-row';
+import { TrustBadges } from '../components/home/trust-badges';
+import type { ProductCard, HomepageSectionKey } from '../lib/types';
 
-// Build-time data fetch. If any of these throw, Astro logs the error and
-// bakes a blank page — same graceful-degradation behaviour as the Next.js
-// original. The build no longer hangs at 60s like the old NEXT_PUBLIC trap.
+// Build-time fetch — same shape as views/home.tsx's async function. Three
+// API calls in parallel since the homepage is the most-hit route; we want
+// the fastest possible build.
 const [meta, productsRes, categories] = await Promise.all([
   getStorefront().catch(() => null),
-  getProducts({ perPage: 24 }).catch(() => ({ data: [], meta: null })),
+  getProducts({ perPage: 100 }).catch(() => ({ data: [], meta: null })),
   getCategories().catch(() => []),
 ]);
 
-const products = productsRes.data ?? [];
-const tenantName = meta?.name ?? 'Storefront';
-const tagline = meta?.about ?? '';
+// If the storefront API is completely unreachable, render a minimal
+// placeholder rather than crashing the build. This matches the original
+// Next.js code's behaviour (which logged a warning and rendered blank
+// pages) but logs more loudly so we notice.
+if (!meta) {
+  console.error('[index.astro] getStorefront() returned null — tenant API unreachable. Rendering placeholder.');
+}
+
+const all = productsRes.data ?? [];
+const home = meta?.homepage ?? null;
+const byId = new Map(all.map((p: ProductCard) => [p.id, p]));
+
+const resolve = (ids: number[]): ProductCard[] =>
+  ids.map((id) => byId.get(id)).filter(Boolean) as ProductCard[];
+
+const heroProducts        = home ? resolve(home.hero.product_ids)            : [];
+const featureProducts     = home ? resolve(home.feature_products.product_ids): [];
+const trendingProducts    = home ? resolve(home.trending_products.product_ids): [];
+const mostSellingProducts = home ? resolve(home.most_selling.product_ids)    : [];
+const dealsProducts       = home ? resolve(home.deals_of_day.product_ids)    : [];
+
+const promoRowItems = home
+  ? home.promo_row.cards
+      .map((card: any) => {
+        const p = card.product_id ? byId.get(card.product_id) : null;
+        return p ? { card, product: p } : null;
+      })
+      .filter(Boolean) as { card: any; product: ProductCard }[]
+  : [];
+
+const dealsSpotlight = home?.deals_of_day.spotlight_id
+  ? byId.get(home.deals_of_day.spotlight_id) ?? null
+  : null;
+
+const sectionOrder: HomepageSectionKey[] = home?.section_order?.length
+  ? home.section_order
+  : [
+      'hero', 'categories', 'feature_products', 'promo_row',
+      'trending_products', 'brand_strip', 'promo_banner',
+      'most_selling', 'card_payment_promo', 'deals_of_day',
+      'services_row', 'trust_badges',
+    ];
 ---
 
-<Base>
-  <header class="border-b border-slate-200 bg-white">
-    <div class="mx-auto max-w-7xl px-4 py-4 flex items-center justify-between">
-      <a href="/" class="flex items-center gap-2">
-        {meta?.logo_url && (
-          <img src={meta.logo_url} alt={tenantName} class="h-8 w-8 rounded" />
-        )}
-        <span class="text-lg font-semibold text-slate-900">{tenantName}</span>
-      </a>
-      <nav class="hidden sm:flex items-center gap-6 text-sm text-slate-600">
-        <a href="/products" class="hover:text-slate-900">Products</a>
-        <a href="/categories" class="hover:text-slate-900">Categories</a>
-        <a href="/order/lookup" class="hover:text-slate-900">Track order</a>
-      </nav>
-    </div>
-  </header>
+<Base title={meta?.name} description={meta?.about}>
+  {meta && <Header client:load meta={meta} categories={categories} />}
 
-  <main class="mx-auto max-w-7xl px-4 py-8">
-    {tagline && (
-      <section class="mb-10 text-center">
-        <p class="text-slate-600 max-w-2xl mx-auto">{tagline}</p>
-      </section>
+  <main class="pb-12">
+    {meta && home && sectionOrder.map((key: HomepageSectionKey) => {
+      switch (key) {
+        case 'hero':
+          return home.hero.visible && heroProducts.length > 0
+            ? <HeroGrid featured={heroProducts} eyebrow={home.hero.eyebrow} />
+            : null;
+        case 'categories':
+          return home.categories.visible
+            ? <CategoryStrip categories={categories} title={home.categories.title} />
+            : null;
+        case 'feature_products':
+          return home.feature_products.visible && featureProducts.length > 0
+            ? <ProductRow
+                title={home.feature_products.title}
+                subtitle={home.feature_products.subtitle}
+                products={featureProducts}
+                cols={5}
+              />
+            : null;
+        case 'promo_row':
+          return home.promo_row.visible && promoRowItems.length === 3
+            ? <PromoRow
+                products={promoRowItems.map((x) => x.product)}
+                cards={promoRowItems.map((x) => x.card)}
+              />
+            : null;
+        case 'trending_products':
+          return home.trending_products.visible && trendingProducts.length > 0
+            ? <ProductRow
+                title={home.trending_products.title}
+                subtitle={home.trending_products.subtitle}
+                products={trendingProducts}
+                cols={5}
+              />
+            : null;
+        case 'brand_strip':
+          return home.brand_strip.visible
+            ? <BrandStrip items={home.brand_strip.items} />
+            : null;
+        case 'promo_banner':
+          return home.promo_banner.visible
+            ? <PromoBanner config={home.promo_banner} />
+            : null;
+        case 'most_selling':
+          return home.most_selling.visible && mostSellingProducts.length > 0
+            ? <ProductRow
+                title={home.most_selling.title}
+                subtitle={home.most_selling.subtitle}
+                products={mostSellingProducts}
+                cols={5}
+              />
+            : null;
+        case 'card_payment_promo':
+          return home.card_payment_promo.visible
+            ? <CardPaymentPromo config={home.card_payment_promo} />
+            : null;
+        case 'deals_of_day':
+          return home.deals_of_day.visible && (dealsSpotlight || dealsProducts.length > 0)
+            ? <DealsOfDay
+                client:visible
+                products={dealsProducts}
+                spotlight={dealsSpotlight}
+                title={home.deals_of_day.title}
+              />
+            : null;
+        case 'services_row':
+          return home.services_row.visible
+            ? <ServicesRow items={home.services_row.items} />
+            : null;
+        case 'trust_badges':
+          return home.trust_badges.visible
+            ? <TrustBadges items={home.trust_badges.items} />
+            : null;
+        default:
+          return null;
+      }
+    })}
+
+    {/* Fallback when the API is unreachable or returned no homepage config */}
+    {!meta && (
+      <div class="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Storefront unavailable</h1>
+        <p class="mt-2 text-sm text-slate-500">
+          We couldn't reach the storefront API while building this page.
+          Try again in a minute, or contact the shop owner.
+        </p>
+      </div>
     )}
-
-    {categories.length > 0 && (
-      <section class="mb-10">
-        <h2 class="text-lg font-semibold text-slate-900 mb-3">Shop by category</h2>
-        <div class="flex flex-wrap gap-2">
-          {categories.map((c) => (
-            <a
-              href={`/categories/${c.slug}`}
-              class="rounded-full border border-slate-300 px-3 py-1 text-sm text-slate-700 hover:border-brand-500 hover:text-brand-600"
-            >
-              {c.name}
-            </a>
-          ))}
-        </div>
-      </section>
-    )}
-
-    <section>
-      <h2 class="text-lg font-semibold text-slate-900 mb-4">Latest products</h2>
-
-      {products.length === 0 ? (
-        <p class="text-slate-500">No products yet — check back soon.</p>
-      ) : (
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-          {products.map((p) => (
-            <a
-              href={`/products/${p.slug}`}
-              class="group block rounded-lg border border-slate-200 bg-white overflow-hidden hover:border-brand-300 hover:shadow-md transition"
-            >
-              {p.image_url ? (
-                <img
-                  src={p.image_url}
-                  alt={p.name}
-                  loading="lazy"
-                  class="aspect-square w-full object-cover group-hover:scale-[1.02] transition"
-                />
-              ) : (
-                <div class="aspect-square w-full bg-slate-100" />
-              )}
-              <div class="p-3">
-                <h3 class="text-sm font-medium text-slate-900 line-clamp-2">{p.name}</h3>
-                <p class="mt-1 text-sm font-semibold text-brand-600">
-                  ৳{p.price}
-                </p>
-              </div>
-            </a>
-          ))}
-        </div>
-      )}
-    </section>
   </main>
 
-  <footer class="border-t border-slate-200 bg-slate-50 mt-12">
-    <div class="mx-auto max-w-7xl px-4 py-6 text-sm text-slate-500 text-center">
-      © {new Date().getFullYear()} {tenantName}. Powered by Reply.BD.
-    </div>
-  </footer>
+  {meta && <Footer meta={meta} categories={categories} />}
+  {meta?.messenger?.url && <MessengerCTA client:visible href={meta.messenger.url} />}
 </Base>

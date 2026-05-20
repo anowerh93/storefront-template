@@ -47,7 +47,7 @@ export function CategoryStrip({
           const Icon = ICON_MAP[c.slug.toLowerCase()] ?? Package;
           const tileCls = TILE_COLORS[i % TILE_COLORS.length];
           return (
-            <Link
+            <a
               key={c.slug}
               href={`/categories/${c.slug}`}
               className={`group flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br ${tileCls} aspect-square p-3 hover:shadow-md hover:-translate-y-0.5 transition`}

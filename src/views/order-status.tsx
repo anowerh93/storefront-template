@@ -1,5 +1,6 @@
-import { CheckCircle2, Package, Truck, MessageCircle } from 'lucide-react';
-import { lookupOrder, getStorefront } from '../lib/api';
+import { useEffect, useState } from 'react';
+import { CheckCircle2, Package, Truck, MessageCircle, Loader2 } from 'lucide-react';
+import { lookupOrder } from '../lib/api';
 import { formatBDT, relativeTime } from '../lib/format';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -9,6 +10,7 @@ import { Button } from '../components/ui/button';
 import { Separator } from '../components/ui/separator';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { NotFoundPage } from './not-found';
+import type { OrderResponse, StorefrontMeta } from '../lib/types';
 
 const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'brand' }> = {
   pending:   { label: 'Order received',  variant: 'brand' },
@@ -19,17 +21,45 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'succe
   cancelled: { label: 'Cancelled',       variant: 'default' },
 };
 
-export async function OrderStatusPage({
+/**
+ * Astro+CF port: previously did its own `await getStorefront()` +
+ * `await lookupOrder()`. Storefront meta now comes from the Astro page
+ * as a prop. Order is looked up CLIENT-SIDE via fetch since the order
+ * lookup is per-customer and shouldn't be cached at the CF edge — moving
+ * it to the client also lets us show a loading state while the request
+ * runs, and avoids the "order placed but page 404s because lookup race"
+ * window right after submit.
+ */
+export function OrderStatusPage({
   orderNumber,
-  searchParams,
+  phone,
+  placed,
+  meta,
 }: {
   orderNumber: string;
-  searchParams?: { phone?: string; placed?: string };
+  phone?: string;
+  placed?: boolean;
+  meta: StorefrontMeta | null;
 }) {
-  const meta = await getStorefront();
+  const [order, setOrder] = useState<OrderResponse | null>(null);
+  const [loading, setLoading] = useState<boolean>(Boolean(phone));
+  const [notFound, setNotFound] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!phone) return;
+    let cancelled = false;
+    setLoading(true);
+    lookupOrder(orderNumber, phone)
+      .then((res) => { if (!cancelled) setOrder(res); })
+      .catch(() => { if (!cancelled) setNotFound(true); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, [orderNumber, phone]);
+
+  if (!meta) return <NotFoundPage />;
 
   // No phone → render the lookup form (the customer needs to verify identity).
-  if (!searchParams?.phone) {
+  if (!phone) {
     return (
       <>
         <Header meta={meta} />
@@ -43,13 +73,25 @@ export async function OrderStatusPage({
     );
   }
 
-  let order;
-  try {
-    order = await lookupOrder(orderNumber, searchParams.phone);
-  } catch {
-    // notFound() → NotFoundPage render. See product-detail.tsx for rationale.
+  if (loading) {
+    return (
+      <>
+        <Header meta={meta} />
+        <main className="mx-auto max-w-md px-4 sm:px-6 py-20 text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-400" />
+          <p className="mt-4 text-sm text-slate-500">Looking up your order…</p>
+        </main>
+        <Footer meta={meta} />
+      </>
+    );
+  }
+
+  if (notFound || !order) {
     return <NotFoundPage />;
   }
+
+  // Below this point: original render path with `order` available.
+  const searchParams = { placed: placed ? '1' : undefined };
 
   const justPlaced = searchParams.placed === '1';
   const statusInfo = STATUS_LABELS[order.status] ?? { label: order.status, variant: 'default' as const };

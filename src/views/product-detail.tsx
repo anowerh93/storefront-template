@@ -1,5 +1,4 @@
 import { Star, Truck, ShieldCheck, MessageCircle } from 'lucide-react';
-import { getProduct, getStorefront } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -11,19 +10,34 @@ import { Separator } from '../components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import { OrderNowForm } from '../components/product/order-now-form';
 import { NotFoundPage } from './not-found';
+import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
-export async function ProductDetailPage({ slug }: { slug: string }) {
-  let product;
-  try {
-    product = await getProduct(slug);
-  } catch {
-    // Astro+CF port: was next/navigation's notFound() — Next caught
-    // it and rendered the app's 404 route. Astro has no equivalent
-    // throw-and-catch mechanism, so we self-render the NotFoundPage
-    // component instead. Same UX, no framework magic.
-    return <NotFoundPage />;
-  }
-  const meta = await getStorefront();
+/**
+ * Product detail page. The OrderNowForm inside this tree is what places
+ * the order — that's why ProductDetailPage hydrates as a client:load
+ * React island. The whole tree (Header + content + Footer) hydrates so
+ * the form's React state, validation, and submit flow have everything
+ * they need; that's a bigger JS bundle than strictly necessary but
+ * matches what the old Next.js version was shipping anyway.
+ *
+ * Astro+CF port: previously this was a Next.js Server Component that did
+ * its own `await getProduct(slug)`. Astro renders client islands as
+ * sync React components, so the fetch moved up into the Astro page
+ * frontmatter (src/pages/products/[slug].astro) which passes results in
+ * as props. NotFoundPage rendering is still self-contained — when the
+ * Astro page can't find the product it passes `product={null}` and we
+ * render the 404 view in-place.
+ */
+export function ProductDetailPage({
+  product,
+  meta,
+}: {
+  product: ProductDetail | null;
+  meta: StorefrontMeta | null;
+}) {
+  // Either fetch failed (product) or storefront meta missing → 404 page.
+  if (!product || !meta) return <NotFoundPage />;
+
   const isFunnel = !!product.funnel;
   const discount = discountPct(product.price, product.compare_at_price);
 
@@ -177,7 +191,7 @@ export async function ProductDetailPage({ slug }: { slug: string }) {
           <section className="mx-auto max-w-3xl px-4 sm:px-6 -mt-2">
             <div className="relative aspect-square sm:aspect-[5/4] rounded-3xl overflow-hidden bg-slate-100 shadow-xl">
               {(product.gallery_urls?.[0] ?? product.image_url) && (
-                <Image
+                <img
                   src={(product.gallery_urls?.[0] ?? product.image_url) as string}
                   alt={product.name}
                   fill

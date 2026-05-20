@@ -7,14 +7,14 @@ export function ProductCard({ product }: { product: ProductCardType }) {
   const discount = discountPct(product.price, product.compare_at_price);
 
   return (
-    <Link
+    <a
       href={`/products/${product.slug}`}
       className="group block rounded-2xl bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-md transition overflow-hidden"
     >
       {/* Image */}
       <div className="relative aspect-square bg-slate-100 overflow-hidden">
         {product.image_url ? (
-          <Image
+          <img
             src={product.image_url}
             alt={product.name}
             fill

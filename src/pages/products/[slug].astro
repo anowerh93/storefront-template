@@ -1,0 +1,53 @@
+---
+/**
+ * Product detail page — the order funnel entry point.
+ *
+ * Customers land here after clicking a product card. The OrderNowForm
+ * inside submits straight to /api/v1/storefronts/{slug}/orders. No
+ * separate cart page.
+ *
+ * Render mode: SSR on CF Workers (prerender:false). Pre-rendering each
+ * PDP at build time would mean rebuilding the whole storefront every
+ * time a product is added — cheaper for v1 to let CF Workers fetch on
+ * first request and CDN-cache it. Trade-off: ~150ms slower first paint
+ * on each unique URL, basically free thereafter.
+ *
+ * Fetch is in Astro frontmatter (server-side) so we pass the product
+ * data to the React component as a prop. The view itself was refactored
+ * from async-fetching to prop-receiving so it could be client:load'd —
+ * client islands have to be sync.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getProduct, getStorefront } from '../../lib/api';
+import { ProductDetailPage } from '../../views/product-detail';
+import type { ProductDetail, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+let product: ProductDetail | null = null;
+let meta: StorefrontMeta | null = null;
+
+// Two independent fetches — if the product 404s we still want meta for
+// the layout/branding on the rendered NotFoundPage.
+try {
+  product = await getProduct(slug);
+} catch (err) {
+  console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
+}
+
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[products/[slug].astro] getStorefront() failed:', err);
+}
+---
+
+<Base
+  title={product?.name}
+  description={product?.short_description ?? product?.name}
+  ogImage={product?.image_url ?? undefined}
+>
+  <ProductDetailPage client:load product={product} meta={meta} />
+</Base>

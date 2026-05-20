@@ -20,7 +20,7 @@ export function PromoBanner({ config }: { config: HomepageConfig['promo_banner']
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-10">
-      <Link
+      <a
         href={config.button_url}
         className={`group flex items-center justify-between gap-6 p-5 sm:p-7 rounded-2xl bg-gradient-to-r ${grad} text-white overflow-hidden relative`}
       >

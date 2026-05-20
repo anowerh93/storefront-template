@@ -23,7 +23,7 @@ export function PromoRow({
           const card = cards[i] ?? cards[0];
           const tone = TONE_MAP[card.tone] ?? TONE_MAP.rose;
           return (
-            <Link
+            <a
               key={p.id}
               href={`/products/${p.slug}`}
               className={`group relative overflow-hidden rounded-2xl ${tone.bg} p-5 sm:p-6 min-h-[200px] flex`}
@@ -40,7 +40,7 @@ export function PromoRow({
                 </span>
               </div>
               {p.image_url && (
-                <Image
+                <img
                   src={p.image_url}
                   alt={p.name}
                   fill

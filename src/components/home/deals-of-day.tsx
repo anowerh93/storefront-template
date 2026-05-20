@@ -49,13 +49,13 @@ export function DealsOfDay({
         </div>
 
         {/* Featured */}
-        <Link
+        <a
           href={`/products/${featured.slug}`}
           className="group bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-lg rounded-2xl p-5 sm:p-6 transition flex flex-col"
         >
           <div className="relative aspect-[4/3] rounded-xl bg-slate-50 overflow-hidden mb-4">
             {featured.image_url && (
-              <Image
+              <img
                 src={featured.image_url}
                 alt={featured.name}
                 fill
@@ -104,7 +104,7 @@ export function DealsOfDay({
 
 function MiniDealCard({ product }: { product: ProductCard }) {
   return (
-    <Link
+    <a
       href={`/products/${product.slug}`}
       className="group flex gap-3 items-center p-3 rounded-xl bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-sm transition"
     >

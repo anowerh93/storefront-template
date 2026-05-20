@@ -35,7 +35,7 @@ export async function CategoryListPage() {
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
             {categories.map((c) => (
-              <Link
+              <a
                 key={c.slug}
                 href={`/categories/${c.slug}`}
                 className="group relative rounded-2xl bg-gradient-to-br from-brand-50 via-white to-brand-100/50 ring-1 ring-brand-100 hover:ring-brand-300 hover:shadow-lg transition p-5 overflow-hidden"

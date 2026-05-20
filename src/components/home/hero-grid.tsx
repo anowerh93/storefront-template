@@ -23,7 +23,7 @@ export function HeroGrid({
       <div className="grid lg:grid-cols-[2fr_1fr] gap-4 lg:gap-5">
         {/* Big card */}
         {big ? (
-          <Link
+          <a
             href={`/products/${big.slug}`}
             className="group relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-600 to-emerald-700 text-white p-6 sm:p-10 min-h-[280px] sm:min-h-[400px] flex"
           >
@@ -49,7 +49,7 @@ export function HeroGrid({
               </div>
             </div>
             {big.image_url && (
-              <Image
+              <img
                 src={big.image_url}
                 alt={big.name}
                 fill
@@ -107,7 +107,7 @@ function SmallCard({
   }[variant];
 
   return (
-    <Link
+    <a
       href={`/products/${product.slug}`}
       className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cls} p-5 min-h-[140px] flex`}
     >
@@ -124,7 +124,7 @@ function SmallCard({
         )}
       </div>
       {product.image_url && (
-        <Image
+        <img
           src={product.image_url}
           alt={product.name}
           fill
