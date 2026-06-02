@@ -3,28 +3,20 @@ import type { ProductCard } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 
 /**
- * Hero — a big promotional banner on the left + two vivid product tiles
- * stacked on the right (inspired by the Shopwise-style storefront hero).
+ * Hero — full-bleed promo banner on the left + two full-bleed product tiles
+ * stacked on the right, matching the Shopwise-style reference.
  *
- * Product-driven: the banner + tiles use the tenant's featured products
- * (image, name, price, discount), so it auto-fills with no manual banner
- * uploads. Falls back to a clean placeholder when there are no featured
- * products yet.
- *
- * Key visual upgrades over the old version:
- *  - Full-colour product images (dropped the mix-blend-luminosity that
- *    washed them out into the panel colour).
- *  - "Get N% Off" eyebrow auto-computed from compare-at price.
- *  - Two CTAs (Shop Now + Browse all), like the reference.
- *  - Brand-coloured big banner (uses the tenant's --color-brand-*), vivid
- *    amber/sky tiles on the right.
+ * Every panel uses a FULL-CONTAINER image (object-cover, absolute inset-0)
+ * with a gradient scrim so the overlaid text stays readable — no contained/
+ * letterboxed images, no empty colour boxes. Product-driven (featured
+ * product_ids), so it auto-fills; real product photos (or the demo's stock
+ * photos) fill the frame edge-to-edge.
  */
 export function HeroGrid({
   featured,
   eyebrow,
 }: {
   featured: ProductCard[];
-  /** Tenant-customizable text above the hero headline (fallback when no discount). */
   eyebrow?: string;
 }) {
   const big = featured[0];
@@ -32,14 +24,12 @@ export function HeroGrid({
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-5">
-      <div className="grid lg:grid-cols-[2fr_1fr] gap-4 lg:gap-5">
-        {/* ── Big banner ── */}
-        {big ? <BigBanner product={big} eyebrow={eyebrow} /> : <BigPlaceholder />}
+      <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5">
+        {big ? <BigBanner product={big} eyebrow={eyebrow} /> : <BannerPlaceholder />}
 
-        {/* ── Two stacked tiles ── */}
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
-          {tiles[0] ? <PromoTile product={tiles[0]} tone="amber" /> : <TilePlaceholder tone="amber" />}
-          {tiles[1] ? <PromoTile product={tiles[1]} tone="sky" /> : <TilePlaceholder tone="sky" />}
+          {tiles[0] ? <Tile product={tiles[0]} /> : <TilePlaceholder />}
+          {tiles[1] ? <Tile product={tiles[1]} /> : <TilePlaceholder />}
         </div>
       </div>
     </section>
@@ -51,12 +41,27 @@ function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: strin
   const badge = off ? `Get ${off}% Off` : (eyebrow || 'Featured');
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white min-h-[320px] sm:min-h-[440px]">
-      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[62%] sm:max-w-[55%]">
-        <span className="inline-block w-fit text-[11px] uppercase tracking-wider font-bold bg-white/20 backdrop-blur px-3 py-1 rounded-full">
+    <a
+      href={`/products/${product.slug}`}
+      className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-brand-700"
+    >
+      {/* Full-container image */}
+      {product.image_url && (
+        <img
+          src={product.image_url}
+          alt={product.name}
+          loading="eager"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      )}
+      {/* Scrim: opaque brand on the left for text → clear on the right for the photo */}
+      <div className="absolute inset-0 bg-gradient-to-r from-brand-900/95 via-brand-800/70 to-brand-900/10" />
+
+      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[78%] sm:max-w-[58%] text-white">
+        <span className="inline-block w-fit text-[11px] sm:text-xs uppercase tracking-wider font-bold bg-white/20 backdrop-blur px-3 py-1 rounded-full">
           {badge}
         </span>
-        <h1 className="mt-4 text-2xl sm:text-4xl lg:text-5xl font-extrabold leading-tight">
+        <h1 className="mt-4 text-2xl sm:text-4xl lg:text-5xl font-extrabold leading-[1.1] drop-shadow-sm">
           {product.name}
         </h1>
         <div className="mt-4 flex items-baseline gap-2">
@@ -66,79 +71,65 @@ function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: strin
           )}
         </div>
         <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
-          <a
-            href={`/products/${product.slug}`}
-            className="inline-flex items-center gap-2 bg-white text-slate-900 hover:bg-slate-100 transition font-bold text-sm px-5 py-2.5 rounded-full"
-          >
+          <span className="inline-flex items-center gap-2 bg-white text-slate-900 font-bold text-sm px-5 py-2.5 rounded-full group-hover:bg-amber-300 transition">
             Shop Now <ArrowRight className="h-3.5 w-3.5" />
-          </a>
-          <a
-            href="/products"
-            className="inline-flex items-center font-semibold text-sm px-5 py-2.5 rounded-full ring-1 ring-white/40 hover:bg-white/10 transition"
-          >
-            Browse all
-          </a>
+          </span>
+          <span className="inline-flex items-center font-semibold text-sm px-5 py-2.5 rounded-full ring-1 ring-white/50 hover:bg-white/10 transition">
+            View all
+          </span>
         </div>
-        {/* Decorative slider dots — matches the reference look. */}
         <div className="mt-6 hidden sm:flex items-center gap-1.5">
           <span className="h-2 w-6 rounded-full bg-white/90" />
           <span className="h-2 w-2 rounded-full bg-white/40" />
           <span className="h-2 w-2 rounded-full bg-white/40" />
         </div>
       </div>
-
-      {product.image_url && (
-        // object-CONTAIN, not cover: product images are square (and demo
-        // placeholders are labelled cards) — cover would slice them. Contain
-        // shows the whole image, full colour, floating on the brand panel.
-        <img
-          src={product.image_url}
-          alt={product.name}
-          loading="eager"
-          className="pointer-events-none absolute right-0 top-0 h-full w-[42%] sm:w-[46%] object-contain object-center p-4 sm:p-6"
-        />
-      )}
-    </div>
+    </a>
   );
 }
 
-function PromoTile({ product, tone }: { product: ProductCard; tone: 'amber' | 'sky' }) {
-  const cls = {
-    amber: 'from-orange-500 to-amber-500',
-    sky:   'from-sky-500 to-indigo-600',
-  }[tone];
-
+function Tile({ product }: { product: ProductCard }) {
+  const off = discountPct(product.price, product.compare_at_price ?? null);
   return (
     <a
       href={`/products/${product.slug}`}
-      className={`group relative overflow-hidden rounded-2xl bg-gradient-to-br ${cls} text-white min-h-[150px] sm:min-h-[170px] lg:min-h-[210px] flex`}
+      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
     >
-      <div className="relative z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[60%]">
-        <h3 className="font-bold leading-tight text-sm sm:text-base line-clamp-2">{product.name}</h3>
-        <p className="mt-1 text-base sm:text-lg font-extrabold">{formatBDT(product.price)}</p>
-        <span className="mt-2 inline-flex w-fit items-center gap-1 text-[11px] font-semibold bg-white/20 backdrop-blur px-2.5 py-1 rounded-full">
-          Shop now <ArrowRight className="h-3 w-3" />
-        </span>
-      </div>
       {product.image_url && (
         <img
           src={product.image_url}
           alt={product.name}
           loading="lazy"
-          className="pointer-events-none absolute right-0 top-0 h-full w-[40%] object-contain object-center p-2.5 group-hover:scale-105 transition-transform duration-500"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       )}
+      {/* Bottom-up scrim so the title/price read over any photo */}
+      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+
+      {off && (
+        <span className="absolute top-2.5 left-2.5 z-10 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+          -{off}%
+        </span>
+      )}
+
+      <div className="absolute inset-x-0 bottom-0 z-10 p-3.5 sm:p-4 text-white">
+        <h3 className="font-bold leading-tight text-sm sm:text-base line-clamp-2 drop-shadow">{product.name}</h3>
+        <div className="mt-1 flex items-center justify-between">
+          <p className="text-base sm:text-lg font-extrabold drop-shadow">{formatBDT(product.price)}</p>
+          <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-white/25 backdrop-blur px-2.5 py-1 rounded-full">
+            Shop <ArrowRight className="h-3 w-3" />
+          </span>
+        </div>
+      </div>
     </a>
   );
 }
 
-function BigPlaceholder() {
+function BannerPlaceholder() {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white p-6 sm:p-10 min-h-[320px] sm:min-h-[440px] flex items-center">
+    <div className="rounded-2xl bg-gradient-to-br from-brand-500 to-brand-700 text-white p-6 sm:p-10 min-h-[300px] sm:min-h-[420px] flex items-center">
       <div className="max-w-sm">
-        <span className="inline-block text-[11px] uppercase tracking-wider font-bold bg-white/20 backdrop-blur px-3 py-1 rounded-full">
-          Welcome
-        </span>
+        <span className="inline-block text-[11px] uppercase tracking-wider font-bold bg-white/20 backdrop-blur px-3 py-1 rounded-full">Welcome</span>
         <h1 className="mt-4 text-3xl sm:text-5xl font-extrabold leading-tight">Add your first product</h1>
         <p className="mt-3 text-sm text-white/80">Featured products appear here once you add them in the dashboard.</p>
         <a href="/products" className="mt-5 inline-flex items-center gap-2 bg-white text-slate-900 font-bold text-sm px-5 py-2.5 rounded-full">
@@ -149,10 +140,9 @@ function BigPlaceholder() {
   );
 }
 
-function TilePlaceholder({ tone }: { tone: 'amber' | 'sky' }) {
-  const cls = { amber: 'from-orange-500 to-amber-500', sky: 'from-sky-500 to-indigo-600' }[tone];
+function TilePlaceholder() {
   return (
-    <div className={`rounded-2xl bg-gradient-to-br ${cls} min-h-[150px] sm:min-h-[170px] lg:min-h-[210px] flex items-center justify-center text-white/70 text-sm p-4 text-center`}>
+    <div className="rounded-2xl bg-gradient-to-br from-slate-300 to-slate-400 min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] flex items-center justify-center text-white/80 text-sm p-4 text-center">
       Featured slot
     </div>
   );
