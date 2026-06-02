@@ -33,7 +33,10 @@ export function Footer({
                   {meta.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="font-bold text-white text-lg">{meta.name}</span>
+              {/* Name text only when no logo — see header.tsx note. */}
+              {!meta.logo_url && (
+                <span className="font-bold text-white text-lg">{meta.name}</span>
+              )}
             </div>
             {meta.about && (
               <p className="text-sm text-emerald-200 leading-relaxed mb-4 max-w-xs">{meta.about}</p>

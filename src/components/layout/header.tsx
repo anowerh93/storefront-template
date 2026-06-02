@@ -44,9 +44,14 @@ export function Header({
                   {meta.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="font-bold text-slate-900 text-lg sm:text-xl tracking-tight hidden sm:inline">
-                {meta.name}
-              </span>
+              {/* Show the shop-name text ONLY when there's no logo. A logo
+                  is usually a wordmark that already includes the name, so
+                  rendering both produced redundant "[logo] Anower". */}
+              {!meta.logo_url && (
+                <span className="font-bold text-slate-900 text-lg sm:text-xl tracking-tight hidden sm:inline">
+                  {meta.name}
+                </span>
+              )}
             </a>
 
             {/* Location pill — desktop only */}
