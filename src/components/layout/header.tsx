@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { ChevronDown, Heart, MapPin, Menu, Search, User, X } from 'lucide-react';
+import { ChevronDown, MapPin, Menu, Search, User, X } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
 import { Button } from '../ui/button';
 
@@ -59,9 +59,13 @@ export function Header({
             {/* Search bar — flex-1 hero */}
             <form action="/products" method="get" className="flex-1 max-w-2xl">
               <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
-                <select className="bg-amber-300 text-slate-900 text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
-                  <option>All Categories</option>
-                  {categories.map((c) => <option key={c.slug}>{c.name}</option>)}
+                {/* name="category" + option values so the dropdown actually
+                    filters — it submits ?category=<slug> to /products, which
+                    the product-list page reads. Was decorative before (no
+                    name attr, no option values → selecting did nothing). */}
+                <select name="category" className="bg-amber-300 text-slate-900 text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
+                  <option value="">All Categories</option>
+                  {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
                 </select>
                 <input
                   type="search"
@@ -75,19 +79,24 @@ export function Header({
               </div>
             </form>
 
-            {/* Right cluster: account, wishlist, mobile menu */}
+            {/* Right cluster: track order, mobile menu.
+                NOTE: these used to be dead <button>s copied from the
+                reference design. "Track My Order" now links to the real
+                order-lookup page. The "Wishlist" button was removed — this
+                storefront has no wishlist (or cart) feature; the funnel is
+                direct-order on the PDP, so a wishlist button was pure dead
+                UI. Add it back only if/when a wishlist feature ships. */}
             <div className="flex items-center gap-1 shrink-0">
-              <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm">
+              <a
+                href="/order/lookup"
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
+              >
                 <User className="h-5 w-5 text-slate-600" />
                 <div className="text-left hidden xl:block">
                   <div className="text-[10px] text-slate-500 leading-none">Track</div>
                   <div className="text-xs font-semibold text-slate-900">My Order</div>
                 </div>
-              </button>
-              <button className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm">
-                <Heart className="h-5 w-5 text-slate-600" />
-                <span className="text-xs font-semibold text-slate-900 hidden xl:inline">Wishlist</span>
-              </button>
+              </a>
 
               <button
                 onClick={() => setMobileOpen((v) => !v)}
