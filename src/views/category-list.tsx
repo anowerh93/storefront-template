@@ -1,12 +1,23 @@
 import { FolderOpen, ArrowRight } from 'lucide-react';
-import { getCategories, getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
+import type { Category, StorefrontMeta } from '../lib/types';
 
-export async function CategoryListPage() {
-  const [meta, categories] = await Promise.all([getStorefront(), getCategories()]);
+// Astro+CF port: meta + categories now arrive as props (fetched in the
+// Astro page frontmatter) instead of an internal await. Pure presentational
+// component — no interactivity, so the Astro page can render it without
+// hydration (static HTML).
+export function CategoryListPage({
+  meta,
+  categories,
+}: {
+  meta: StorefrontMeta | null;
+  categories: Category[];
+}) {
+  if (!meta) return <NotFoundPage />;
 
   return (
     <>

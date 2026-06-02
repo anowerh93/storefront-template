@@ -1,0 +1,49 @@
+---
+/**
+ * Category detail — products within one category, with sort + pagination.
+ *
+ * SSR on CF Workers (prerender:false): the slug is dynamic and ?sort /
+ * ?page come off the URL. A failed/missing category passes res=null and
+ * the view renders its 404 in-place. Hydrated as an island for SortDropdown.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getCategory, getStorefront, getCategories, type ProductSort } from '../../lib/api';
+import { CategoryDetailPage } from '../../views/category-detail';
+import type { StorefrontMeta, Category, Paginated, ProductCard } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+const sp   = Astro.url.searchParams;
+const sort = (sp.get('sort') ?? 'newest') as ProductSort;
+const page = parseInt(sp.get('page') ?? '1', 10);
+
+let res: { category: Category; products: Paginated<ProductCard> } | null = null;
+let meta: StorefrontMeta | null = null;
+let categories: Category[] = [];
+
+try {
+  res = await getCategory(slug, { sort, page });
+} catch (err) {
+  console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
+}
+
+try {
+  [meta, categories] = await Promise.all([
+    getStorefront(),
+    getCategories().catch(() => []),
+  ]);
+} catch (err) {
+  console.warn('[categories/[slug].astro] getStorefront() failed:', err);
+}
+---
+
+<Base title={res?.category?.name ?? 'Category'}>
+  <CategoryDetailPage
+    client:load
+    searchParams={{ sort, page: String(page) }}
+    res={res}
+    meta={meta}
+    categories={categories}
+  />
+</Base>

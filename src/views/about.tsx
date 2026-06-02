@@ -1,11 +1,14 @@
-import { getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
+import type { StorefrontMeta } from '../lib/types';
 
-export async function AboutPage() {
-  const meta = await getStorefront();
+// Astro+CF port: meta arrives as a prop (fetched in src/pages/about.astro).
+// Pure content page, no interactivity → rendered as static HTML.
+export function AboutPage({ meta }: { meta: StorefrontMeta | null }) {
+  if (!meta) return <NotFoundPage />;
   return (
     <>
       <Header meta={meta} />

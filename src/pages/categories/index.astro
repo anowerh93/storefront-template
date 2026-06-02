@@ -1,0 +1,28 @@
+---
+/**
+ * Category index (footer/header "Categories" link). Pure presentational —
+ * no query params, no interactivity — so it's prerendered to static HTML
+ * at build time (Astro default). The category list is fetched per-tenant
+ * at build; a content change triggers a full rebuild (RevalidateStorefrontJob).
+ */
+import Base from '../../layouts/Base.astro';
+import { getStorefront, getCategories } from '../../lib/api';
+import { CategoryListPage } from '../../views/category-list';
+import type { StorefrontMeta, Category } from '../../lib/types';
+
+let meta: StorefrontMeta | null = null;
+let categories: Category[] = [];
+
+try {
+  [meta, categories] = await Promise.all([
+    getStorefront(),
+    getCategories().catch(() => []),
+  ]);
+} catch (err) {
+  console.warn('[categories/index.astro] fetch failed:', err);
+}
+---
+
+<Base title="Categories">
+  <CategoryListPage meta={meta} categories={categories} />
+</Base>

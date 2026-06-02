@@ -1,5 +1,5 @@
 import { Search, X, PackageX } from 'lucide-react';
-import { getProducts, getStorefront, getCategories, type ProductSort } from '../lib/api';
+import { type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -7,22 +7,34 @@ import { ProductGrid } from '../components/product/product-grid';
 import { SortDropdown } from '../components/product/sort-dropdown';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
+import type { Category, Paginated, ProductCard, StorefrontMeta } from '../lib/types';
 
-export async function ProductListPage({
+/**
+ * Astro+CF port: was an async server component that fetched meta +
+ * products + categories itself. The fetch now happens in the Astro page
+ * frontmatter (src/pages/products/index.astro) and results arrive as
+ * props, so this can render as a sync client island (SortDropdown needs
+ * hydration). All filter/pagination links are plain <a> + a native GET
+ * <form> — those work without JS; only SortDropdown's onChange needs it.
+ */
+export function ProductListPage({
   searchParams,
+  meta,
+  productsRes,
+  categories,
 }: {
   searchParams?: { search?: string; category?: string; page?: string; sort?: string };
+  meta: StorefrontMeta | null;
+  productsRes: Paginated<ProductCard>;
+  categories: Category[];
 }) {
+  if (!meta) return <NotFoundPage />;
+
   const page     = parseInt(searchParams?.page ?? '1', 10);
   const search   = searchParams?.search ?? '';
   const category = searchParams?.category ?? '';
   const sort     = (searchParams?.sort ?? 'newest') as ProductSort;
-
-  const [meta, productsRes, categories] = await Promise.all([
-    getStorefront(),
-    getProducts({ page, perPage: 24, search, category, sort }),
-    getCategories().catch(() => []),
-  ]);
 
   const total       = productsRes.meta.total;
   const lastPage    = productsRes.meta.last_page;

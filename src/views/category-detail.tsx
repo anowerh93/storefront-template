@@ -1,5 +1,5 @@
 import { PackageX } from 'lucide-react';
-import { getCategory, getStorefront, getCategories, type ProductSort } from '../lib/api';
+import { type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -7,25 +7,29 @@ import { ProductGrid } from '../components/product/product-grid';
 import { SortDropdown } from '../components/product/sort-dropdown';
 import { Button } from '../components/ui/button';
 import { NotFoundPage } from './not-found';
+import type { Category, Paginated, ProductCard, StorefrontMeta } from '../lib/types';
 
-export async function CategoryDetailPage({
-  slug,
+/**
+ * Astro+CF port: was async (fetched category+products+meta). The Astro page
+ * (src/pages/categories/[slug].astro) does the fetch and passes `res` in;
+ * a null res (category 404 or fetch error) renders NotFoundPage in-place.
+ * Rendered as a client island because SortDropdown needs hydration.
+ */
+export function CategoryDetailPage({
   searchParams,
+  res,
+  meta,
+  categories,
 }: {
-  slug: string;
   searchParams?: { sort?: string; page?: string };
+  res: { category: Category; products: Paginated<ProductCard> } | null;
+  meta: StorefrontMeta | null;
+  categories: Category[];
 }) {
+  if (!res || !meta) return <NotFoundPage />;
+
   const sort = (searchParams?.sort ?? 'newest') as ProductSort;
   const page = parseInt(searchParams?.page ?? '1', 10);
-
-  let res;
-  try {
-    res = await getCategory(slug, { sort, page });
-  } catch {
-    // notFound() → NotFoundPage render. See product-detail.tsx for rationale.
-    return <NotFoundPage />;
-  }
-  const [meta, categories] = await Promise.all([getStorefront(), getCategories().catch(() => [])]);
   const { category, products } = res;
 
   return (
