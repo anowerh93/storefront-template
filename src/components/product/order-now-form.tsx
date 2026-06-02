@@ -70,11 +70,7 @@ export function OrderNowForm({
       pixel.initiateCheckout({ value: subtotal, numItems: qty });
 
       // The API expects `variant_index` (position in the variants array),
-      // not the variant's database ID. Compute it here.
-      const variantIdx = variant
-        ? product.variants.findIndex((v) => v.id === variant.id)
-        : -1;
-
+      // which each variant carries directly as `index`.
       const order = await submitOrder({
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
@@ -82,7 +78,7 @@ export function OrderNowForm({
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
         product_id:     product.id,
-        variant_index:  variantIdx >= 0 ? variantIdx : null,
+        variant_index:  variant ? variant.index : null,
         quantity:       qty,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
       });
@@ -110,19 +106,19 @@ export function OrderNowForm({
         <div className="space-y-2">
           <Label>Choose option</Label>
           <RadioGroup
-            value={variant?.id.toString()}
-            onValueChange={(v) => setVariant(product.variants.find((x) => x.id.toString() === v) ?? null)}
+            value={variant?.index.toString()}
+            onValueChange={(v) => setVariant(product.variants.find((x) => x.index.toString() === v) ?? null)}
             className="grid grid-cols-2 sm:grid-cols-3 gap-2"
           >
             {product.variants.map((v) => (
               <label
-                key={v.id}
+                key={v.index}
                 className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border cursor-pointer transition
-                  ${variant?.id === v.id ? 'border-brand-500 bg-brand-50' : 'border-slate-300 hover:border-slate-400'}
+                  ${variant?.index === v.index ? 'border-brand-500 bg-brand-50' : 'border-slate-300 hover:border-slate-400'}
                   ${!v.in_stock ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
-                <RadioGroupItem value={v.id.toString()} disabled={!v.in_stock} />
-                <span className="text-sm font-medium text-slate-900">{v.name}</span>
+                <RadioGroupItem value={v.index.toString()} disabled={!v.in_stock} />
+                <span className="text-sm font-medium text-slate-900">{v.label}</span>
               </label>
             ))}
           </RadioGroup>

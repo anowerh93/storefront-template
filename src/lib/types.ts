@@ -170,12 +170,21 @@ export type ProductDetail = ProductCard & {
   };
 };
 
+// Matches the storefront API's variant shape exactly (StorefrontController::
+// variants()). The API keys each variant by its array `index` (used as the
+// stable identity AND submitted as `variant_index` when ordering) and a
+// composed `label` ("Red / XL"); there is no `id` / `name`.
 export type ProductVariant = {
-  id: number;
-  name: string;
+  index: number;
+  label: string;
+  color: string | null;
+  size: string | null;
+  weight: string | null;
   price: number | null;
+  compare_at_price: number | null;
+  stock: number | null;
   in_stock: boolean;
-  attributes: Record<string, string>;
+  image_url: string | null;
 };
 
 export type ProductReview = {
