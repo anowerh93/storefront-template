@@ -28,7 +28,12 @@ export function Header({
       {/* ───────────────────── Row 1 ───────────────────── */}
       <div className="border-b border-slate-100">
         <div className="mx-auto max-w-[1280px] px-4 sm:px-6">
-          <div className="flex h-16 items-center gap-4">
+          {/* Mobile: wrap so the search bar drops to its own full-width second
+              line (logo + menu on top). Desktop (md+): single 64px row with
+              search inline. flex-wrap + the search's order-last/w-full is the
+              standard mobile-commerce header that stops the bar getting
+              crushed next to a wide logo on phones. */}
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 py-2.5 md:h-16 md:flex-nowrap md:gap-4 md:py-0">
             {/* Logo */}
             <a href="/" className="flex items-center gap-2 shrink-0">
               {meta.logo_url ? (
@@ -38,7 +43,7 @@ export function Header({
                 // "larriag" out of a longer name). Contain shows the whole
                 // logo; w-auto lets a wordmark be wide and an icon stay square.
                 <img src={meta.logo_url} alt={meta.name}
-                       className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
+                       className="h-8 w-auto max-w-[130px] sm:h-9 sm:max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
@@ -61,8 +66,8 @@ export function Header({
               <span className="font-semibold text-slate-900">Bangladesh</span>
             </div>
 
-            {/* Search bar — flex-1 hero */}
-            <form action="/products" method="get" className="flex-1 max-w-2xl">
+            {/* Search bar — full-width second line on mobile, inline hero on desktop */}
+            <form action="/products" method="get" className="order-last w-full md:order-none md:flex-1 md:max-w-2xl">
               <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
                 {/* name="category" + option values so the dropdown actually
                     filters — it submits ?category=<slug> to /products, which
@@ -91,7 +96,7 @@ export function Header({
                 storefront has no wishlist (or cart) feature; the funnel is
                 direct-order on the PDP, so a wishlist button was pure dead
                 UI. Add it back only if/when a wishlist feature ships. */}
-            <div className="flex items-center gap-1 shrink-0">
+            <div className="flex items-center gap-1 shrink-0 ml-auto md:ml-0">
               <a
                 href="/order/lookup"
                 className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
