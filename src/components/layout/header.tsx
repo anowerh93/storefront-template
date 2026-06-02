@@ -32,8 +32,13 @@ export function Header({
             {/* Logo */}
             <a href="/" className="flex items-center gap-2 shrink-0">
               {meta.logo_url ? (
-                <img src={meta.logo_url} alt={meta.name} width={36} height={36}
-                       className="h-9 w-9 rounded-lg object-cover" />
+                // object-CONTAIN (not cover) + auto width: logos are often
+                // wide wordmarks, and a fixed square + object-cover would
+                // crop them to a meaningless centre slice (e.g. showing
+                // "larriag" out of a longer name). Contain shows the whole
+                // logo; w-auto lets a wordmark be wide and an icon stay square.
+                <img src={meta.logo_url} alt={meta.name}
+                       className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}

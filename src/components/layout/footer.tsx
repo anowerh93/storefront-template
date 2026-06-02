@@ -25,7 +25,9 @@ export function Footer({
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-3">
               {meta.logo_url ? (
-                <img src={meta.logo_url} alt={meta.name} width={36} height={36} className="h-9 w-9 rounded-lg object-cover" />
+                // object-contain + auto width so wide wordmark logos show
+                // whole, not a cropped centre slice. See header.tsx note.
+                <img src={meta.logo_url} alt={meta.name} className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
