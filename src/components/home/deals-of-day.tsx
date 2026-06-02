@@ -58,9 +58,8 @@ export function DealsOfDay({
               <img
                 src={featured.image_url}
                 alt={featured.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 600px"
-                className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             )}
             {discount && (
@@ -110,7 +109,7 @@ function MiniDealCard({ product }: { product: ProductCard }) {
     >
       <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-50 overflow-hidden shrink-0">
         {product.image_url && (
-          <img src={product.image_url} alt={product.name} fill sizes="80px" className="object-contain p-1" />
+          <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         )}
       </div>
       <div className="min-w-0 flex-1">

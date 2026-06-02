@@ -26,9 +26,19 @@ export function PromoRow({
             <a
               key={p.id}
               href={`/products/${p.slug}`}
-              className={`group relative overflow-hidden rounded-2xl ${tone.bg} p-5 sm:p-6 min-h-[200px] flex`}
+              className={`group relative overflow-hidden rounded-2xl ${tone.bg} min-h-[190px] sm:min-h-[210px]`}
             >
-              <div className="relative z-10 max-w-[60%]">
+              {/* Full-bleed image on the right half — flush to the edges, no
+                  padding box. object-cover so a real photo fills cleanly. */}
+              {p.image_url && (
+                <img
+                  src={p.image_url}
+                  alt={p.name}
+                  loading="lazy"
+                  className="absolute right-0 top-0 h-full w-[46%] object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              )}
+              <div className="relative z-10 p-5 sm:p-6 max-w-[54%]">
                 <span className={`text-[10px] uppercase tracking-wide font-bold ${tone.eyebrow}`}>{card.eyebrow}</span>
                 <h3 className="mt-1.5 text-lg sm:text-xl font-bold text-slate-900 leading-tight">{p.name}</h3>
                 <div className="mt-3">
@@ -39,15 +49,6 @@ export function PromoRow({
                   Shop Now <ArrowRight className="h-3 w-3" />
                 </span>
               </div>
-              {p.image_url && (
-                <img
-                  src={p.image_url}
-                  alt={p.name}
-                  fill
-                  sizes="(max-width: 640px) 100vw, 33vw"
-                  className="object-contain object-right p-4 group-hover:scale-105 transition-transform duration-500"
-                />
-              )}
             </a>
           );
         })}

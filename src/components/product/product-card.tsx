@@ -17,9 +17,8 @@ export function ProductCard({ product }: { product: ProductCardType }) {
           <img
             src={product.image_url}
             alt={product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
+            loading="lazy"
+            className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
           />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-3xl font-bold">

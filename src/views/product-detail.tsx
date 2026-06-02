@@ -194,10 +194,8 @@ export function ProductDetailPage({
                 <img
                   src={(product.gallery_urls?.[0] ?? product.image_url) as string}
                   alt={product.name}
-                  fill
-                  priority
-                  sizes="(max-width: 768px) 100vw, 768px"
-                  className="object-cover"
+                  loading="eager"
+                  className="absolute inset-0 h-full w-full object-cover"
                 />
               )}
             </div>
@@ -279,14 +277,14 @@ function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getPro
     <div className="space-y-3">
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100">
         {urls[0] && (
-          <img src={urls[0]} alt={product.name} fill priority sizes="(max-width: 1024px) 100vw, 600px" className="object-cover" />
+          <img src={urls[0]} alt={product.name} loading="eager" className="absolute inset-0 h-full w-full object-cover" />
         )}
       </div>
       {urls.length > 1 && (
         <div className="grid grid-cols-4 gap-2">
           {urls.slice(0, 4).map((src, i) => (
             <div key={i} className="relative aspect-square rounded-lg overflow-hidden bg-slate-100 ring-1 ring-slate-200">
-              <img src={src} alt={product.name} fill sizes="120px" className="object-cover" />
+              <img src={src} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
             </div>
           ))}
         </div>
