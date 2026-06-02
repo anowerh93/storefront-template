@@ -61,6 +61,7 @@
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
     "tailwindcss": "^4.0.0",
+    "wrangler": "^3.90.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
@@ -68,8 +69,7 @@
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "typescript": "^5.7.2",
-    "wrangler": "^3.90.0"
+    "typescript": "^5.7.2"
   },
   "engines": {
     "node": ">=20.0.0"
