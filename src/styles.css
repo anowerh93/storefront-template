@@ -8,18 +8,20 @@
  * runtime injection fails or during SSR before metadata loads.
  */
 @theme {
-  /* Brand defaults — overridden at runtime per tenant */
-  --color-brand-50:  rgb(238 242 255);
-  --color-brand-100: rgb(224 231 255);
-  --color-brand-200: rgb(199 210 254);
-  --color-brand-300: rgb(165 180 252);
-  --color-brand-400: rgb(129 140 248);
-  --color-brand-500: rgb(99  102 241);
-  --color-brand-600: rgb(79   70 229);
-  --color-brand-700: rgb(67   56 202);
-  --color-brand-800: rgb(55   48 163);
-  --color-brand-900: rgb(49   46 129);
-  --color-brand-950: rgb(30   27 75);
+  /* Brand defaults — #F07F13 (warm orange) ramp, generated with the same
+     tint/shade math as brandCssVars(). Overridden at runtime per tenant; this
+     static set is the fallback when no theme_color is injected. */
+  --color-brand-50:  rgb(254 249 243);
+  --color-brand-100: rgb(253 236 220);
+  --color-brand-200: rgb(251 217 184);
+  --color-brand-300: rgb(248 191 137);
+  --color-brand-400: rgb(244 159  78);
+  --color-brand-500: rgb(240 127  19);
+  --color-brand-600: rgb(216 114  17);
+  --color-brand-700: rgb(180  95  14);
+  --color-brand-800: rgb(144  76  11);
+  --color-brand-900: rgb(108  57   9);
+  --color-brand-950: rgb(72   38   6);
 
   /* Neutral surface tokens — the rest of the app reads `surface` etc. */
   --color-surface:        rgb(255 255 255);
