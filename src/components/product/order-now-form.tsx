@@ -199,11 +199,11 @@ export function OrderNowForm({
       )}
 
       {/* ── COD reassurance + price summary ── */}
-      <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-4 flex items-start gap-3">
-        <Truck className="h-5 w-5 text-emerald-700 shrink-0 mt-0.5" />
+      <div className="rounded-2xl bg-brand-50 border border-brand-200 p-4 flex items-start gap-3">
+        <Truck className="h-5 w-5 text-brand-700 shrink-0 mt-0.5" />
         <div className="flex-1">
-          <p className="text-sm font-semibold text-emerald-900">Cash on Delivery</p>
-          <p className="text-xs text-emerald-700">Pay when your order arrives. No upfront payment.</p>
+          <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
+          <p className="text-xs text-brand-700">Pay when your order arrives. No upfront payment.</p>
         </div>
       </div>
 
@@ -215,7 +215,7 @@ export function OrderNowForm({
         {meta.shipping?.enabled && (
           <div className="flex justify-between text-slate-600">
             <span>Shipping</span>
-            <span>{shippingFee === 0 ? <span className="text-emerald-600 font-semibold">Free</span> : formatBDT(shippingFee)}</span>
+            <span>{shippingFee === 0 ? <span className="text-brand-600 font-semibold">Free</span> : formatBDT(shippingFee)}</span>
           </div>
         )}
         <Separator />
@@ -249,7 +249,7 @@ export function OrderNowForm({
 function Trust({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
   return (
     <div className="flex flex-col items-center gap-1 text-center">
-      <Icon className="h-4 w-4 text-emerald-600" />
+      <Icon className="h-4 w-4 text-brand-600" />
       <span>{label}</span>
     </div>
   );

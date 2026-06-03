@@ -20,7 +20,7 @@ const TILE_COLORS = [
   'from-yellow-100 to-yellow-200 text-yellow-700',
   'from-pink-100 to-pink-200 text-pink-700',
   'from-rose-100 to-rose-200 text-rose-700',
-  'from-emerald-100 to-emerald-200 text-emerald-700',
+  'from-brand-100 to-brand-200 text-brand-700',
   'from-purple-100 to-purple-200 text-purple-700',
 ];
 

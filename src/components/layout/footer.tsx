@@ -1,3 +1,5 @@
+// NOTE: footer uses the tenant brand palette (brand-*) end-to-end so it
+// follows the storefront theme colour — no hard-coded green.
 import { Facebook, Instagram, Youtube, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
 
@@ -18,7 +20,7 @@ export function Footer({
   const social = (meta.social_links ?? {}) as Record<string, string>;
 
   return (
-    <footer className="mt-16 bg-emerald-900 text-emerald-50">
+    <footer className="mt-16 bg-brand-900 text-brand-50">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 py-12 sm:py-14">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8">
           {/* Brand col */}
@@ -29,7 +31,7 @@ export function Footer({
                 // whole, not a cropped centre slice. See header.tsx note.
                 <img src={meta.logo_url} alt={meta.name} className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
               ) : (
-                <div className="h-9 w-9 rounded-lg bg-emerald-700 flex items-center justify-center text-white font-bold">
+                <div className="h-9 w-9 rounded-lg bg-brand-700 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
                 </div>
               )}
@@ -39,17 +41,17 @@ export function Footer({
               )}
             </div>
             {meta.about && (
-              <p className="text-sm text-emerald-200 leading-relaxed mb-4 max-w-xs">{meta.about}</p>
+              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs">{meta.about}</p>
             )}
             <ul className="space-y-2 text-sm">
-              <ContactRow icon={MapPin}><span className="text-emerald-200">Bangladesh</span></ContactRow>
+              <ContactRow icon={MapPin}><span className="text-brand-200">Bangladesh</span></ContactRow>
               {meta.whatsapp && (
                 <ContactRow icon={Phone}>
                   <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="hover:text-white">+{meta.whatsapp}</a>
                 </ContactRow>
               )}
               <ContactRow icon={Mail}>
-                <span className="text-emerald-200">support@{(meta.slug ?? 'shop')}.com</span>
+                <span className="text-brand-200">support@{(meta.slug ?? 'shop')}.com</span>
               </ContactRow>
             </ul>
           </div>
@@ -85,7 +87,7 @@ export function Footer({
             <FooterLink href="/about">Terms &amp; Conditions</FooterLink>
             <FooterLink href="/about">FAQs</FooterLink>
             {meta.messenger?.url && (
-              <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-emerald-200 hover:text-white transition">
+              <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
                 Contact via Messenger
               </a>
             )}
@@ -93,8 +95,8 @@ export function Footer({
         </div>
 
         {/* Bottom strip */}
-        <div className="mt-10 pt-6 border-t border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <p className="text-xs text-emerald-300">© {new Date().getFullYear()} {meta.name}. All rights reserved.</p>
+        <div className="mt-10 pt-6 border-t border-brand-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <p className="text-xs text-brand-300">© {new Date().getFullYear()} {meta.name}. All rights reserved.</p>
 
           <div className="flex items-center gap-2">
             {social.facebook && (
@@ -111,7 +113,7 @@ export function Footer({
             )}
           </div>
 
-          <p className="text-xs text-emerald-300">
+          <p className="text-xs text-brand-300">
             Powered by <a href="https://reply.bd" target="_blank" rel="noopener" className="font-semibold text-white hover:underline">Reply.BD</a>
           </p>
         </div>
@@ -131,7 +133,7 @@ function FooterCol({ title, children }: { title: string; children: React.ReactNo
 
 function FooterLink({ href, children }: { href: string; children: React.ReactNode }) {
   return (
-    <a href={href} className="block py-1 text-sm text-emerald-200 hover:text-white transition">
+    <a href={href} className="block py-1 text-sm text-brand-200 hover:text-white transition">
       {children}
     </a>
   );
@@ -140,7 +142,7 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
 function ContactRow({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
   return (
     <li className="flex items-center gap-2">
-      <Icon className="h-4 w-4 text-emerald-400 shrink-0" />
+      <Icon className="h-4 w-4 text-brand-400 shrink-0" />
       {children}
     </li>
   );
@@ -153,7 +155,7 @@ function SocialIcon({ href, icon: Icon, label }: { href: string; icon: React.Com
       target="_blank"
       rel="noopener"
       aria-label={label}
-      className="w-9 h-9 rounded-full bg-emerald-800 hover:bg-emerald-700 flex items-center justify-center text-emerald-200 hover:text-white transition"
+      className="w-9 h-9 rounded-full bg-brand-800 hover:bg-brand-700 flex items-center justify-center text-brand-200 hover:text-white transition"
     >
       <Icon className="h-4 w-4" />
     </a>

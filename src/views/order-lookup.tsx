@@ -86,7 +86,7 @@ function Trust({
 }) {
   return (
     <div className="rounded-xl bg-white ring-1 ring-slate-200 px-3 py-3 flex flex-col items-center gap-1">
-      <Icon className="h-5 w-5 text-emerald-600" />
+      <Icon className="h-5 w-5 text-brand-600" />
       <p className="text-xs font-semibold text-slate-900">{title}</p>
       <p className="text-[10px] text-slate-500">{subtitle}</p>
     </div>

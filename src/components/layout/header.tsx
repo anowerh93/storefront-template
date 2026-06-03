@@ -129,7 +129,7 @@ export function Header({
               <button
                 onClick={() => setCatsOpen((v) => !v)}
                 onBlur={() => setTimeout(() => setCatsOpen(false), 200)}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition"
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold transition"
               >
                 <Menu className="h-4 w-4" />
                 Browse All Categories

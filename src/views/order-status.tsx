@@ -102,11 +102,11 @@ export function OrderStatusPage({
 
       <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10">
         {justPlaced && (
-          <div className="rounded-2xl bg-emerald-50 border border-emerald-200 p-5 mb-6 flex items-start gap-3">
-            <CheckCircle2 className="h-6 w-6 text-emerald-600 shrink-0" />
+          <div className="rounded-2xl bg-brand-50 border border-brand-200 p-5 mb-6 flex items-start gap-3">
+            <CheckCircle2 className="h-6 w-6 text-brand-600 shrink-0" />
             <div>
-              <h2 className="font-semibold text-emerald-900">Order placed!</h2>
-              <p className="text-sm text-emerald-700 mt-0.5">
+              <h2 className="font-semibold text-brand-900">Order placed!</h2>
+              <p className="text-sm text-brand-700 mt-0.5">
                 We've received your order and will contact you shortly to confirm the details.
               </p>
             </div>

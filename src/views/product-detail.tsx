@@ -101,9 +101,9 @@ export function ProductDetailPage({
               <div className="flex flex-wrap gap-2">
                 <CodBadge size="lg" />
                 {meta.shipping?.free_shipping_threshold && product.price >= meta.shipping.free_shipping_threshold && (
-                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200">
-                    <Truck className="h-4 w-4 text-emerald-700" />
-                    <span className="text-sm font-semibold text-emerald-800">Free shipping</span>
+                  <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-50 border border-brand-200">
+                    <Truck className="h-4 w-4 text-brand-700" />
+                    <span className="text-sm font-semibold text-brand-800">Free shipping</span>
                   </div>
                 )}
               </div>
@@ -296,7 +296,7 @@ function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getPro
 function TrustItem({ icon: Icon, title, body }: { icon: React.ComponentType<{ className?: string }>; title: string; body: string }) {
   return (
     <div className="flex items-start gap-2.5">
-      <Icon className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+      <Icon className="h-5 w-5 text-brand-600 shrink-0 mt-0.5" />
       <div>
         <p className="font-semibold text-slate-900">{title}</p>
         <p className="text-slate-500">{body}</p>

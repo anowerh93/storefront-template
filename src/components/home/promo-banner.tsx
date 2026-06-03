@@ -4,7 +4,7 @@ import type { HomepageConfig } from '../../lib/types';
 const GRADIENTS = {
   purple:  'from-violet-700 via-purple-600 to-fuchsia-600',
   rose:    'from-rose-600 via-pink-600 to-fuchsia-600',
-  emerald: 'from-emerald-700 via-emerald-600 to-teal-600',
+  emerald: 'from-brand-700 via-brand-600 to-brand-500',
   amber:   'from-amber-600 via-orange-600 to-rose-600',
   sky:     'from-sky-700 via-blue-600 to-indigo-600',
   slate:   'from-slate-800 via-slate-700 to-slate-600',
