@@ -118,14 +118,38 @@ export function getCategories() {
   });
 }
 
-export function getCategory(slug: string, opts: { sort?: ProductSort; page?: number } = {}) {
-  return apiFetch<{ category: Category; products: Paginated<ProductCard> }>(
-    `/categories/${encodeURIComponent(slug)}`,
-    {
-      params: { sort: opts.sort, page: opts.page },
-      tags: ['categories', `category:${slug}`, 'products'],
-    },
-  );
+export async function getCategory(
+  slug: string,
+  opts: { sort?: ProductSort; page?: number } = {},
+): Promise<{ category: Category; products: Paginated<ProductCard> }> {
+  // The API returns { data: { ...category fields, products: [...] }, meta: {pagination} }
+  // — i.e. the category fields are FLAT on `data` with a nested products
+  // array, and pagination lives in the sibling top-level `meta`. The page,
+  // though, wants { category, products: Paginated }. Reshape here (unwrap:false
+  // so we keep the top-level `meta`). Mismatching this is what blanked the
+  // category page: `const { category } = res` was undefined → category.name threw.
+  const json = await apiFetch<any>(`/categories/${encodeURIComponent(slug)}`, {
+    params: { sort: opts.sort, page: opts.page },
+    tags: ['categories', `category:${slug}`, 'products'],
+    unwrap: false,
+  });
+
+  const data: Record<string, any> = json?.data ?? {};
+  const { products: items, ...category } = data;
+  const list = (items ?? []) as ProductCard[];
+
+  return {
+    category: category as Category,
+    products: {
+      data: list,
+      meta: json?.meta ?? {
+        current_page: 1,
+        last_page: 1,
+        per_page: list.length || 24,
+        total: list.length,
+      },
+    } as Paginated<ProductCard>,
+  };
 }
 
 export function getMessengerLink(opts: { productId?: number; variant?: string } = {}) {

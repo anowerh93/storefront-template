@@ -52,7 +52,7 @@ export function CategoryDetailPage({
             </p>
           </div>
           {products.data.length > 0 && (
-            <SortDropdown current={sort} basePath={`/categories/${slug}`} />
+            <SortDropdown current={sort} basePath={`/categories/${category.slug}`} />
           )}
         </div>
 
