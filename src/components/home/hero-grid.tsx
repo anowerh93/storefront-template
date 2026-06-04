@@ -3,17 +3,19 @@ import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 
 /**
- * Hero — big banner on the left + two tiles stacked on the right.
+ * Hero — big banner on the left + two tiles stacked on the right (Shopwise
+ * layout). The hero ALWAYS renders in the full-bleed designed style — a
+ * full-cover image with the copy overlaid on a light left-only legibility
+ * gradient. Two content sources, decided per slot:
  *
- * Two modes, decided per slot:
- *   • CONFIGURED (admin uploaded a banner/tile image in Storefront →
- *     Customization): a designed full-bleed image with the merchant's
- *     headline + buttons overlaid (Shopwise-style). A light left-only gradient
- *     keeps the text readable while the right of the image stays clean.
- *   • FALLBACK (no image set): the product-driven cards (featured products).
+ *   • CONFIGURED — the merchant uploaded a banner/tile image in Storefront →
+ *     Customization. Uses their headline + buttons.
+ *   • PRODUCT (default) — no upload yet, so we use the featured product's own
+ *     image as the banner background and overlay its name + price. This means
+ *     a brand-new store looks like the reference out of the box, with no setup.
  *
- * The big banner and each tile fall back independently, so a merchant can mix
- * a designed banner with product tiles, or vice-versa.
+ * Each slot falls back independently, so a merchant can mix a designed banner
+ * with product tiles, or vice-versa.
  */
 export function HeroGrid({
   featured,
@@ -22,15 +24,15 @@ export function HeroGrid({
   featured: ProductCard[];
   hero: HomepageConfig['hero'];
 }) {
-  const big       = featured[0];
-  const tiles     = featured.slice(1, 3);
-  const heroTiles = hero?.tiles ?? [];
+  const big           = featured[0];
+  const tileProducts  = featured.slice(1, 3);
+  const heroTiles     = hero?.tiles ?? [];
 
   const renderTile = (i: number) => {
     const configured = heroTiles[i];
     if (configured?.image_url) return <ConfiguredTile key={`c${i}`} tile={configured} />;
-    const product = tiles[i];
-    return product ? <Tile key={`p${i}`} product={product} /> : <TilePlaceholder key={`e${i}`} />;
+    const product = tileProducts[i];
+    return product ? <ProductTile key={`p${i}`} product={product} /> : <TilePlaceholder key={`e${i}`} />;
   };
 
   return (
@@ -38,7 +40,7 @@ export function HeroGrid({
       <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5">
         {hero?.image_url
           ? <ConfiguredBigBanner hero={hero} />
-          : (big ? <BigBanner product={big} eyebrow={hero?.eyebrow} /> : <BannerPlaceholder />)}
+          : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} /> : <BannerPlaceholder />)}
 
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
           {renderTile(0)}
@@ -48,6 +50,13 @@ export function HeroGrid({
     </section>
   );
 }
+
+/* ── Shared style tokens ─────────────────────────────────────────────────── */
+
+// A light LEFT-side legibility gradient — text reads, the right of the image
+// (where the model/product usually sits) stays clean. No colour tint.
+const BANNER_GRADIENT = 'absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent';
+const TILE_GRADIENT   = 'absolute inset-0 bg-gradient-to-r from-black/55 via-black/15 to-transparent';
 
 /* ── Configured (admin-designed) banner + tiles ──────────────────────────── */
 
@@ -63,9 +72,7 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
         loading="eager"
         className="absolute inset-0 h-full w-full object-cover"
       />
-      {/* Light LEFT-side legibility gradient — text reads, the right of the
-          image (where the model/product usually sits) stays clean. */}
-      <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
+      <div className={BANNER_GRADIENT} />
 
       <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
         {hero.eyebrow && (
@@ -114,7 +121,7 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
       />
       {(tile.heading || tile.subtext) && (
         <>
-          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/15 to-transparent" />
+          <div className={TILE_GRADIENT} />
           <div className="absolute inset-0 z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[78%] text-white">
             {tile.heading && (
               <h3 className="font-bold uppercase text-base sm:text-lg leading-tight drop-shadow">{tile.heading}</h3>
@@ -129,88 +136,94 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
   );
 }
 
-/* ── Fallback (product-driven) banner + tiles ────────────────────────────── */
+/* ── Product-driven default (same full-bleed style, no upload needed) ─────── */
 
-function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: string }) {
-  const off = discountPct(product.price, product.compare_at_price ?? null);
+function ProductBigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: string }) {
+  const off = discountPct(Number(product.price), product.compare_at_price ? Number(product.compare_at_price) : null);
   const badge = off ? `Get ${off}% Off` : (eyebrow || 'Featured');
 
   return (
     <a
       href={`/products/${product.slug}`}
-      className="group grid grid-cols-1 sm:grid-cols-2 overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-brand-600"
+      className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
     >
-      <div className="order-2 sm:order-1 flex flex-col justify-center p-6 sm:p-10 text-white bg-gradient-to-br from-brand-600 to-brand-700">
-        <span className="inline-block w-fit text-[11px] sm:text-xs uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full">
+      {product.image_url && (
+        <img
+          src={product.image_url}
+          alt={product.name}
+          loading="eager"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
+        />
+      )}
+      <div className={BANNER_GRADIENT} />
+
+      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
+        <span className="inline-block w-fit text-[11px] sm:text-xs uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
           {badge}
         </span>
-        <h1 className="mt-4 text-2xl sm:text-4xl lg:text-5xl font-extrabold leading-[1.1]">
+        <h1 className="mt-3 text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase leading-[1.1] drop-shadow-sm">
           {product.name}
         </h1>
-        <div className="mt-4 flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-bold">{formatBDT(product.price)}</span>
+        <div className="mt-3 flex items-baseline gap-2">
+          <span className="text-2xl sm:text-3xl font-bold drop-shadow">{formatBDT(product.price)}</span>
           {product.compare_at_price && Number(product.compare_at_price) > Number(product.price) && (
             <span className="text-sm text-white/70 line-through">{formatBDT(Number(product.compare_at_price))}</span>
           )}
         </div>
         <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
-          <span className="inline-flex items-center gap-2 bg-white text-brand-700 font-bold text-sm px-5 py-2.5 rounded-full group-hover:bg-brand-50 transition">
+          <span className="inline-flex items-center gap-2 bg-white text-slate-900 font-bold text-sm px-6 py-2.5 rounded uppercase tracking-wide group-hover:bg-brand-50 transition">
             Shop Now <ArrowRight className="h-3.5 w-3.5" />
           </span>
-          <span className="inline-flex items-center font-semibold text-sm px-5 py-2.5 rounded-full ring-1 ring-white/50 hover:bg-white/10 transition">
+          <span className="inline-flex items-center font-semibold text-sm px-6 py-2.5 rounded uppercase tracking-wide ring-1 ring-white/70 hover:bg-white/10 transition">
             View all
           </span>
         </div>
-      </div>
-
-      <div className="order-1 sm:order-2 relative min-h-[220px] sm:min-h-0 bg-brand-50">
-        {product.image_url && (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            loading="eager"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-          />
-        )}
-      </div>
-    </a>
-  );
-}
-
-function Tile({ product }: { product: ProductCard }) {
-  const off = discountPct(product.price, product.compare_at_price ?? null);
-  return (
-    <a
-      href={`/products/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-white border border-slate-200/70 hover:shadow-md transition"
-    >
-      <div className="relative flex-1 min-h-[96px] bg-slate-100">
-        {product.image_url && (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-          />
-        )}
-        {off && (
-          <span className="absolute top-2.5 left-2.5 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
-            -{off}%
-          </span>
-        )}
-      </div>
-      <div className="p-3 sm:p-3.5">
-        <h3 className="font-bold leading-tight text-sm line-clamp-1 text-slate-900">{product.name}</h3>
-        <div className="mt-1 flex items-center justify-between">
-          <p className="text-base font-extrabold text-brand-700">{formatBDT(product.price)}</p>
-          <span className="inline-flex items-center gap-1 text-[11px] font-semibold bg-brand-600 group-hover:bg-brand-700 text-white px-2.5 py-1 rounded-full transition">
-            Shop <ArrowRight className="h-3 w-3" />
-          </span>
+        <div className="mt-6 hidden sm:flex items-center gap-1.5">
+          <span className="h-2 w-6 rounded-full bg-white/90" />
+          <span className="h-2 w-2 rounded-full bg-white/40" />
+          <span className="h-2 w-2 rounded-full bg-white/40" />
         </div>
       </div>
     </a>
   );
 }
+
+function ProductTile({ product }: { product: ProductCard }) {
+  const off = discountPct(Number(product.price), product.compare_at_price ? Number(product.compare_at_price) : null);
+
+  return (
+    <a
+      href={`/products/${product.slug}`}
+      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
+    >
+      {product.image_url && (
+        <img
+          src={product.image_url}
+          alt={product.name}
+          loading="lazy"
+          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      )}
+      <div className={TILE_GRADIENT} />
+      {off && (
+        <span className="absolute top-2.5 right-2.5 z-10 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+          -{off}%
+        </span>
+      )}
+      <div className="absolute inset-0 z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[80%] text-white">
+        <h3 className="font-bold uppercase text-sm sm:text-base leading-tight drop-shadow line-clamp-2">{product.name}</h3>
+        <div className="mt-1 flex items-baseline gap-2">
+          <span className="text-base sm:text-lg font-extrabold drop-shadow">{formatBDT(product.price)}</span>
+          {product.compare_at_price && Number(product.compare_at_price) > Number(product.price) && (
+            <span className="text-xs text-white/70 line-through">{formatBDT(Number(product.compare_at_price))}</span>
+          )}
+        </div>
+      </div>
+    </a>
+  );
+}
+
+/* ── Placeholders (empty store) ──────────────────────────────────────────── */
 
 function BannerPlaceholder() {
   return (
