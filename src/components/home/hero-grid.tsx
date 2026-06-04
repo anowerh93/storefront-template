@@ -1,39 +1,135 @@
 import { ArrowRight } from 'lucide-react';
-import type { ProductCard } from '../../lib/types';
+import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 
 /**
- * Hero — split-panel banner on the left (solid brand-colour text panel +
- * CLEAN product image beside it) and two product tiles stacked on the right.
+ * Hero — big banner on the left + two tiles stacked on the right.
  *
- * No image overlays/scrims anywhere: the photo is shown in its true colours
- * and the text lives on a solid brand panel (big banner) or a white info bar
- * (tiles), so nothing tints the product image. Brand colour comes from the
- * tenant's theme via the `brand-*` palette.
+ * Two modes, decided per slot:
+ *   • CONFIGURED (admin uploaded a banner/tile image in Storefront →
+ *     Customization): a designed full-bleed image with the merchant's
+ *     headline + buttons overlaid (Shopwise-style). A light left-only gradient
+ *     keeps the text readable while the right of the image stays clean.
+ *   • FALLBACK (no image set): the product-driven cards (featured products).
+ *
+ * The big banner and each tile fall back independently, so a merchant can mix
+ * a designed banner with product tiles, or vice-versa.
  */
 export function HeroGrid({
   featured,
-  eyebrow,
+  hero,
 }: {
   featured: ProductCard[];
-  eyebrow?: string;
+  hero: HomepageConfig['hero'];
 }) {
-  const big = featured[0];
-  const tiles = featured.slice(1, 3);
+  const big       = featured[0];
+  const tiles     = featured.slice(1, 3);
+  const heroTiles = hero?.tiles ?? [];
+
+  const renderTile = (i: number) => {
+    const configured = heroTiles[i];
+    if (configured?.image_url) return <ConfiguredTile key={`c${i}`} tile={configured} />;
+    const product = tiles[i];
+    return product ? <Tile key={`p${i}`} product={product} /> : <TilePlaceholder key={`e${i}`} />;
+  };
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-5">
       <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5">
-        {big ? <BigBanner product={big} eyebrow={eyebrow} /> : <BannerPlaceholder />}
+        {hero?.image_url
+          ? <ConfiguredBigBanner hero={hero} />
+          : (big ? <BigBanner product={big} eyebrow={hero?.eyebrow} /> : <BannerPlaceholder />)}
 
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
-          {tiles[0] ? <Tile product={tiles[0]} /> : <TilePlaceholder />}
-          {tiles[1] ? <Tile product={tiles[1]} /> : <TilePlaceholder />}
+          {renderTile(0)}
+          {renderTile(1)}
         </div>
       </div>
     </section>
   );
 }
+
+/* ── Configured (admin-designed) banner + tiles ──────────────────────────── */
+
+function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
+  const b1 = hero.button1;
+  const b2 = hero.button2;
+
+  return (
+    <div className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900">
+      <img
+        src={hero.image_url!}
+        alt={hero.headline || ''}
+        loading="eager"
+        className="absolute inset-0 h-full w-full object-cover"
+      />
+      {/* Light LEFT-side legibility gradient — text reads, the right of the
+          image (where the model/product usually sits) stays clean. */}
+      <div className="absolute inset-0 bg-gradient-to-r from-black/55 via-black/20 to-transparent" />
+
+      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
+        {hero.eyebrow && (
+          <span className="text-sm sm:text-base font-medium text-white/90">{hero.eyebrow}</span>
+        )}
+        {hero.headline && (
+          <h1 className="mt-2 text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase leading-[1.1] drop-shadow-sm">
+            {hero.headline}
+          </h1>
+        )}
+        <div className="mt-5 sm:mt-7 flex flex-wrap items-center gap-3">
+          {b1?.label && (
+            <a href={b1.url || '/products'}
+               className="inline-flex items-center gap-2 ring-1 ring-white/70 hover:bg-white/10 font-semibold text-sm px-6 py-2.5 rounded uppercase tracking-wide transition">
+              {b1.label} <ArrowRight className="h-3.5 w-3.5" />
+            </a>
+          )}
+          {b2?.label && (
+            <a href={b2.url || '/products'}
+               className="inline-flex items-center bg-amber-400 hover:bg-amber-300 text-slate-900 font-semibold text-sm px-6 py-2.5 rounded uppercase tracking-wide transition">
+              {b2.label}
+            </a>
+          )}
+        </div>
+        <div className="mt-6 hidden sm:flex items-center gap-1.5">
+          <span className="h-2 w-6 rounded-full bg-white/90" />
+          <span className="h-2 w-2 rounded-full bg-white/40" />
+          <span className="h-2 w-2 rounded-full bg-white/40" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number] }) {
+  return (
+    <a
+      href={tile.url || '/products'}
+      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
+    >
+      <img
+        src={tile.image_url!}
+        alt={tile.heading || ''}
+        loading="lazy"
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+      />
+      {(tile.heading || tile.subtext) && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/15 to-transparent" />
+          <div className="absolute inset-0 z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[78%] text-white">
+            {tile.heading && (
+              <h3 className="font-bold uppercase text-base sm:text-lg leading-tight drop-shadow">{tile.heading}</h3>
+            )}
+            {tile.subtext && (
+              <p className="text-xs text-white/85 mt-1 drop-shadow line-clamp-2">{tile.subtext}</p>
+            )}
+          </div>
+        </>
+      )}
+    </a>
+  );
+}
+
+/* ── Fallback (product-driven) banner + tiles ────────────────────────────── */
 
 function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: string }) {
   const off = discountPct(product.price, product.compare_at_price ?? null);
@@ -44,7 +140,6 @@ function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: strin
       href={`/products/${product.slug}`}
       className="group grid grid-cols-1 sm:grid-cols-2 overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-brand-600"
     >
-      {/* Text panel — solid brand colour, no image behind it */}
       <div className="order-2 sm:order-1 flex flex-col justify-center p-6 sm:p-10 text-white bg-gradient-to-br from-brand-600 to-brand-700">
         <span className="inline-block w-fit text-[11px] sm:text-xs uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full">
           {badge}
@@ -66,14 +161,8 @@ function BigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: strin
             View all
           </span>
         </div>
-        <div className="mt-6 hidden sm:flex items-center gap-1.5">
-          <span className="h-2 w-6 rounded-full bg-white/90" />
-          <span className="h-2 w-2 rounded-full bg-white/40" />
-          <span className="h-2 w-2 rounded-full bg-white/40" />
-        </div>
       </div>
 
-      {/* Clean product image — no overlay/scrim */}
       <div className="order-1 sm:order-2 relative min-h-[220px] sm:min-h-0 bg-brand-50">
         {product.image_url && (
           <img
@@ -95,7 +184,6 @@ function Tile({ product }: { product: ProductCard }) {
       href={`/products/${product.slug}`}
       className="group flex flex-col overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-white border border-slate-200/70 hover:shadow-md transition"
     >
-      {/* Clean image — no overlay */}
       <div className="relative flex-1 min-h-[96px] bg-slate-100">
         {product.image_url && (
           <img
@@ -111,8 +199,6 @@ function Tile({ product }: { product: ProductCard }) {
           </span>
         )}
       </div>
-
-      {/* White info bar — brand-coloured price + Shop button */}
       <div className="p-3 sm:p-3.5">
         <h3 className="font-bold leading-tight text-sm line-clamp-1 text-slate-900">{product.name}</h3>
         <div className="mt-1 flex items-center justify-between">
@@ -132,7 +218,7 @@ function BannerPlaceholder() {
       <div className="max-w-sm">
         <span className="inline-block text-[11px] uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full">Welcome</span>
         <h1 className="mt-4 text-3xl sm:text-5xl font-extrabold leading-tight">Add your first product</h1>
-        <p className="mt-3 text-sm text-white/80">Featured products appear here once you add them in the dashboard.</p>
+        <p className="mt-3 text-sm text-white/80">Set a hero banner image in Customization, or add featured products.</p>
         <a href="/products" className="mt-5 inline-flex items-center gap-2 bg-white text-brand-700 font-bold text-sm px-5 py-2.5 rounded-full">
           Browse all <ArrowRight className="h-3.5 w-3.5" />
         </a>

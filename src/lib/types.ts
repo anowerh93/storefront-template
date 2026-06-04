@@ -54,6 +54,11 @@ export type HomepageConfig = {
   hero: {
     visible: boolean;
     eyebrow: string;
+    headline: string;
+    image_url: string | null;
+    button1: { label: string; url: string };
+    button2: { label: string; url: string };
+    tiles: { image_url: string | null; heading: string; subtext: string; url: string }[];
     product_ids: number[];
   };
   categories: {
