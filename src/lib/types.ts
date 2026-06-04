@@ -73,7 +73,7 @@ export type HomepageConfig = {
   };
   promo_row: {
     visible: boolean;
-    cards: { eyebrow: string; tone: string; product_id: number | null }[];
+    cards: { eyebrow: string; headline?: string; cta_label?: string; tone?: string; product_id: number | null }[];
   };
   trending_products: {
     visible: boolean;
