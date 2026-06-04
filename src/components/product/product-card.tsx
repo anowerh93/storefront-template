@@ -52,9 +52,9 @@ export function ProductCard({ product }: { product: ProductCardType }) {
         )}
 
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-bold text-slate-900">{formatBDT(product.price)}</span>
+          <span className="text-base font-bold text-slate-900">{formatBDT(product.price, { currency: product.currency })}</span>
           {product.compare_at_price && product.compare_at_price > product.price && (
-            <span className="text-xs text-slate-400 line-through">{formatBDT(product.compare_at_price)}</span>
+            <span className="text-xs text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
           )}
         </div>
       </div>

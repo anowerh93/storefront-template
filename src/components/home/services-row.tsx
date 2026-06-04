@@ -1,4 +1,3 @@
-import { ArrowRight } from 'lucide-react';
 import { getIcon } from '../../lib/icons';
 import type { HomepageConfig } from '../../lib/types';
 
@@ -27,9 +26,6 @@ export function ServicesRow({ items }: { items: HomepageConfig['services_row']['
               </div>
               <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-snug">{svc.title}</h3>
               <p className="text-xs sm:text-sm text-slate-600 mt-1">{svc.body}</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-900">
-                Learn more <ArrowRight className="h-3 w-3" />
-              </span>
             </div>
           );
         })}

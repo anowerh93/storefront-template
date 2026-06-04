@@ -187,7 +187,7 @@ export function OrderNowForm({
                   <span className="text-sm font-medium text-slate-900">{z.label}</span>
                 </div>
                 <span className="text-sm font-semibold text-slate-900">
-                  {z.fee === 0 ? 'Free' : formatBDT(z.fee)}
+                  {z.fee === 0 ? 'Free' : formatBDT(z.fee, { currency: meta.currency })}
                 </span>
               </label>
             ))}
@@ -209,19 +209,19 @@ export function OrderNowForm({
 
       <div className="rounded-2xl bg-slate-50 p-4 space-y-1.5 text-sm">
         <div className="flex justify-between text-slate-600">
-          <span>Subtotal ({qty} × {formatBDT(unitPrice)})</span>
-          <span>{formatBDT(subtotal)}</span>
+          <span>Subtotal ({qty} × {formatBDT(unitPrice, { currency: meta.currency })})</span>
+          <span>{formatBDT(subtotal, { currency: meta.currency })}</span>
         </div>
         {meta.shipping?.enabled && (
           <div className="flex justify-between text-slate-600">
             <span>Shipping</span>
-            <span>{shippingFee === 0 ? <span className="text-brand-600 font-semibold">Free</span> : formatBDT(shippingFee)}</span>
+            <span>{shippingFee === 0 ? <span className="text-brand-600 font-semibold">Free</span> : formatBDT(shippingFee, { currency: meta.currency })}</span>
           </div>
         )}
         <Separator />
         <div className="flex items-baseline justify-between pt-1">
           <span className="font-semibold text-slate-900">Total</span>
-          <span className="text-2xl font-bold text-slate-900">{formatBDT(total)}</span>
+          <span className="text-2xl font-bold text-slate-900">{formatBDT(total, { currency: meta.currency })}</span>
         </div>
       </div>
 
@@ -233,7 +233,7 @@ export function OrderNowForm({
         disabled={!inStock || submitting}
       >
         <ShoppingBag className="h-4 w-4" />
-        {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : `Order Now — ${formatBDT(total)}`}
+        {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : `Order Now — ${formatBDT(total, { currency: meta.currency })}`}
       </Button>
 
       {/* Trust strip */}

@@ -1,15 +1,11 @@
-// NOTE: footer uses the tenant brand palette (brand-*) end-to-end so it
-// follows the storefront theme colour — no hard-coded green.
+// Footer uses the tenant brand palette (brand-*) end-to-end and renders ONLY
+// real tenant data — no fabricated email, no placeholder links. Every row is
+// conditional: contact location/phone/email show only when set, and the
+// "Links" column appears only if the tenant added footer links in
+// Customization. "Powered by Reply.BD" is the platform credit (intentional).
 import { Facebook, Instagram, Youtube, MessageCircle, MapPin, Phone, Mail } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
 
-/**
- * 5-column footer based on the Omerce reference:
- *   Brand · Department · About us · Services · Help · App Support
- *
- * Most columns are static; "Department" mirrors the live category list so
- * tenants get auto-updated footer nav as they add categories.
- */
 export function Footer({
   meta,
   categories = [],
@@ -18,24 +14,22 @@ export function Footer({
   categories?: Category[];
 }) {
   const social = (meta.social_links ?? {}) as Record<string, string>;
+  const footerLinks = meta.footer_links ?? [];
 
   return (
     <footer className="mt-16 bg-brand-900 text-brand-50">
       <div className="mx-auto max-w-[1280px] px-4 sm:px-6 py-12 sm:py-14">
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-8">
-          {/* Brand col */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8">
+          {/* Brand + contact */}
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-3">
               {meta.logo_url ? (
-                // object-contain + auto width so wide wordmark logos show
-                // whole, not a cropped centre slice. See header.tsx note.
                 <img src={meta.logo_url} alt={meta.name} className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-700 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              {/* Name text only when no logo — see header.tsx note. */}
               {!meta.logo_url && (
                 <span className="font-bold text-white text-lg">{meta.name}</span>
               )}
@@ -43,20 +37,26 @@ export function Footer({
             {meta.about && (
               <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs">{meta.about}</p>
             )}
-            <ul className="space-y-2 text-sm">
-              <ContactRow icon={MapPin}><span className="text-brand-200">Bangladesh</span></ContactRow>
-              {meta.whatsapp && (
-                <ContactRow icon={Phone}>
-                  <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="hover:text-white">+{meta.whatsapp}</a>
-                </ContactRow>
-              )}
-              <ContactRow icon={Mail}>
-                <span className="text-brand-200">support@{(meta.slug ?? 'shop')}.com</span>
-              </ContactRow>
-            </ul>
+            {(meta.location || meta.whatsapp || meta.email) && (
+              <ul className="space-y-2 text-sm">
+                {meta.location && (
+                  <ContactRow icon={MapPin}><span className="text-brand-200">{meta.location}</span></ContactRow>
+                )}
+                {meta.whatsapp && (
+                  <ContactRow icon={Phone}>
+                    <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="text-brand-200 hover:text-white">+{meta.whatsapp}</a>
+                  </ContactRow>
+                )}
+                {meta.email && (
+                  <ContactRow icon={Mail}>
+                    <a href={`mailto:${meta.email}`} className="text-brand-200 hover:text-white break-all">{meta.email}</a>
+                  </ContactRow>
+                )}
+              </ul>
+            )}
           </div>
 
-          {/* Department */}
+          {/* Department = live categories */}
           <FooterCol title="Department">
             {categories.slice(0, 6).map((c) => (
               <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
@@ -66,32 +66,27 @@ export function Footer({
             )}
           </FooterCol>
 
-          {/* About */}
-          <FooterCol title="About us">
-            <FooterLink href="/about">About {meta.name}</FooterLink>
-            <FooterLink href="/about">Our story</FooterLink>
-            <FooterLink href="/about">Press &amp; Blog</FooterLink>
-          </FooterCol>
-
-          {/* Services */}
-          <FooterCol title="Services">
+          {/* Shop = real, working links only */}
+          <FooterCol title="Shop">
+            <FooterLink href="/products">All products</FooterLink>
+            <FooterLink href="/categories">Categories</FooterLink>
             <FooterLink href="/order/lookup">Track Order</FooterLink>
-            <FooterLink href="/about">Shipping &amp; Delivery</FooterLink>
-            <FooterLink href="/about">Order History</FooterLink>
-            <FooterLink href="/about">Returns &amp; Refunds</FooterLink>
-          </FooterCol>
-
-          {/* Help */}
-          <FooterCol title="Help">
-            <FooterLink href="/about">Privacy Policy</FooterLink>
-            <FooterLink href="/about">Terms &amp; Conditions</FooterLink>
-            <FooterLink href="/about">FAQs</FooterLink>
+            <FooterLink href="/about">About {meta.name}</FooterLink>
             {meta.messenger?.url && (
               <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
                 Contact via Messenger
               </a>
             )}
           </FooterCol>
+
+          {/* Tenant-defined links (Privacy / Terms / FAQ …) — only if set */}
+          {footerLinks.length > 0 && (
+            <FooterCol title="Links">
+              {footerLinks.map((l, i) => (
+                <FooterLink key={i} href={l.url}>{l.label}</FooterLink>
+              ))}
+            </FooterCol>
+          )}
         </div>
 
         {/* Bottom strip */}
@@ -99,18 +94,10 @@ export function Footer({
           <p className="text-xs text-brand-300">© {new Date().getFullYear()} {meta.name}. All rights reserved.</p>
 
           <div className="flex items-center gap-2">
-            {social.facebook && (
-              <SocialIcon href={social.facebook} icon={Facebook} label="Facebook" />
-            )}
-            {social.instagram && (
-              <SocialIcon href={social.instagram} icon={Instagram} label="Instagram" />
-            )}
-            {social.youtube && (
-              <SocialIcon href={social.youtube} icon={Youtube} label="YouTube" />
-            )}
-            {meta.messenger?.url && (
-              <SocialIcon href={meta.messenger.url} icon={MessageCircle} label="Messenger" />
-            )}
+            {social.facebook && <SocialIcon href={social.facebook} icon={Facebook} label="Facebook" />}
+            {social.instagram && <SocialIcon href={social.instagram} icon={Instagram} label="Instagram" />}
+            {social.youtube && <SocialIcon href={social.youtube} icon={Youtube} label="YouTube" />}
+            {meta.messenger?.url && <SocialIcon href={meta.messenger.url} icon={MessageCircle} label="Messenger" />}
           </div>
 
           <p className="text-xs text-brand-300">

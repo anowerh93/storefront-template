@@ -59,12 +59,14 @@ export function Header({
               )}
             </a>
 
-            {/* Location pill — desktop only */}
-            <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 px-2.5 py-1.5 rounded-lg hover:bg-slate-50 cursor-pointer shrink-0">
-              <MapPin className="w-3.5 h-3.5 text-slate-400" />
-              <span className="text-slate-500">Deliver to</span>
-              <span className="font-semibold text-slate-900">Bangladesh</span>
-            </div>
+            {/* Location pill — desktop only; rendered only when the tenant set a delivery location */}
+            {meta.location && (
+              <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-600 px-2.5 py-1.5 rounded-lg shrink-0">
+                <MapPin className="w-3.5 h-3.5 text-slate-400" />
+                <span className="text-slate-500">Deliver to</span>
+                <span className="font-semibold text-slate-900">{meta.location}</span>
+              </div>
+            )}
 
             {/* Search bar — full-width second line on mobile, inline hero on desktop */}
             <form action="/products" method="get" className="order-last w-full md:order-none md:flex-1 md:max-w-2xl">

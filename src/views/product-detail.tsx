@@ -88,10 +88,10 @@ export function ProductDetailPage({
 
               {/* Price */}
               <div className="flex items-baseline gap-3 flex-wrap">
-                <span className="text-3xl font-bold text-slate-900">{formatBDT(product.price)}</span>
+                <span className="text-3xl font-bold text-slate-900">{formatBDT(product.price, { currency: product.currency })}</span>
                 {product.compare_at_price && product.compare_at_price > product.price && (
                   <>
-                    <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price)}</span>
+                    <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
                     <Badge variant="danger">Save {discount}%</Badge>
                   </>
                 )}
@@ -205,10 +205,10 @@ export function ProductDetailPage({
           <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-10">
             <div className="rounded-3xl bg-white ring-1 ring-slate-200 p-6 sm:p-8 shadow-sm">
               <div className="flex items-baseline gap-3 flex-wrap mb-4">
-                <span className="text-3xl font-bold text-slate-900">{formatBDT(product.price)}</span>
+                <span className="text-3xl font-bold text-slate-900">{formatBDT(product.price, { currency: product.currency })}</span>
                 {product.compare_at_price && product.compare_at_price > product.price && (
                   <>
-                    <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price)}</span>
+                    <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
                     <Badge variant="danger">Save {discount}%</Badge>
                   </>
                 )}

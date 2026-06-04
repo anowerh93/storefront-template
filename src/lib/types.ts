@@ -20,6 +20,9 @@ export type StorefrontMeta = {
   about: string | null;
   currency: string;
   whatsapp: string | null;
+  email: string | null;
+  location: string | null;
+  footer_links: { label: string; url: string }[];
   social_links: Record<string, string> | object;
   messenger: { url: string | null; handle: string | null } | null;
   turnstile: { site_key: string | null };
@@ -147,6 +150,7 @@ export type ProductCard = {
   short_description?: string | null;
   price: number;
   compare_at_price: number | null;
+  currency: string;
   image_url: string | null;
   stock_badge?: string | null;
   has_variants?: boolean;

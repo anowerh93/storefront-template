@@ -136,9 +136,9 @@ export function OrderStatusPage({
                 <div className="flex-1">
                   <p className="font-medium text-slate-900">{it.product_name}</p>
                   {it.variant && <p className="text-xs text-slate-500">{it.variant}</p>}
-                  <p className="text-xs text-slate-500">Qty: {it.quantity} × {formatBDT(it.unit_price)}</p>
+                  <p className="text-xs text-slate-500">Qty: {it.quantity} × {formatBDT(it.unit_price, { currency: order.currency })}</p>
                 </div>
-                <span className="font-semibold text-slate-900 shrink-0">{formatBDT(it.subtotal)}</span>
+                <span className="font-semibold text-slate-900 shrink-0">{formatBDT(it.subtotal, { currency: order.currency })}</span>
               </li>
             ))}
           </ul>
@@ -147,13 +147,13 @@ export function OrderStatusPage({
 
           <div className="space-y-1.5 text-sm pt-4">
             <div className="flex justify-between text-slate-600">
-              <span>Subtotal</span><span>{formatBDT(order.subtotal)}</span>
+              <span>Subtotal</span><span>{formatBDT(order.subtotal, { currency: order.currency })}</span>
             </div>
             <div className="flex justify-between text-slate-600">
-              <span>Shipping</span><span>{order.shipping_fee === 0 ? 'Free' : formatBDT(order.shipping_fee)}</span>
+              <span>Shipping</span><span>{order.shipping_fee === 0 ? 'Free' : formatBDT(order.shipping_fee, { currency: order.currency })}</span>
             </div>
             <div className="flex justify-between text-base font-bold text-slate-900 pt-1">
-              <span>Total</span><span>{formatBDT(order.total)}</span>
+              <span>Total</span><span>{formatBDT(order.total, { currency: order.currency })}</span>
             </div>
           </div>
         </div>

@@ -83,9 +83,9 @@ export function DealsOfDay({
           <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2">{featured.name}</h3>
 
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{formatBDT(featured.price)}</span>
+            <span className="text-2xl font-bold text-slate-900">{formatBDT(featured.price, { currency: featured.currency })}</span>
             {featured.compare_at_price && featured.compare_at_price > featured.price && (
-              <span className="text-sm text-slate-400 line-through">{formatBDT(featured.compare_at_price)}</span>
+              <span className="text-sm text-slate-400 line-through">{formatBDT(featured.compare_at_price, { currency: featured.currency })}</span>
             )}
           </div>
 
@@ -114,7 +114,7 @@ function MiniDealCard({ product }: { product: ProductCard }) {
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs sm:text-sm font-medium text-slate-900 line-clamp-2 group-hover:text-brand-600">{product.name}</p>
-        <p className="text-sm font-bold text-slate-900 mt-1">{formatBDT(product.price)}</p>
+        <p className="text-sm font-bold text-slate-900 mt-1">{formatBDT(product.price, { currency: product.currency })}</p>
       </div>
     </a>
   );

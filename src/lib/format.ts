@@ -8,6 +8,15 @@
  * round numbers — typical Bangladeshi e-commerce convention). Pass
  * `decimals: 2` for line items that have fractional pricing.
  */
+/** Currency code → display symbol. Unknown codes fall back to the code itself. */
+const CURRENCY_SYMBOLS: Record<string, string> = {
+  BDT: '৳', USD: '$', INR: '₹', EUR: '€', GBP: '£', PKR: '₨', NPR: '₨', LKR: 'Rs ',
+};
+
+/**
+ * Format a price in the store's currency. `opts.currency` is a 3-letter code
+ * (e.g. "BDT", "USD") — mapped to a symbol. Defaults to BDT (৳).
+ */
 export function formatBDT(
   value: number | string | null | undefined,
   opts: { decimals?: number; currency?: string } = {},
@@ -16,7 +25,8 @@ export function formatBDT(
   const num = typeof value === 'string' ? parseFloat(value) : value;
   if (!Number.isFinite(num)) return '—';
 
-  const symbol = opts.currency ?? '৳';
+  const code = (opts.currency ?? 'BDT').toUpperCase();
+  const symbol = CURRENCY_SYMBOLS[code] ?? `${code} `;
   const decimals = opts.decimals ?? (Number.isInteger(num) ? 0 : 2);
 
   // en-IN gives the right comma grouping for South Asian numbers

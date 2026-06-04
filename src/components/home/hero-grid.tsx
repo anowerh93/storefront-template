@@ -165,9 +165,9 @@ function ProductBigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?
           {product.name}
         </h1>
         <div className="mt-3 flex items-baseline gap-2">
-          <span className="text-2xl sm:text-3xl font-bold drop-shadow">{formatBDT(product.price)}</span>
+          <span className="text-2xl sm:text-3xl font-bold drop-shadow">{formatBDT(product.price, { currency: product.currency })}</span>
           {product.compare_at_price && Number(product.compare_at_price) > Number(product.price) && (
-            <span className="text-sm text-white/70 line-through">{formatBDT(Number(product.compare_at_price))}</span>
+            <span className="text-sm text-white/70 line-through">{formatBDT(Number(product.compare_at_price), { currency: product.currency })}</span>
           )}
         </div>
         <div className="mt-5 sm:mt-6 flex flex-wrap items-center gap-3">
@@ -213,9 +213,9 @@ function ProductTile({ product }: { product: ProductCard }) {
       <div className="absolute inset-0 z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[80%] text-white">
         <h3 className="font-bold uppercase text-sm sm:text-base leading-tight drop-shadow line-clamp-2">{product.name}</h3>
         <div className="mt-1 flex items-baseline gap-2">
-          <span className="text-base sm:text-lg font-extrabold drop-shadow">{formatBDT(product.price)}</span>
+          <span className="text-base sm:text-lg font-extrabold drop-shadow">{formatBDT(product.price, { currency: product.currency })}</span>
           {product.compare_at_price && Number(product.compare_at_price) > Number(product.price) && (
-            <span className="text-xs text-white/70 line-through">{formatBDT(Number(product.compare_at_price))}</span>
+            <span className="text-xs text-white/70 line-through">{formatBDT(Number(product.compare_at_price), { currency: product.currency })}</span>
           )}
         </div>
       </div>
