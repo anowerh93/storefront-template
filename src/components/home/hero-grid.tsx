@@ -38,7 +38,7 @@ export function HeroGrid({
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-5">
-      <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5">
+      <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5 lg:items-start">
         {hero?.image_url
           ? <ConfiguredBigBanner hero={hero} />
           : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} /> : <BannerPlaceholder />)}
@@ -68,13 +68,23 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
   // one click target: button 1's link, then button 2's, then /products.
   const href = hero.button1?.url || hero.button2?.url || '/products';
 
+  // Render the upload at its OWN aspect ratio (w-full h-auto) — no fixed height
+  // and no FitImage blur-fill. FitImage letterboxed a wide banner inside the
+  // taller hero box and filled the gap with a blurred copy, which showed up as
+  // lighter bands above/below the artwork. h-auto means the banner is exactly
+  // the image: no bands, no crop, whatever ratio the merchant uploads.
   return (
     <a
       href={href}
-      className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
+      className="group block overflow-hidden rounded-2xl"
       aria-label={hero.headline || 'Shop now'}
     >
-      <FitImage src={hero.image_url!} alt={hero.headline || ''} eager />
+      <img
+        src={hero.image_url!}
+        alt={hero.headline || ''}
+        loading="eager"
+        className="block w-full h-auto"
+      />
     </a>
   );
 }
