@@ -68,8 +68,14 @@ export function Header({
               </div>
             )}
 
-            {/* Search bar — full-width second line on mobile, inline hero on desktop */}
-            <form action="/products" method="get" className="order-last w-full md:order-none md:flex-1 md:max-w-2xl">
+            {/* Search bar — full-width second line on mobile; on desktop a
+                centred hero (max-w-2xl + mx-auto) so it stays visually centred
+                regardless of how wide the logo or the right-hand cluster are.
+                (Was md:flex-1, which grew from right after the logo and only
+                looked centred when both sides happened to be balanced — it
+                drifted left once the wishlist button and location pill were
+                removed.) */}
+            <form action="/products" method="get" className="order-last w-full md:order-none md:mx-auto md:max-w-2xl">
               <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
                 {/* name="category" + option values so the dropdown actually
                     filters — it submits ?category=<slug> to /products, which
