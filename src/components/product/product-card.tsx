@@ -2,6 +2,7 @@ import { Star } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 import { Badge } from '../ui/badge';
+import { FitImage } from '../ui/fit-image';
 
 export function ProductCard({ product }: { product: ProductCardType }) {
   const discount = discountPct(product.price, product.compare_at_price);
@@ -14,12 +15,7 @@ export function ProductCard({ product }: { product: ProductCardType }) {
       {/* Image */}
       <div className="relative aspect-square bg-slate-100 overflow-hidden">
         {product.image_url ? (
-          <img
-            src={product.image_url}
-            alt={product.name}
-            loading="lazy"
-            className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <FitImage src={product.image_url} alt={product.name} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-3xl font-bold">
             {product.name.charAt(0).toUpperCase()}

@@ -1,6 +1,7 @@
 import { ArrowRight } from 'lucide-react';
 import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
+import { FitImage } from '../ui/fit-image';
 
 /**
  * Hero — big banner on the left + two tiles stacked on the right (Shopwise
@@ -66,12 +67,7 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
 
   return (
     <div className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900">
-      <img
-        src={hero.image_url!}
-        alt={hero.headline || ''}
-        loading="eager"
-        className="absolute inset-0 h-full w-full object-cover"
-      />
+      <FitImage src={hero.image_url!} alt={hero.headline || ''} eager />
       <div className={BANNER_GRADIENT} />
 
       <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
@@ -113,12 +109,7 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
       href={tile.url || '/products'}
       className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
     >
-      <img
-        src={tile.image_url!}
-        alt={tile.heading || ''}
-        loading="lazy"
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-      />
+      <FitImage src={tile.image_url!} alt={tile.heading || ''} />
       {(tile.heading || tile.subtext) && (
         <>
           <div className={TILE_GRADIENT} />
@@ -148,12 +139,7 @@ function ProductBigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?
       className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
     >
       {product.image_url && (
-        <img
-          src={product.image_url}
-          alt={product.name}
-          loading="eager"
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-        />
+        <FitImage src={product.image_url} alt={product.name} eager />
       )}
       <div className={BANNER_GRADIENT} />
 
@@ -197,12 +183,7 @@ function ProductTile({ product }: { product: ProductCard }) {
       className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
     >
       {product.image_url && (
-        <img
-          src={product.image_url}
-          alt={product.name}
-          loading="lazy"
-          className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-        />
+        <FitImage src={product.image_url} alt={product.name} />
       )}
       <div className={TILE_GRADIENT} />
       {off && (

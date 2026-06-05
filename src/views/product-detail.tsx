@@ -6,6 +6,7 @@ import { MessengerCTA } from '../components/layout/messenger-cta';
 import { CodBadge } from '../components/layout/cod-badge';
 import { ProductGrid } from '../components/product/product-grid';
 import { Badge } from '../components/ui/badge';
+import { FitImage } from '../components/ui/fit-image';
 import { Separator } from '../components/ui/separator';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../components/ui/accordion';
 import { OrderNowForm } from '../components/product/order-now-form';
@@ -191,12 +192,7 @@ export function ProductDetailPage({
           <section className="mx-auto max-w-3xl px-4 sm:px-6 -mt-2">
             <div className="relative aspect-square sm:aspect-[5/4] rounded-3xl overflow-hidden bg-slate-100 shadow-xl">
               {(product.gallery_urls?.[0] ?? product.image_url) && (
-                <img
-                  src={(product.gallery_urls?.[0] ?? product.image_url) as string}
-                  alt={product.name}
-                  loading="eager"
-                  className="absolute inset-0 h-full w-full object-cover"
-                />
+                <FitImage src={(product.gallery_urls?.[0] ?? product.image_url) as string} alt={product.name} eager />
               )}
             </div>
           </section>
@@ -277,7 +273,7 @@ function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getPro
     <div className="space-y-3">
       <div className="relative aspect-square rounded-2xl overflow-hidden bg-slate-100">
         {urls[0] && (
-          <img src={urls[0]} alt={product.name} loading="eager" className="absolute inset-0 h-full w-full object-cover" />
+          <FitImage src={urls[0]} alt={product.name} eager />
         )}
       </div>
       {urls.length > 1 && (
