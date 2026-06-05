@@ -62,44 +62,20 @@ const TILE_GRADIENT   = 'absolute inset-0 bg-gradient-to-r from-black/55 via-bla
 /* ── Configured (admin-designed) banner + tiles ──────────────────────────── */
 
 function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
-  const b1 = hero.button1;
-  const b2 = hero.button2;
+  // The merchant uploaded a fully-designed banner (their own text + CTA baked
+  // into the artwork), so we show it CLEAN — no gradient, no overlaid eyebrow /
+  // headline / buttons / dots competing with their design. The whole banner is
+  // one click target: button 1's link, then button 2's, then /products.
+  const href = hero.button1?.url || hero.button2?.url || '/products';
 
   return (
-    <div className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900">
+    <a
+      href={href}
+      className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
+      aria-label={hero.headline || 'Shop now'}
+    >
       <FitImage src={hero.image_url!} alt={hero.headline || ''} eager />
-      <div className={BANNER_GRADIENT} />
-
-      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
-        {hero.eyebrow && (
-          <span className="text-sm sm:text-base font-medium text-white/90">{hero.eyebrow}</span>
-        )}
-        {hero.headline && (
-          <h1 className="mt-2 text-2xl sm:text-4xl lg:text-5xl font-extrabold uppercase leading-[1.1] drop-shadow-sm">
-            {hero.headline}
-          </h1>
-        )}
-        <div className="mt-5 sm:mt-7 flex flex-wrap items-center gap-3">
-          {b1?.label && (
-            <a href={b1.url || '/products'}
-               className="inline-flex items-center gap-2 ring-1 ring-white/70 hover:bg-white/10 font-semibold text-sm px-6 py-2.5 rounded uppercase tracking-wide transition">
-              {b1.label} <ArrowRight className="h-3.5 w-3.5" />
-            </a>
-          )}
-          {b2?.label && (
-            <a href={b2.url || '/products'}
-               className="inline-flex items-center bg-amber-400 hover:bg-amber-300 text-slate-900 font-semibold text-sm px-6 py-2.5 rounded uppercase tracking-wide transition">
-              {b2.label}
-            </a>
-          )}
-        </div>
-        <div className="mt-6 hidden sm:flex items-center gap-1.5">
-          <span className="h-2 w-6 rounded-full bg-white/90" />
-          <span className="h-2 w-2 rounded-full bg-white/40" />
-          <span className="h-2 w-2 rounded-full bg-white/40" />
-        </div>
-      </div>
-    </div>
+    </a>
   );
 }
 
