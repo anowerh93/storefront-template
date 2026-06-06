@@ -95,7 +95,16 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
       href={tile.url || '/products'}
       className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
     >
-      <FitImage src={tile.image_url!} alt={tile.heading || ''} eager />
+      {/* Merchant-designed tile artwork fills the slot edge-to-edge (cover) so
+          there are no blurred side-strips when the upload isn't an exact 2.1:1.
+          A correctly-sized 840x400 upload fills with no crop; off-ratio images
+          lose a sliver of an edge instead of showing blur bands. */}
+      <img
+        src={tile.image_url!}
+        alt={tile.heading || ''}
+        loading="eager"
+        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+      />
       {(tile.heading || tile.subtext) && (
         <>
           <div className={TILE_GRADIENT} />
