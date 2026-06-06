@@ -93,9 +93,9 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
   return (
     <a
       href={tile.url || '/products'}
-      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
+      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
     >
-      <FitImage src={tile.image_url!} alt={tile.heading || ''} />
+      <FitImage src={tile.image_url!} alt={tile.heading || ''} eager />
       {(tile.heading || tile.subtext) && (
         <>
           <div className={TILE_GRADIENT} />
@@ -166,10 +166,10 @@ function ProductTile({ product }: { product: ProductCard }) {
   return (
     <a
       href={`/products/${product.slug}`}
-      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] bg-slate-800"
+      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
     >
       {product.image_url && (
-        <FitImage src={product.image_url} alt={product.name} />
+        <FitImage src={product.image_url} alt={product.name} eager />
       )}
       <div className={TILE_GRADIENT} />
       {off && (
@@ -209,7 +209,7 @@ function BannerPlaceholder() {
 
 function TilePlaceholder() {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 min-h-[150px] sm:min-h-[175px] lg:min-h-[202px] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
+    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
       Featured slot
     </div>
   );
