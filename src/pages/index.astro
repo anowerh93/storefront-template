@@ -73,6 +73,14 @@ const dealsSpotlight = home?.deals_of_day.spotlight_id
   ? byId.get(home.deals_of_day.spotlight_id) ?? null
   : null;
 
+// Categories strip: if the merchant picked specific categories in Customization,
+// show exactly those in their chosen order; otherwise fall back to ALL visible
+// categories (the default — keeps existing stores unchanged).
+const catById = new Map(categories.map((c: any) => [c.id, c]));
+const homepageCategories = home?.categories?.category_ids?.length
+  ? (home.categories.category_ids.map((id: number) => catById.get(id)).filter(Boolean) as typeof categories)
+  : categories;
+
 const sectionOrder: HomepageSectionKey[] = home?.section_order?.length
   ? home.section_order
   : [
@@ -95,7 +103,7 @@ const sectionOrder: HomepageSectionKey[] = home?.section_order?.length
             : null;
         case 'categories':
           return home.categories.visible
-            ? <CategoryStrip categories={categories} title={home.categories.title} />
+            ? <CategoryStrip categories={homepageCategories} title={home.categories.title} />
             : null;
         case 'feature_products':
           return home.feature_products.visible && featureProducts.length > 0

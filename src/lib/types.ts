@@ -67,6 +67,7 @@ export type HomepageConfig = {
   categories: {
     visible: boolean;
     title: string;
+    category_ids: number[];
   };
   feature_products: {
     visible: boolean;
@@ -233,6 +234,7 @@ export type Paginated<T> = {
 // ──────────────────────────────────────────────────────────────
 
 export type Category = {
+  id: number;
   slug: string;
   name: string;
   product_count: number;
