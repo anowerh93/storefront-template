@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Star, Truck, ShieldCheck, MessageCircle } from 'lucide-react';
 import { formatBDT, discountPct } from '../lib/format';
 import { Header } from '../components/layout/header';
@@ -39,7 +40,12 @@ export function ProductDetailPage({
   // Either fetch failed (product) or storefront meta missing → 404 page.
   if (!product || !meta) return <NotFoundPage />;
 
-  const isFunnel = !!product.funnel;
+  // Use the conversion-focused funnel layout ONLY when the merchant actually
+  // configured funnel content. The API always returns a funnel object (even
+  // empty), so a bare `!!product.funnel` made EVERY product funnel and hid the
+  // richer standard layout (gallery + reviews + related).
+  const f = product.funnel;
+  const isFunnel = !!(f && (f.headline || f.subheadline || (f.benefits?.length ?? 0) > 0 || (f.faq?.length ?? 0) > 0));
   const discount = discountPct(product.price, product.compare_at_price);
 
   return (
@@ -182,23 +188,28 @@ export function ProductDetailPage({
               {product.funnel?.subheadline && (
                 <p className="mt-4 text-lg text-slate-600 max-w-2xl mx-auto">{product.funnel.subheadline}</p>
               )}
+              {(product.rating_count ?? 0) > 0 && product.rating_avg != null && (
+                <div className="mt-5 flex items-center justify-center gap-2 text-sm">
+                  <div className="flex items-center gap-0.5">
+                    {[1,2,3,4,5].map((n) => (
+                      <Star key={n} className={`h-4 w-4 ${n <= Math.round(product.rating_avg!) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                    ))}
+                  </div>
+                  <span className="font-semibold text-slate-900">{product.rating_avg.toFixed(1)}</span>
+                  <span className="text-slate-500">({product.rating_count} reviews)</span>
+                </div>
+              )}
               <div className="mt-6 flex justify-center">
                 <CodBadge size="lg" />
               </div>
             </div>
           </section>
 
-          {/* Hero image */}
-          <section className="mx-auto max-w-3xl px-4 sm:px-6 -mt-2">
-            <div className="relative aspect-square sm:aspect-[5/4] rounded-3xl overflow-hidden bg-slate-100 shadow-xl">
-              {(product.gallery_urls?.[0] ?? product.image_url) && (
-                <FitImage src={(product.gallery_urls?.[0] ?? product.image_url) as string} alt={product.name} eager />
-              )}
-            </div>
-          </section>
+          {/* Hero image gallery */}
+          <FunnelGallery product={product} />
 
           {/* Buy block */}
-          <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-10">
+          <section id="buy" className="mx-auto max-w-3xl px-4 sm:px-6 mt-10 scroll-mt-20">
             <div className="rounded-3xl bg-white ring-1 ring-slate-200 p-6 sm:p-8 shadow-sm">
               <div className="flex items-baseline gap-3 flex-wrap mb-4">
                 <span className="text-3xl font-bold text-slate-900">{formatBDT(product.price, { currency: product.currency })}</span>
@@ -210,6 +221,11 @@ export function ProductDetailPage({
                 )}
               </div>
               <OrderNowForm product={product} meta={meta} />
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-5 border-t border-slate-100 text-xs">
+                <TrustItem icon={Truck} title="Cash on Delivery" body="Pay on receipt" />
+                <TrustItem icon={ShieldCheck} title="Genuine product" body="100% authentic" />
+                <TrustItem icon={MessageCircle} title="Quick support" body="Reply within an hour" />
+              </div>
             </div>
           </section>
 
@@ -241,6 +257,29 @@ export function ProductDetailPage({
             </section>
           )}
 
+          {/* Reviews — social proof */}
+          {(product.reviews?.items?.length ?? 0) > 0 && (
+            <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-14">
+              <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">What customers say</h2>
+              <div className="grid sm:grid-cols-2 gap-5">
+                {product.reviews.items.slice(0, 6).map((r) => (
+                  <article key={r.id} className="rounded-2xl bg-white ring-1 ring-slate-200 p-5">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="flex items-center gap-0.5">
+                        {[1,2,3,4,5].map((n) => (
+                          <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+                        ))}
+                      </div>
+                      <span className="text-sm font-medium text-slate-900">{r.author}</span>
+                    </div>
+                    {r.title && <p className="text-sm font-semibold text-slate-900 mb-1">{r.title}</p>}
+                    <p className="text-sm text-slate-600 leading-relaxed">{r.body}</p>
+                  </article>
+                ))}
+              </div>
+            </section>
+          )}
+
           {/* FAQ */}
           {product.funnel?.faq && product.funnel.faq.length > 0 && (
             <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-14">
@@ -257,10 +296,13 @@ export function ProductDetailPage({
           )}
 
           {/* Final CTA */}
-          <section className="mx-auto max-w-3xl px-4 sm:px-6 my-14 text-center">
-            <a href="#top" className="inline-block">
-              <span className="text-sm font-medium text-brand-600 hover:underline">Order yours now ↑</span>
+          <section className="mx-auto max-w-3xl px-4 sm:px-6 my-16 text-center">
+            <a href="#buy"
+               className="inline-flex items-center justify-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-bold px-8 py-4 rounded-xl text-base shadow-lg shadow-brand-600/25 transition-all hover:-translate-y-0.5 active:translate-y-0">
+              Order yours now
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M5 15l7-7 7 7"/></svg>
             </a>
+            <p className="mt-3 text-xs text-slate-500">Cash on delivery available · Takes ~30 seconds to order</p>
           </section>
         </main>
       )}
@@ -271,7 +313,7 @@ export function ProductDetailPage({
   );
 }
 
-function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getProduct>> }) {
+function ProductGallery({ product }: { product: ProductDetail }) {
   // The API returns `gallery_urls: string[]` plus the `image_url` thumbnail.
   // Compose them into a stable list (primary first, then any extras).
   const urls = [
@@ -296,6 +338,39 @@ function ProductGallery({ product }: { product: Awaited<ReturnType<typeof getPro
         </div>
       )}
     </div>
+  );
+}
+
+function FunnelGallery({ product }: { product: ProductDetail }) {
+  // Gallery images first (the funnel showcase), then the primary image_url.
+  const urls = [
+    ...(product.gallery_urls ?? []),
+    ...(product.image_url ? [product.image_url] : []),
+  ].filter((u, i, arr) => !!u && arr.indexOf(u) === i);
+  const [active, setActive] = useState(0);
+  if (urls.length === 0) return null;
+
+  return (
+    <section className="mx-auto max-w-3xl px-4 sm:px-6 -mt-2">
+      <div className="relative aspect-square sm:aspect-[5/4] rounded-3xl overflow-hidden bg-slate-100 shadow-xl ring-1 ring-slate-200/70">
+        <FitImage src={urls[active]} alt={product.name} eager />
+      </div>
+      {urls.length > 1 && (
+        <div className="mt-3 flex flex-wrap justify-center gap-2.5">
+          {urls.slice(0, 6).map((src, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => setActive(i)}
+              aria-label={`View image ${i + 1}`}
+              className={`relative h-16 w-16 overflow-hidden rounded-xl bg-slate-100 ring-2 transition ${i === active ? 'ring-brand-500' : 'ring-slate-200 hover:ring-slate-300'}`}
+            >
+              <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+            </button>
+          ))}
+        </div>
+      )}
+    </section>
   );
 }
 
