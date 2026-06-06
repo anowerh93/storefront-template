@@ -213,6 +213,15 @@ export function ProductDetailPage({
             </div>
           </section>
 
+          {/* Description — the Basic Info description, shown on the funnel
+              layout too (previously only the standard layout rendered it). */}
+          {product.description && (
+            <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-12">
+              <h2 className="text-2xl font-bold text-slate-900 text-center mb-5">About this product</h2>
+              <p className="text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+            </section>
+          )}
+
           {/* Benefits */}
           {product.funnel?.benefits && product.funnel.benefits.length > 0 && (
             <section className="mx-auto max-w-3xl px-4 sm:px-6 mt-14">
