@@ -215,7 +215,7 @@ export type ProductReview = {
 export type FunnelPayload = {
   headline: string | null;
   subheadline: string | null;
-  benefits: { title: string; body: string }[];
+  benefits: string[];
   faq: { q: string; a: string }[];
 };
 

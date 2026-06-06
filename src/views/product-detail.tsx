@@ -219,12 +219,13 @@ export function ProductDetailPage({
               <h2 className="text-2xl font-bold text-slate-900 text-center mb-8">Why you'll love it</h2>
               <div className="grid sm:grid-cols-2 gap-5">
                 {product.funnel.benefits.map((b, i) => (
-                  <div key={i} className="rounded-2xl bg-white ring-1 ring-slate-200 p-5">
-                    <div className="w-9 h-9 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold mb-3">
+                  <div key={i} className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 flex items-start gap-3">
+                    <div className="w-9 h-9 shrink-0 rounded-xl bg-brand-100 text-brand-700 flex items-center justify-center font-bold">
                       {i + 1}
                     </div>
-                    <h3 className="font-semibold text-slate-900 mb-1">{b.title}</h3>
-                    <p className="text-sm text-slate-600">{b.body}</p>
+                    <p className="text-sm text-slate-700 leading-relaxed pt-1.5">
+                      {typeof b === 'string' ? b : ((b as any)?.title ?? (b as any)?.body ?? '')}
+                    </p>
                   </div>
                 ))}
               </div>
