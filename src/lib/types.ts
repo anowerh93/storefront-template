@@ -164,6 +164,7 @@ export type ProductCard = {
 };
 
 export type ProductDetail = ProductCard & {
+  brand: string | null;
   description: string | null;
   currency: string;
   gallery_urls: string[];
