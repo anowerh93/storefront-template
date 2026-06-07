@@ -252,7 +252,10 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
   const galleryUrls = (product.gallery_urls ?? []).filter(Boolean);
   const reviews = product.reviews?.items ?? [];
   const faq = product.funnel?.faq ?? [];
-  const specs = (product.specifications ?? []).filter((s) => s.label || s.value);
+  // Grouped spec sections; keep only groups that have a title or real rows.
+  const specGroups = (product.specifications ?? [])
+    .map((g) => ({ title: g.title ?? '', rows: (g.rows ?? []).filter((r) => r.label || r.value) }))
+    .filter((g) => g.title || g.rows.length);
 
   const phone = meta.whatsapp?.trim() || null;
   const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
@@ -260,13 +263,13 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
   const video = product.video_url ? videoEmbed(product.video_url) : null;
 
   const tabs = [
-    product.description ? { key: 'description', label: 'Description' } : null,
-    specs.length ? { key: 'specs', label: 'Specifications' } : null,
+    product.description_html ? { key: 'description', label: 'Description' } : null,
+    specGroups.length ? { key: 'specs', label: 'Specifications' } : null,
     galleryUrls.length ? { key: 'galleries', label: 'Galleries' } : null,
     video ? { key: 'video', label: 'Video' } : null,
     reviews.length ? { key: 'reviews', label: 'Reviews' } : null,
     faq.length ? { key: 'faq', label: 'FAQ' } : null,
-    product.support_info ? { key: 'support', label: 'Support' } : null,
+    product.support_info_html ? { key: 'support', label: 'Support' } : null,
   ].filter(Boolean) as { key: string; label: string }[];
 
   const [active, setActive] = useState(tabs[0]?.key ?? 'description');
@@ -288,21 +291,35 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
       </div>
 
       <div className="p-5 sm:p-6">
-        {active === 'description' && product.description && (
-          <div className="prose prose-sm max-w-none whitespace-pre-line text-slate-600">{product.description}</div>
+        {active === 'description' && product.description_html && (
+          <div
+            className="prose prose-sm max-w-none text-slate-600 prose-headings:text-slate-900 prose-a:text-brand-600 prose-table:text-sm"
+            dangerouslySetInnerHTML={{ __html: product.description_html }}
+          />
         )}
 
         {active === 'specs' && (
-          <table className="w-full overflow-hidden rounded-xl text-sm ring-1 ring-slate-100">
-            <tbody>
-              {specs.map((s, i) => (
-                <tr key={i} className="border-b border-slate-100 last:border-0 even:bg-slate-50/60">
-                  <th className="w-2/5 px-4 py-2.5 text-left align-top font-semibold text-slate-600">{s.label}</th>
-                  <td className="px-4 py-2.5 align-top text-slate-800">{s.value}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+          <div className="space-y-6">
+            {specGroups.map((g, gi) => (
+              <div key={gi}>
+                {g.title && (
+                  <h3 className="mb-2 text-sm font-bold text-slate-900">{g.title}</h3>
+                )}
+                {g.rows.length > 0 && (
+                  <table className="w-full overflow-hidden rounded-xl text-sm ring-1 ring-slate-100">
+                    <tbody>
+                      {g.rows.map((r, ri) => (
+                        <tr key={ri} className="border-b border-slate-100 last:border-0 even:bg-slate-50/60">
+                          <th className="w-2/5 px-4 py-2.5 text-left align-top font-semibold text-slate-600">{r.label}</th>
+                          <td className="px-4 py-2.5 align-top text-slate-800">{r.value}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ))}
+          </div>
         )}
 
         {active === 'video' && video && (
@@ -373,8 +390,11 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
 
         {active === 'support' && (
           <div className="space-y-5">
-            {product.support_info && (
-              <div className="prose prose-sm max-w-none whitespace-pre-line text-slate-600">{product.support_info}</div>
+            {product.support_info_html && (
+              <div
+                className="prose prose-sm max-w-none text-slate-600 prose-headings:text-slate-900 prose-a:text-brand-600 prose-table:text-sm"
+                dangerouslySetInnerHTML={{ __html: product.support_info_html }}
+              />
             )}
             {(phone || email) && (
               <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">

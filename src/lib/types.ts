@@ -166,10 +166,15 @@ export type ProductCard = {
 export type ProductDetail = ProductCard & {
   brand: string | null;
   warranty: string | null;
-  specifications: { label: string; value: string }[];
+  /** Grouped spec sections: [{ title, rows: [{label, value}] }]. */
+  specifications: { title: string; rows: { label: string; value: string }[] }[];
   video_url: string | null;
+  /** Raw Markdown (kept for fallbacks). */
   support_info: string | null;
   description: string | null;
+  /** Server-rendered, sanitized HTML from the Markdown source. */
+  support_info_html: string | null;
+  description_html: string | null;
   currency: string;
   gallery_urls: string[];
   variants: ProductVariant[];
