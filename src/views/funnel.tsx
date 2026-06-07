@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -43,6 +43,29 @@ const schema = z.object({
   notes:            z.string().max(500).optional(),
 });
 type FormData = z.infer<typeof schema>;
+
+/* Fade/slide a block in as it scrolls into view (funnels are noindex + JS-only
+   FB-ad traffic, so a JS-driven reveal is safe). Disabled → renders immediately. */
+function Reveal({ enabled, children }: { enabled: boolean; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [shown, setShown] = useState(!enabled);
+  useEffect(() => {
+    if (!enabled || shown) return;
+    const el = ref.current;
+    if (!el) return;
+    const io = new IntersectionObserver(
+      (entries) => { if (entries.some((e) => e.isIntersecting)) { setShown(true); io.disconnect(); } },
+      { threshold: 0.08, rootMargin: '0px 0px -40px 0px' },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [enabled, shown]);
+  return (
+    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+      {children}
+    </div>
+  );
+}
 
 export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: StorefrontMeta | null }) {
   useEffect(() => {
@@ -91,7 +114,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
-          return node ? <div key={key}>{node}</div> : null;
+          return node ? <Reveal key={key} enabled={config.animate !== false}>{node}</Reveal> : null;
         })}
       </main>
       <SlimFooter meta={meta} />
@@ -143,7 +166,17 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
   return (
     <section className="text-center">
       {config.eyebrow && <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">{config.eyebrow}</p>}
-      <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-900 sm:text-4xl">{config.headline || product.name}</h1>
+      {(() => {
+        const text = config.headline || product.name;
+        const hs = config.headline_style || 'plain';
+        if (hs === 'gradient') {
+          return <h1 className="mt-1 bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-2xl font-extrabold leading-tight text-transparent sm:text-4xl">{text}</h1>;
+        }
+        if (hs === 'highlight') {
+          return <h1 className="mt-1 text-2xl font-extrabold leading-tight sm:text-4xl"><span className="box-decoration-clone rounded bg-brand-100 px-2 text-brand-900">{text}</span></h1>;
+        }
+        return <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-900 sm:text-4xl">{text}</h1>;
+      })()}
       {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600">{config.subheadline}</p>}
       {img && (
         <div className="relative mt-5 aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
@@ -347,14 +380,30 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
 
         {product.variants.length > 0 && (
           <div>
-            <Label>Choose option</Label>
-            <div className="mt-1.5 flex flex-wrap gap-2">
-              {product.variants.map((v) => (
-                <button type="button" key={v.index} disabled={!v.in_stock} onClick={() => setVariantIdx(v.index)}
-                        className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${variantIdx === v.index ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-slate-400'} ${!v.in_stock ? 'cursor-not-allowed opacity-40' : ''}`}>
-                  {v.label}
-                </button>
-              ))}
+            <Label>{product.variants.length > 1 ? 'Choose your pack' : 'Option'}</Label>
+            <div className="mt-1.5 grid gap-2">
+              {product.variants.map((v) => {
+                const vp = v.price ?? product.price;
+                const vc = v.compare_at_price ?? product.compare_at_price;
+                const off = discountPct(vp, vc);
+                const selected = variantIdx === v.index;
+                return (
+                  <button type="button" key={v.index} disabled={!v.in_stock} onClick={() => setVariantIdx(v.index)}
+                          className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-300 hover:border-slate-400'} ${!v.in_stock ? 'cursor-not-allowed opacity-40' : ''}`}>
+                    <span className="flex items-center gap-2">
+                      <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-brand-500' : 'border-slate-300'}`}>
+                        {selected && <span className="h-2 w-2 rounded-full bg-brand-500" />}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">{v.label}</span>
+                    </span>
+                    <span className="shrink-0 text-right">
+                      <span className="text-sm font-bold text-rose-600">{formatBDT(vp, { currency: product.currency })}</span>
+                      {vc && vc > vp && <span className="ml-1 text-xs text-slate-400 line-through">{formatBDT(vc, { currency: product.currency })}</span>}
+                      {off && <span className="ml-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{off}%</span>}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         )}

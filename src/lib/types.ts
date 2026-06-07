@@ -262,7 +262,8 @@ export type FunnelProduct = {
 
 export type FunnelBlockConfig = {
   section_order: string[];
-  hero: { visible: boolean; eyebrow: string; headline: string; subheadline: string; image_url: string | null; cta_label: string };
+  animate?: boolean;
+  hero: { visible: boolean; eyebrow: string; headline: string; headline_style?: 'plain' | 'gradient' | 'highlight'; subheadline: string; image_url: string | null; cta_label: string };
   benefits: { visible: boolean; title: string; items: string[] };
   gallery: { visible: boolean; image_urls: string[] };
   price: { visible: boolean; note: string };
