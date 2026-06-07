@@ -66,3 +66,31 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
+/* ── Per-word/per-selection animations (funnel rich-text) ──────────────────
+   Words carry data-anim="TOKEN" (set in the dashboard inline editor, validated
+   server-side by App\Support\RichText). Tokens MUST mirror ANIM_TOKENS in
+   resources/js/inline-editor.js. They play only once their block scrolls into
+   view (Reveal adds .funnel-revealed). Resting state (no .funnel-revealed) is
+   fully visible, so text never hides if JS is disabled. */
+@keyframes fnl-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fnl-slide-up { from { opacity: 0; transform: translateY(0.6em); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fnl-pop { 0% { opacity: 0; transform: scale(0.6); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes fnl-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.09); } }
+@keyframes fnl-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
+
+/* transforms need inline-block; fade (opacity only) stays inline so it wraps */
+[data-anim="slide-up"],
+[data-anim="pop"],
+[data-anim="pulse"],
+[data-anim="shake"] { display: inline-block; }
+
+.funnel-revealed [data-anim="fade"]     { animation: fnl-fade .7s both; }
+.funnel-revealed [data-anim="slide-up"] { animation: fnl-slide-up .7s both; }
+.funnel-revealed [data-anim="pop"]      { animation: fnl-pop .6s both; }
+.funnel-revealed [data-anim="pulse"]    { animation: fnl-pulse 1.6s ease-in-out infinite; }
+.funnel-revealed [data-anim="shake"]    { animation: fnl-shake 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .funnel-revealed [data-anim] { animation: none !important; }
+}

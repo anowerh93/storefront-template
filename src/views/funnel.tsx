@@ -61,7 +61,7 @@ function Reveal({ enabled, children }: { enabled: boolean; children: ReactNode }
     return () => io.disconnect();
   }, [enabled, shown]);
   return (
-    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? 'translate-y-0 opacity-100' : 'translate-y-6 opacity-0'}`}>
+    <div ref={ref} className={`transition-all duration-700 ease-out ${shown ? 'translate-y-0 opacity-100 funnel-revealed' : 'translate-y-6 opacity-0'}`}>
       {children}
     </div>
   );
