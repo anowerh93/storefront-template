@@ -35,6 +35,13 @@ function BadgeIcon({ name, className }: { name: string; className?: string }) {
   return <C className={className} />;
 }
 
+/* Render sanitised inline rich-text HTML (bold/underline/highlight/colour/
+   data-anim) authored in the dashboard editor. Values are whitelist-sanitised
+   server-side (App\Support\RichText), so this is safe. */
+function RT({ html, as: Tag = 'span', className }: { html: string; as?: any; className?: string }) {
+  return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
+}
+
 const schema = z.object({
   customer_name:    z.string().min(2, 'Please enter your full name'),
   customer_address: z.string().min(10, 'Please enter your full delivery address'),
@@ -165,7 +172,7 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
   const img = config.image_url || product.image_url;
   return (
     <section className="text-center">
-      {config.eyebrow && <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">{config.eyebrow}</p>}
+      {config.eyebrow && <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />}
       {(() => {
         // headline is sanitized inline HTML (bold/underline/highlight/colour);
         // fall back to the plain product name when empty.
@@ -199,7 +206,7 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
         </div>
       )}
       <a href="#funnel-order" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-7 py-3 text-base font-bold text-white shadow transition hover:bg-brand-700">
-        <ShoppingBag className="h-5 w-5" /> {config.cta_label || 'Order Now'}
+        <ShoppingBag className="h-5 w-5" /> <RT html={config.cta_label || 'Order Now'} />
       </a>
     </section>
   );
@@ -208,12 +215,12 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
 function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
   return (
     <section>
-      {config.title && <h2 className="mb-4 text-center text-xl font-bold text-slate-900">{config.title}</h2>}
+      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
       <ul className="mx-auto max-w-xl space-y-2.5">
         {config.items.map((b, i) => (
           <li key={i} className="flex gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
             <Check className="h-5 w-5 shrink-0 text-emerald-600" />
-            <span className="text-slate-700">{b}</span>
+            <RT className="text-slate-700" html={b} />
           </li>
         ))}
       </ul>
@@ -244,7 +251,7 @@ function PriceBlock({ config, product }: { config: FunnelBlockConfig['price']; p
         )}
         {off && <span className="rounded-full bg-rose-600 px-2.5 py-1 text-xs font-bold text-white">Save {off}%</span>}
       </div>
-      {config.note && <p className="mt-2 text-sm text-slate-500">{config.note}</p>}
+      {config.note && <RT as="p" className="mt-2 text-sm text-slate-500" html={config.note} />}
     </section>
   );
 }
@@ -261,8 +268,8 @@ function Urgency({ config }: { config: FunnelBlockConfig['urgency'] }) {
   const ss = String(left % 60).padStart(2, '0');
   return (
     <section className="rounded-2xl bg-amber-50 px-5 py-4 text-center ring-1 ring-amber-200">
-      <p className="flex items-center justify-center gap-2 font-bold text-amber-900"><Clock className="h-5 w-5" /> {config.headline}</p>
-      {config.stock_text && <p className="mt-1 text-sm text-amber-700">{config.stock_text}</p>}
+      <p className="flex items-center justify-center gap-2 font-bold text-amber-900"><Clock className="h-5 w-5" /> <RT html={config.headline} /></p>
+      {config.stock_text && <RT as="p" className="mt-1 text-sm text-amber-700" html={config.stock_text} />}
       {config.countdown_minutes > 0 && <p className="mt-2 text-2xl font-extrabold tabular-nums text-amber-900">{hh}:{mm}:{ss}</p>}
     </section>
   );
@@ -271,12 +278,12 @@ function Urgency({ config }: { config: FunnelBlockConfig['urgency'] }) {
 function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
   return (
     <section>
-      {config.title && <h2 className="mb-4 text-center text-xl font-bold text-slate-900">{config.title}</h2>}
+      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
       <div className="grid gap-3 sm:grid-cols-2">
         {config.items.map((w, i) => (
           <div key={i} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-            <p className="font-semibold text-slate-900">{w.title}</p>
-            {w.body && <p className="mt-1 text-sm text-slate-600">{w.body}</p>}
+            <RT as="p" className="font-semibold text-slate-900" html={w.title} />
+            {w.body && <RT as="p" className="mt-1 text-sm text-slate-600" html={w.body} />}
           </div>
         ))}
       </div>
@@ -287,7 +294,7 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
 function Reviews({ config, product }: { config: FunnelBlockConfig['reviews']; product: FunnelProduct }) {
   return (
     <section>
-      {config.title && <h2 className="mb-4 text-center text-xl font-bold text-slate-900">{config.title}</h2>}
+      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
       <div className="space-y-4">
         {product.reviews.items.slice(0, 10).map((r) => (
           <article key={r.id} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
@@ -315,8 +322,8 @@ function Faq({ config }: { config: FunnelBlockConfig['faq'] }) {
       <div className="mx-auto max-w-xl space-y-3">
         {config.items.map((f, i) => (
           <details key={i} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-            <summary className="cursor-pointer font-semibold text-slate-900">{f.q}</summary>
-            <p className="mt-2 text-sm leading-relaxed text-slate-600">{f.a}</p>
+            <summary className="cursor-pointer font-semibold text-slate-900"><RT html={f.q} /></summary>
+            <RT as="p" className="mt-2 text-sm leading-relaxed text-slate-600" html={f.a} />
           </details>
         ))}
       </div>
@@ -330,7 +337,7 @@ function TrustBadges({ items }: { items: { icon: string; title: string }[] }) {
       {items.map((b, i) => (
         <div key={i} className="flex flex-col items-center gap-1.5 rounded-xl bg-white p-4 text-center ring-1 ring-slate-200">
           <BadgeIcon name={b.icon} className="h-6 w-6 text-brand-600" />
-          <span className="text-xs font-medium text-slate-700">{b.title}</span>
+          <RT className="text-xs font-medium text-slate-700" html={b.title} />
         </div>
       ))}
     </section>
@@ -388,7 +395,7 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
 
   return (
     <section id="funnel-order" className="scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
-      <h2 className="text-center text-lg font-bold text-slate-900">{config.heading || 'Order now — Cash on Delivery'}</h2>
+      <RT as="h2" className="text-center text-lg font-bold text-slate-900" html={config.heading || 'Order now — Cash on Delivery'} />
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">
         {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
@@ -479,7 +486,7 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
 
         <Button type="submit" variant="brand" size="lg" className="w-full shadow-md" disabled={!inStock || submitting}>
           <ShoppingBag className="h-4 w-4" />
-          {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : (config.button_label || 'Confirm Order')}
+          {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : <RT html={config.button_label || 'Confirm Order'} />}
         </Button>
       </form>
     </section>
