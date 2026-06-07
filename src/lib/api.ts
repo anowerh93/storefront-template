@@ -28,6 +28,7 @@
 import type {
   Category,
   CreateOrderInput,
+  FunnelData,
   OrderResponse,
   Paginated,
   ProductCard,
@@ -150,6 +151,12 @@ export async function getCategory(
       },
     } as Paginated<ProductCard>,
   };
+}
+
+export function getFunnel(funnelSlug: string) {
+  return apiFetch<FunnelData>(`/funnels/${encodeURIComponent(funnelSlug)}`, {
+    tags: ['funnels', `funnel:${funnelSlug}`],
+  });
 }
 
 export function getMessengerLink(opts: { productId?: number; variant?: string } = {}) {

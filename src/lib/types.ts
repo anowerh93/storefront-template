@@ -229,6 +229,59 @@ export type FunnelPayload = {
   faq: { q: string; a: string }[];
 };
 
+// ──────────────────────────────────────────────────────────────
+// Funnels (GET /storefronts/{slug}/funnels/{funnelSlug})
+// ──────────────────────────────────────────────────────────────
+
+export type FunnelReview = {
+  id: number;
+  author_name: string;
+  location: string | null;
+  avatar_url: string | null;
+  rating: number;
+  body: string;
+  images: string[];
+  is_featured: boolean;
+  created_at: string | null;
+};
+
+export type FunnelProduct = {
+  id: number;
+  slug: string;
+  name: string;
+  price: number;
+  compare_at_price: number | null;
+  currency: string;
+  image_url: string | null;
+  gallery_urls: string[];
+  variants: ProductVariant[];
+  in_stock: boolean;
+  stock_badge?: string | null;
+  reviews: { count: number; average: number | null; items: FunnelReview[] };
+};
+
+export type FunnelBlockConfig = {
+  section_order: string[];
+  hero: { visible: boolean; eyebrow: string; headline: string; subheadline: string; image_url: string | null; cta_label: string };
+  benefits: { visible: boolean; title: string; items: string[] };
+  gallery: { visible: boolean; image_urls: string[] };
+  price: { visible: boolean; note: string };
+  urgency: { visible: boolean; headline: string; stock_text: string; countdown_minutes: number };
+  order_form: { visible: boolean; heading: string; button_label: string };
+  why_us: { visible: boolean; title: string; items: { title: string; body: string }[] };
+  reviews: { visible: boolean; title: string };
+  faq: { visible: boolean; items: { q: string; a: string }[] };
+  trust_badges: { visible: boolean; items: { icon: string; title: string }[] };
+};
+
+export type FunnelData = {
+  slug: string;
+  name: string;
+  goal: string;
+  config: FunnelBlockConfig;
+  product: FunnelProduct;
+};
+
 export type Paginated<T> = {
   data: T[];
   meta: {

@@ -19,9 +19,11 @@ export interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
+  /** Funnel/landing pages set this so they don't compete with the catalog in search. */
+  noindex?: boolean;
 }
 
-const { title, description, ogImage } = Astro.props;
+const { title, description, ogImage, noindex } = Astro.props;
 
 // Fetch tenant metadata. If it fails (API down, slug mis-set), render a
 // graceful skeleton rather than crashing the build — matches the Next.js
@@ -58,6 +60,7 @@ const favicon = meta?.logo_url ?? null;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{finalTitle}</title>
     {finalDescription && <meta name="description" content={finalDescription} />}
+    {noindex && <meta name="robots" content="noindex,nofollow" />}
 
     {/* OpenGraph + Twitter — built-in defaults so social shares look right */}
     <meta property="og:title" content={finalTitle} />

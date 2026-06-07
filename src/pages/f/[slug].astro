@@ -1,0 +1,31 @@
+---
+/**
+ * Ad funnel landing page: /f/{slug}
+ *
+ * SSR on CF Workers (prerender:false) — the funnel is resolved per request
+ * by slug (not a build-time route), same pattern as checkout/product pages.
+ * Always noindex so it never competes with the catalog product page in search.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getFunnel, getStorefront } from '../../lib/api';
+import { FunnelPage } from '../../views/funnel';
+import type { FunnelPayload, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+let funnel: FunnelPayload | null = null;
+let meta: StorefrontMeta | null = null;
+
+if (slug) {
+  try { funnel = await getFunnel(slug); } catch (err) { console.warn(`[f/[slug].astro] getFunnel(${slug}) failed:`, err); }
+}
+try { meta = await getStorefront(); } catch (err) { console.warn('[f/[slug].astro] getStorefront() failed:', err); }
+
+if (!funnel) { Astro.response.status = 404; }
+---
+
+<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true}>
+  <FunnelPage client:load funnel={funnel} meta={meta} />
+</Base>
