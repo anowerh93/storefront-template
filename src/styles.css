@@ -50,6 +50,15 @@
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Inline highlight (<mark>) from funnel rich-text headlines — keep the
+     editor's amber look and inherit the surrounding text colour. */
+  mark {
+    background-color: rgb(253 230 138); /* amber-200 */
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 0.1em;
+  }
 }
 
 @layer utilities {

@@ -167,17 +167,32 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
     <section className="text-center">
       {config.eyebrow && <p className="text-sm font-semibold uppercase tracking-wide text-brand-600">{config.eyebrow}</p>}
       {(() => {
-        const text = config.headline || product.name;
+        // headline is sanitized inline HTML (bold/underline/highlight/colour);
+        // fall back to the plain product name when empty.
+        const html = (config.headline || '').trim();
         const hs = config.headline_style || 'plain';
+        const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
         if (hs === 'gradient') {
-          return <h1 className="mt-1 bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-2xl font-extrabold leading-tight text-transparent sm:text-4xl">{text}</h1>;
+          const cls = `${base} bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-transparent`;
+          return html
+            ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
+            : <h1 className={cls}>{product.name}</h1>;
         }
         if (hs === 'highlight') {
-          return <h1 className="mt-1 text-2xl font-extrabold leading-tight sm:text-4xl"><span className="box-decoration-clone rounded bg-brand-100 px-2 text-brand-900">{text}</span></h1>;
+          return (
+            <h1 className={base}>
+              <span className="box-decoration-clone rounded bg-brand-100 px-2 text-brand-900">
+                {html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : product.name}
+              </span>
+            </h1>
+          );
         }
-        return <h1 className="mt-1 text-2xl font-extrabold leading-tight text-slate-900 sm:text-4xl">{text}</h1>;
+        const cls = `${base} text-slate-900`;
+        return html
+          ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
+          : <h1 className={cls}>{product.name}</h1>;
       })()}
-      {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600">{config.subheadline}</p>}
+      {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
       {img && (
         <div className="relative mt-5 aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
           <FitImage src={img} alt={product.name} eager />
