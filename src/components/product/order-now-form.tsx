@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Minus, Plus, ShoppingBag, Truck, ShieldCheck, MessageCircle } from 'lucide-react';
+import { Minus, Plus, ShoppingBag, Truck } from 'lucide-react';
 import type { ProductDetail, ProductVariant, StorefrontMeta } from '../../lib/types';
 import { submitOrder } from '../../lib/api';
 import { formatBDT } from '../../lib/format';
@@ -235,22 +235,6 @@ export function OrderNowForm({
         <ShoppingBag className="h-4 w-4" />
         {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : `Order Now — ${formatBDT(total, { currency: meta.currency })}`}
       </Button>
-
-      {/* Trust strip */}
-      <div className="grid grid-cols-3 gap-2 pt-1 text-[10px] text-slate-500">
-        <Trust icon={Truck} label="Cash on Delivery" />
-        <Trust icon={ShieldCheck} label="100% genuine" />
-        <Trust icon={MessageCircle} label="Easy support" />
-      </div>
     </form>
-  );
-}
-
-function Trust({ icon: Icon, label }: { icon: React.ComponentType<{ className?: string }>; label: string }) {
-  return (
-    <div className="flex flex-col items-center gap-1 text-center">
-      <Icon className="h-4 w-4 text-brand-600" />
-      <span>{label}</span>
-    </div>
   );
 }
