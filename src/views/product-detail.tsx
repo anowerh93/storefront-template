@@ -65,8 +65,13 @@ export function ProductDetailPage({
           </nav>
 
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-            {/* Gallery */}
-            <ProductGallery product={product} />
+            {/* Gallery — sticky on desktop so it follows the (taller) buy box
+                as you scroll, instead of leaving a big empty gap beside it.
+                self-start keeps the column at its natural height so sticky has
+                room to travel within the row. */}
+            <div className="lg:self-start lg:sticky lg:top-6">
+              <ProductGallery product={product} />
+            </div>
 
             {/* Buy box */}
             <div className="space-y-5">
