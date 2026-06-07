@@ -127,10 +127,27 @@ export function OrderNowForm({
 
       <div className="space-y-2">
         <Label>Quantity</Label>
-        <div className="inline-flex items-center rounded-xl border border-slate-300">
-          <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} className="p-2.5 text-slate-600 hover:text-slate-900" aria-label="Decrease"><Minus className="h-4 w-4" /></button>
-          <span className="px-4 py-2 text-sm font-semibold tabular-nums min-w-[3ch] text-center">{qty}</span>
-          <button type="button" onClick={() => setQty(qty + 1)} className="p-2.5 text-slate-600 hover:text-slate-900" aria-label="Increase"><Plus className="h-4 w-4" /></button>
+        <div className="flex w-fit items-stretch overflow-hidden rounded-xl border border-slate-300 bg-white">
+          <button
+            type="button"
+            onClick={() => setQty(Math.max(1, qty - 1))}
+            disabled={qty <= 1}
+            aria-label="Decrease quantity"
+            className="flex items-center justify-center px-4 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Minus className="h-4 w-4" />
+          </button>
+          <span className="flex w-14 items-center justify-center border-x border-slate-300 py-2.5 text-sm font-bold tabular-nums text-slate-900">
+            {qty}
+          </span>
+          <button
+            type="button"
+            onClick={() => setQty(qty + 1)}
+            aria-label="Increase quantity"
+            className="flex items-center justify-center px-4 text-slate-600 transition hover:bg-slate-50 hover:text-slate-900"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
         </div>
       </div>
 
