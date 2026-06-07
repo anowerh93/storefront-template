@@ -1,0 +1,35 @@
+---
+/**
+ * Dedicated checkout page. Reached from the PDP "Order Now" button:
+ *   /checkout?p=<product-slug>&v=<variant-index>&q=<qty>
+ *
+ * SSR on CF Workers (prerender:false) — the product comes from a query
+ * param, not a build-time route, so we fetch it server-side per request
+ * (same pattern as the product + order pages). The CheckoutPage island
+ * then reuses the exact order schema + submitOrder logic.
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getProduct, getStorefront } from '../lib/api';
+import { CheckoutPage } from '../views/checkout';
+import type { ProductDetail, StorefrontMeta } from '../lib/types';
+
+const params = Astro.url.searchParams;
+const slug = params.get('p') ?? '';
+const vRaw = parseInt(params.get('v') ?? '', 10);
+const variantIndex = Number.isNaN(vRaw) ? null : vRaw;
+const qty = Math.max(1, parseInt(params.get('q') ?? '1', 10) || 1);
+
+let product: ProductDetail | null = null;
+let meta: StorefrontMeta | null = null;
+
+if (slug) {
+  try { product = await getProduct(slug); } catch (err) { console.warn(`[checkout.astro] getProduct(${slug}) failed:`, err); }
+}
+try { meta = await getStorefront(); } catch (err) { console.warn('[checkout.astro] getStorefront() failed:', err); }
+---
+
+<Base title="Checkout" description="Secure checkout">
+  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} />
+</Base>
