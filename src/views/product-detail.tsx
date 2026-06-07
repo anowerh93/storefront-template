@@ -120,9 +120,18 @@ export function ProductDetailPage({
                 )}
               </div>
 
+              {/* Description — shown BEFORE the order form so customers know
+                  what they're buying before they start filling it in. */}
+              {product.description && (
+                <div>
+                  <h3 className="text-sm font-semibold text-slate-900 mb-1.5">Description</h3>
+                  <p className="text-sm text-slate-600 leading-relaxed whitespace-pre-line">{product.description}</p>
+                </div>
+              )}
+
               <Separator />
 
-              {/* Add to cart */}
+              {/* Order form */}
               <OrderNowForm product={product} meta={meta} />
 
               {/* Trust signals */}
@@ -132,19 +141,7 @@ export function ProductDetailPage({
                 <TrustItem icon={MessageCircle} title="Easy support" body="We respond within an hour" />
               </div>
 
-              {/* Description */}
-              {product.description && (
-                <Accordion type="single" collapsible defaultValue="description">
-                  <AccordionItem value="description">
-                    <AccordionTrigger>Description</AccordionTrigger>
-                    <AccordionContent>
-                      <div className="prose prose-sm max-w-none text-slate-600 whitespace-pre-line">
-                        {product.description}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-              )}
+              {/* (Description moved above the order form.) */}
             </div>
           </div>
 
