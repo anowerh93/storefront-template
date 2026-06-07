@@ -59,7 +59,7 @@ export async function HomePage() {
     switch (key) {
       case 'hero':
         return home.hero.visible && heroProducts.length > 0
-          ? <HeroGrid key="hero" featured={heroProducts} eyebrow={home.hero.eyebrow} />
+          ? <HeroGrid key="hero" featured={heroProducts} hero={home.hero} />
           : null;
       case 'categories':
         return home.categories.visible

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Phone, Facebook, MessageCircle, Link2, Check, ShoppingBag } from 'lucide-react';
+import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag } from 'lucide-react';
 import { formatBDT, discountPct } from '../lib/format';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -60,7 +60,7 @@ export function ProductDetailPage({
 
         {/* Tabs + sidebar */}
         <div className="mt-8 grid lg:grid-cols-[minmax(0,1fr)_320px] gap-8 items-start">
-          <ProductTabs product={product} />
+          <ProductTabs product={product} meta={meta} />
           <Sidebar product={product} meta={meta} category={category} />
         </div>
       </main>
@@ -235,17 +235,38 @@ function ShareRow({ name }: { name: string }) {
   );
 }
 
+/* ── Video embed helper ───────────────────────────────────────────────── */
+/** Resolve a raw YouTube / Vimeo / direct-file URL into something renderable. */
+function videoEmbed(raw: string): { type: 'iframe' | 'file' | 'link'; src: string } {
+  const u = raw.trim();
+  const yt = u.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/|v\/)|youtu\.be\/)([\w-]{11})/);
+  if (yt) return { type: 'iframe', src: `https://www.youtube.com/embed/${yt[1]}` };
+  const vm = u.match(/vimeo\.com\/(?:video\/)?(\d+)/);
+  if (vm) return { type: 'iframe', src: `https://player.vimeo.com/video/${vm[1]}` };
+  if (/\.(mp4|webm|ogg)(\?|#|$)/i.test(u)) return { type: 'file', src: u };
+  return { type: 'link', src: u };
+}
+
 /* ── Tabs ─────────────────────────────────────────────────────────────── */
-function ProductTabs({ product }: { product: ProductDetail }) {
+function ProductTabs({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
   const galleryUrls = (product.gallery_urls ?? []).filter(Boolean);
   const reviews = product.reviews?.items ?? [];
   const faq = product.funnel?.faq ?? [];
+  const specs = (product.specifications ?? []).filter((s) => s.label || s.value);
+
+  const phone = meta.whatsapp?.trim() || null;
+  const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
+  const email = meta.email?.trim() || null;
+  const video = product.video_url ? videoEmbed(product.video_url) : null;
 
   const tabs = [
     product.description ? { key: 'description', label: 'Description' } : null,
+    specs.length ? { key: 'specs', label: 'Specifications' } : null,
     galleryUrls.length ? { key: 'galleries', label: 'Galleries' } : null,
+    video ? { key: 'video', label: 'Video' } : null,
     reviews.length ? { key: 'reviews', label: 'Reviews' } : null,
     faq.length ? { key: 'faq', label: 'FAQ' } : null,
+    product.support_info ? { key: 'support', label: 'Support' } : null,
   ].filter(Boolean) as { key: string; label: string }[];
 
   const [active, setActive] = useState(tabs[0]?.key ?? 'description');
@@ -269,6 +290,45 @@ function ProductTabs({ product }: { product: ProductDetail }) {
       <div className="p-5 sm:p-6">
         {active === 'description' && product.description && (
           <div className="prose prose-sm max-w-none whitespace-pre-line text-slate-600">{product.description}</div>
+        )}
+
+        {active === 'specs' && (
+          <table className="w-full overflow-hidden rounded-xl text-sm ring-1 ring-slate-100">
+            <tbody>
+              {specs.map((s, i) => (
+                <tr key={i} className="border-b border-slate-100 last:border-0 even:bg-slate-50/60">
+                  <th className="w-2/5 px-4 py-2.5 text-left align-top font-semibold text-slate-600">{s.label}</th>
+                  <td className="px-4 py-2.5 align-top text-slate-800">{s.value}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        {active === 'video' && video && (
+          video.type === 'iframe' ? (
+            <div className="relative aspect-video overflow-hidden rounded-xl bg-black">
+              <iframe
+                src={video.src}
+                title={`${product.name} video`}
+                loading="lazy"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowFullScreen
+                className="absolute inset-0 h-full w-full"
+              />
+            </div>
+          ) : video.type === 'file' ? (
+            <video src={video.src} controls className="w-full rounded-xl bg-black" />
+          ) : (
+            <a
+              href={video.src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white transition hover:bg-slate-800"
+            >
+              ▶ Watch video
+            </a>
+          )
         )}
 
         {active === 'galleries' && (
@@ -310,6 +370,47 @@ function ProductTabs({ product }: { product: ProductDetail }) {
             ))}
           </div>
         )}
+
+        {active === 'support' && (
+          <div className="space-y-5">
+            {product.support_info && (
+              <div className="prose prose-sm max-w-none whitespace-pre-line text-slate-600">{product.support_info}</div>
+            )}
+            {(phone || email) && (
+              <div className="rounded-xl bg-slate-50 p-4 ring-1 ring-slate-100">
+                <p className="text-sm font-semibold text-slate-900">Need help with this product?</p>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {phone && (
+                    <a
+                      href={`https://wa.me/${phoneDigits}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3.5 py-2 text-sm font-semibold text-white transition hover:bg-emerald-600"
+                    >
+                      <MessageCircle className="h-4 w-4" /> WhatsApp
+                    </a>
+                  )}
+                  {phone && (
+                    <a
+                      href={`tel:${phoneDigits}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <Phone className="h-4 w-4 text-brand-600" /> Call
+                    </a>
+                  )}
+                  {email && (
+                    <a
+                      href={`mailto:${email}`}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                    >
+                      <Mail className="h-4 w-4 text-slate-500" /> Email
+                    </a>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -326,6 +427,10 @@ function Sidebar({
   category: { slug: string; name: string } | null;
 }) {
   const related = (product.related_products ?? []).slice(0, 4);
+  // Tenant's order/contact number drives both buttons. Hidden entirely when unset.
+  const phone = meta.whatsapp?.trim() || null;
+  const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
+  const waText = encodeURIComponent(`Hi, I'd like to order: ${product.name}`);
 
   return (
     <aside className="space-y-6">
@@ -349,17 +454,53 @@ function Sidebar({
       )}
 
       <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-4">
-        <h2 className="mb-3 border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">Quick Summary</h2>
-        <dl className="space-y-2.5 text-sm">
+        <h2 className="border-b border-slate-100 pb-3 text-sm font-bold text-slate-900">Quick Summary</h2>
+
+        {product.image_url && (
+          <div className="relative my-4 aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
+            <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
+          </div>
+        )}
+
+        <dl className="divide-y divide-slate-100 text-sm">
           {product.brand && (
-            <div className="flex justify-between gap-3"><dt className="text-slate-500">Brand</dt><dd className="text-right font-semibold text-slate-900">{product.brand}</dd></div>
+            <div className="flex items-center justify-between gap-3 py-2.5"><dt className="text-slate-500">Brand</dt><dd className="text-right font-semibold text-slate-900">{product.brand}</dd></div>
           )}
           {category && (
-            <div className="flex justify-between gap-3"><dt className="text-slate-500">Category</dt><dd className="text-right font-semibold text-slate-900">{category.name}</dd></div>
+            <div className="flex items-center justify-between gap-3 py-2.5"><dt className="text-slate-500">Category</dt><dd className="text-right font-semibold text-slate-900">{category.name}</dd></div>
           )}
-          <div className="flex justify-between gap-3"><dt className="text-slate-500">Price</dt><dd className="text-right font-bold text-brand-600">{formatBDT(product.price, { currency: product.currency })}</dd></div>
-          <div className="flex justify-between gap-3"><dt className="text-slate-500">Availability</dt><dd className={`text-right font-semibold ${product.in_stock ? 'text-emerald-600' : 'text-rose-600'}`}>{product.in_stock ? 'In Stock' : 'Out of Stock'}</dd></div>
+          <div className="flex items-center justify-between gap-3 py-2.5"><dt className="text-slate-500">Price</dt><dd className="text-right font-bold text-brand-600">{formatBDT(product.price, { currency: product.currency })}</dd></div>
+          <div className="flex items-center justify-between gap-3 py-2.5">
+            <dt className="text-slate-500">Stock</dt>
+            <dd>
+              {product.in_stock ? (
+                <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-200">In Stock</span>
+              ) : (
+                <span className="rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-700 ring-1 ring-rose-200">Out of Stock</span>
+              )}
+            </dd>
+          </div>
+          <div className="flex items-center justify-between gap-3 py-2.5"><dt className="text-slate-500">Warranty</dt><dd className="text-right font-semibold text-slate-900">{product.warranty || 'N/A'}</dd></div>
         </dl>
+
+        {phone && (
+          <div className="mt-4 space-y-2">
+            <a
+              href={`https://wa.me/${phoneDigits}?text=${waText}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-emerald-600"
+            >
+              <MessageCircle className="h-4 w-4" /> WhatsApp Order
+            </a>
+            <a
+              href={`tel:${phoneDigits}`}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-bold text-slate-800 transition hover:bg-slate-50"
+            >
+              <Phone className="h-4 w-4 text-brand-600" /> Call Now
+            </a>
+          </div>
+        )}
       </div>
     </aside>
   );
