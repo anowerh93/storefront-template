@@ -79,6 +79,11 @@
 @keyframes fnl-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.09); } }
 @keyframes fnl-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
 
+/* Per-section dark background → readable (white) text. Unlayered so it beats
+   Tailwind's text-* utilities, but plain enough that inline rich-text colours
+   (style="color:…") still win. */
+.funnel-dark :is(h1, h2, h3, h4, p, span, li, summary) { color: #fff; }
+
 /* transforms need inline-block; fade (opacity only) stays inline so it wraps */
 [data-anim="slide-up"],
 [data-anim="pop"],

@@ -121,7 +121,11 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
-          return node ? <Reveal key={key} enabled={config.animate !== false}>{node}</Reveal> : null;
+          return node ? (
+            <Reveal key={key} enabled={config.animate !== false}>
+              <SectionBg bg={(config as unknown as Record<string, SectionBgFields>)[key]}>{node}</SectionBg>
+            </Reveal>
+          ) : null;
         })}
       </main>
       <SlimFooter meta={meta} />
@@ -176,36 +180,50 @@ function isDarkHex(hex?: string): boolean {
   return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
 }
 
-function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
-  const img = config.image_url || product.image_url;
-
-  // Full-section background (one mode at a time) with auto-readable text.
-  const bgType = config.bg_type || 'none';
-  let bgStyle: CSSProperties = {};
+// Reusable per-section background — one mode at a time (solid colour / gradient
+// / image), used to wrap EVERY block. Dark backgrounds get .funnel-dark so the
+// CSS whitens text (inline rich-text colours still win); image gets a baked-in
+// dark scrim. No background → renders children untouched.
+type SectionBgFields = {
+  bg_type?: 'none' | 'color' | 'gradient' | 'image';
+  bg_color?: string;
+  bg_gradient_from?: string;
+  bg_gradient_to?: string;
+  bg_gradient_angle?: number;
+  bg_image_url?: string | null;
+};
+function SectionBg({ bg, children }: { bg?: SectionBgFields; children: ReactNode }) {
+  const t = bg?.bg_type || 'none';
+  let style: CSSProperties = {};
   let dark = false;
-  let hasBg = false;
-  if (bgType === 'color') {
-    bgStyle = { background: config.bg_color || '#0f172a' };
-    dark = isDarkHex(config.bg_color);
-    hasBg = true;
-  } else if (bgType === 'gradient') {
-    bgStyle = { background: `linear-gradient(${config.bg_gradient_angle ?? 135}deg, ${config.bg_gradient_from || '#6366f1'}, ${config.bg_gradient_to || '#f59e0b'})` };
-    dark = isDarkHex(config.bg_gradient_from);
-    hasBg = true;
-  } else if (bgType === 'image' && config.bg_image_url) {
-    bgStyle = {
-      backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(config.bg_image_url)})`,
+  let has = false;
+  if (t === 'color') {
+    style = { background: bg!.bg_color || '#0f172a' };
+    dark = isDarkHex(bg!.bg_color);
+    has = true;
+  } else if (t === 'gradient') {
+    style = { background: `linear-gradient(${bg!.bg_gradient_angle ?? 135}deg, ${bg!.bg_gradient_from || '#6366f1'}, ${bg!.bg_gradient_to || '#f59e0b'})` };
+    dark = isDarkHex(bg!.bg_gradient_from);
+    has = true;
+  } else if (t === 'image' && bg!.bg_image_url) {
+    style = {
+      backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(bg!.bg_image_url)})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
     dark = true;
-    hasBg = true;
+    has = true;
   }
+  if (!has) return <>{children}</>;
+  return <div className={`rounded-3xl px-5 py-8 sm:py-10 ${dark ? 'funnel-dark' : ''}`} style={style}>{children}</div>;
+}
 
+function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
+  const img = config.image_url || product.image_url;
   const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
   return (
-    <section className={`text-center ${hasBg ? 'rounded-3xl px-5 py-10 sm:py-14' : ''}`} style={bgStyle}>
-      {config.eyebrow && <RT as="p" className={`text-sm font-semibold uppercase tracking-wide ${dark ? 'text-white' : 'text-brand-600'}`} html={config.eyebrow} />}
+    <section className="text-center">
+      {config.eyebrow && <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />}
       {(() => {
         // headline is sanitized inline HTML (bold/underline/highlight/colour);
         // fall back to the plain product name when empty.
@@ -226,12 +244,12 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
             </h1>
           );
         }
-        const cls = `${base} ${dark ? 'text-white' : 'text-slate-900'}`;
+        const cls = `${base} text-slate-900`;
         return html
           ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
           : <h1 className={cls}>{product.name}</h1>;
       })()}
-      {config.subheadline && <p className={`mx-auto mt-3 max-w-2xl ${dark ? 'text-white/90' : 'text-slate-600'}`} dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
+      {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
       {img && (
         <div className="relative mx-auto mt-5 aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
           <FitImage src={img} alt={product.name} eager />
