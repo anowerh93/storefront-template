@@ -263,7 +263,22 @@ export type FunnelProduct = {
 export type FunnelBlockConfig = {
   section_order: string[];
   animate?: boolean;
-  hero: { visible: boolean; eyebrow: string; headline: string; headline_style?: 'plain' | 'gradient' | 'highlight'; subheadline: string; image_url: string | null; cta_label: string };
+  hero: {
+    visible: boolean;
+    eyebrow: string;
+    headline: string;
+    headline_style?: 'plain' | 'gradient' | 'highlight';
+    subheadline: string;
+    image_url: string | null;
+    cta_label: string;
+    // Full-section background (one mode at a time)
+    bg_type?: 'none' | 'color' | 'gradient' | 'image';
+    bg_color?: string;
+    bg_gradient_from?: string;
+    bg_gradient_to?: string;
+    bg_gradient_angle?: number;
+    bg_image_url?: string | null;
+  };
   benefits: { visible: boolean; title: string; items: string[] };
   gallery: { visible: boolean; image_urls: string[] };
   price: { visible: boolean; note: string };

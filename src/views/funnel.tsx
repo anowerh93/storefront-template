@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -168,17 +168,49 @@ function StickyCta({ label }: { label: string }) {
 }
 
 /* ── Blocks ───────────────────────────────────────────────────────────── */
+// Luminance test → pick readable text colour over a coloured background.
+function isDarkHex(hex?: string): boolean {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((hex || '').trim());
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  return (0.299 * ((n >> 16) & 255) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 140;
+}
+
 function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
   const img = config.image_url || product.image_url;
+
+  // Full-section background (one mode at a time) with auto-readable text.
+  const bgType = config.bg_type || 'none';
+  let bgStyle: CSSProperties = {};
+  let dark = false;
+  let hasBg = false;
+  if (bgType === 'color') {
+    bgStyle = { background: config.bg_color || '#0f172a' };
+    dark = isDarkHex(config.bg_color);
+    hasBg = true;
+  } else if (bgType === 'gradient') {
+    bgStyle = { background: `linear-gradient(${config.bg_gradient_angle ?? 135}deg, ${config.bg_gradient_from || '#6366f1'}, ${config.bg_gradient_to || '#f59e0b'})` };
+    dark = isDarkHex(config.bg_gradient_from);
+    hasBg = true;
+  } else if (bgType === 'image' && config.bg_image_url) {
+    bgStyle = {
+      backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(config.bg_image_url)})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center',
+    };
+    dark = true;
+    hasBg = true;
+  }
+
+  const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
   return (
-    <section className="text-center">
-      {config.eyebrow && <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />}
+    <section className={`text-center ${hasBg ? 'rounded-3xl px-5 py-10 sm:py-14' : ''}`} style={bgStyle}>
+      {config.eyebrow && <RT as="p" className={`text-sm font-semibold uppercase tracking-wide ${dark ? 'text-white' : 'text-brand-600'}`} html={config.eyebrow} />}
       {(() => {
         // headline is sanitized inline HTML (bold/underline/highlight/colour);
         // fall back to the plain product name when empty.
         const html = (config.headline || '').trim();
         const hs = config.headline_style || 'plain';
-        const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
         if (hs === 'gradient') {
           const cls = `${base} bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-transparent`;
           return html
@@ -194,14 +226,14 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
             </h1>
           );
         }
-        const cls = `${base} text-slate-900`;
+        const cls = `${base} ${dark ? 'text-white' : 'text-slate-900'}`;
         return html
           ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
           : <h1 className={cls}>{product.name}</h1>;
       })()}
-      {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
+      {config.subheadline && <p className={`mx-auto mt-3 max-w-2xl ${dark ? 'text-white/90' : 'text-slate-600'}`} dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
       {img && (
-        <div className="relative mt-5 aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+        <div className="relative mx-auto mt-5 aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
           <FitImage src={img} alt={product.name} eager />
         </div>
       )}
