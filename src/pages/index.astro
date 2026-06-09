@@ -15,6 +15,7 @@
  */
 import Base from '../layouts/Base.astro';
 import { getStorefront, getProducts, getCategories } from '../lib/api';
+import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -28,7 +29,7 @@ import { CardPaymentPromo } from '../components/home/card-payment-promo';
 import { DealsOfDay } from '../components/home/deals-of-day';
 import { ServicesRow } from '../components/home/services-row';
 import { TrustBadges } from '../components/home/trust-badges';
-import type { ProductCard, HomepageSectionKey } from '../lib/types';
+import type { HomepageSectionKey } from '../lib/types';
 
 // Build-time fetch — same shape as views/home.tsx's async function. Three
 // API calls in parallel since the homepage is the most-hit route; we want
@@ -49,46 +50,20 @@ if (!meta) {
 
 const all = productsRes.data ?? [];
 const home = meta?.homepage ?? null;
-const byId = new Map(all.map((p: ProductCard) => [p.id, p]));
 
-const resolve = (ids: number[]): ProductCard[] =>
-  ids.map((id) => byId.get(id)).filter(Boolean) as ProductCard[];
-
-const heroProducts        = home ? resolve(home.hero.product_ids)            : [];
-const featureProducts     = home ? resolve(home.feature_products.product_ids): [];
-const trendingProducts    = home ? resolve(home.trending_products.product_ids): [];
-const mostSellingProducts = home ? resolve(home.most_selling.product_ids)    : [];
-const dealsProducts       = home ? resolve(home.deals_of_day.product_ids)    : [];
-
-const promoRowItems = home
-  ? home.promo_row.cards
-      .map((card: any) => {
-        const p = card.product_id ? byId.get(card.product_id) : null;
-        return p ? { card, product: p } : null;
-      })
-      .filter(Boolean) as { card: any; product: ProductCard }[]
-  : [];
-
-const dealsSpotlight = home?.deals_of_day.spotlight_id
-  ? byId.get(home.deals_of_day.spotlight_id) ?? null
-  : null;
-
-// Categories strip: if the merchant picked specific categories in Customization,
-// show exactly those in their chosen order; otherwise fall back to ALL visible
-// categories (the default — keeps existing stores unchanged).
-const catById = new Map(categories.map((c: any) => [c.id, c]));
-const homepageCategories = home?.categories?.category_ids?.length
-  ? (home.categories.category_ids.map((id: number) => catById.get(id)).filter(Boolean) as typeof categories)
-  : categories;
-
-const sectionOrder: HomepageSectionKey[] = home?.section_order?.length
-  ? home.section_order
-  : [
-      'hero', 'categories', 'feature_products', 'promo_row',
-      'trending_products', 'brand_strip', 'promo_banner',
-      'most_selling', 'card_payment_promo', 'deals_of_day',
-      'services_row', 'trust_badges',
-    ];
+// ID-resolution (config product_ids → full ProductCard objects) lives in the
+// shared helper so the dashboard live-preview island renders identically.
+const {
+  heroProducts,
+  featureProducts,
+  trendingProducts,
+  mostSellingProducts,
+  dealsProducts,
+  promoRowItems,
+  dealsSpotlight,
+  homepageCategories,
+  sectionOrder,
+} = resolveHomeData(home, all, categories);
 ---
 
 <Base title={meta?.name} description={meta?.about}>

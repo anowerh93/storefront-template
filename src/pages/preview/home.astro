@@ -1,0 +1,41 @@
+---
+/**
+ * Homepage live-preview route: /preview/home
+ *
+ * Embedded in an iframe by the myapp dashboard's homepage builder. Renders the
+ * SAME component tree as the live homepage (src/pages/index.astro), but fully
+ * client-driven: the dashboard pushes the in-progress (unsaved) HomepageConfig
+ * over postMessage and this page re-renders instantly. See
+ * src/views/home-preview.tsx + src/lib/preview-protocol.ts.
+ *
+ * SSR (prerender:false) so products/categories are fetched fresh per request —
+ * a product the merchant added since their last deploy still shows up in the
+ * preview. noindex: this is a private editing surface, never a public page.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getStorefront, getProducts, getCategories } from '../../lib/api';
+import { HomePreview } from '../../views/home-preview';
+
+const [meta, productsRes, categories] = await Promise.all([
+  getStorefront().catch(() => null),
+  getProducts({ perPage: 100 }).catch(() => ({ data: [], meta: null })),
+  getCategories().catch(() => []),
+]);
+
+const products = productsRes.data ?? [];
+---
+
+<Base title="Homepage preview" noindex={true}>
+  {meta
+    ? <HomePreview client:load meta={meta} products={products} categories={categories} />
+    : (
+      <div class="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">Preview unavailable</h1>
+        <p class="mt-2 text-sm text-slate-500">
+          Couldn't reach the storefront API. Try again in a minute.
+        </p>
+      </div>
+    )}
+</Base>
