@@ -290,7 +290,11 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
         ))}
       </div>
 
-      <div className="p-5 sm:p-6">
+      {/* Height-capped, internally-scrolling content (desktop) so a long
+          description/spec table doesn't stretch the whole page — mirrors the
+          reference's organized box. key={active} resets scroll on tab switch.
+          On mobile it flows naturally (no nested scroll trap). */}
+      <div key={active} className="p-5 sm:p-6 lg:max-h-[70vh] lg:min-h-[360px] lg:overflow-y-auto">
         {active === 'description' && product.description_html && (
           <div
             className="prose prose-sm max-w-none text-slate-600 prose-headings:text-slate-900 prose-a:text-brand-600 prose-table:text-sm"
