@@ -90,34 +90,23 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
 }
 
 function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number] }) {
+  // Image-first: the merchant uploaded fully-designed tile art (its own text /
+  // CTA baked in), so we show it CLEAN — one click target, no overlaid copy
+  // competing with the artwork. The only thing configured besides the image is
+  // the link destination (tile.url).
   return (
     <a
       href={tile.url || '/products'}
       className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
     >
-      {/* Merchant-designed tile artwork fills the slot edge-to-edge (cover) so
-          there are no blurred side-strips when the upload isn't an exact 2.1:1.
-          A correctly-sized 840x400 upload fills with no crop; off-ratio images
-          lose a sliver of an edge instead of showing blur bands. */}
+      {/* Artwork fills the slot edge-to-edge (cover). A correctly-sized 840x400
+          upload fills with no crop; off-ratio images lose a sliver of an edge. */}
       <img
         src={tile.image_url!}
-        alt={tile.heading || ''}
+        alt=""
         loading="eager"
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
       />
-      {(tile.heading || tile.subtext) && (
-        <>
-          <div className={TILE_GRADIENT} />
-          <div className="absolute inset-0 z-10 flex flex-col justify-center p-4 sm:p-5 max-w-[78%] text-white">
-            {tile.heading && (
-              <h3 className="font-bold uppercase text-base sm:text-lg leading-tight drop-shadow">{tile.heading}</h3>
-            )}
-            {tile.subtext && (
-              <p className="text-xs text-white/85 mt-1 drop-shadow line-clamp-2">{tile.subtext}</p>
-            )}
-          </div>
-        </>
-      )}
     </a>
   );
 }
