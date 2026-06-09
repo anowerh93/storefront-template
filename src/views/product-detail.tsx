@@ -249,13 +249,11 @@ function videoEmbed(raw: string): { type: 'iframe' | 'file' | 'link'; src: strin
 
 /* ── Tabs ─────────────────────────────────────────────────────────────── */
 function ProductTabs({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
-  const galleryUrls = (product.gallery_urls ?? []).filter(Boolean);
+  // The "Galleries" tab shows the customer/lifestyle photos; the product's own
+  // photos live in the buy-box gallery (ProductGallery, via gallery_urls).
+  const customerGalleryUrls = (product.customer_gallery_urls ?? []).filter(Boolean);
   const reviews = product.reviews?.items ?? [];
   const faq = product.funnel?.faq ?? [];
-  // Grouped spec sections; keep only groups that have a title or real rows.
-  const specGroups = (product.specifications ?? [])
-    .map((g) => ({ title: g.title ?? '', rows: (g.rows ?? []).filter((r) => r.label || r.value) }))
-    .filter((g) => g.title || g.rows.length);
 
   const phone = meta.whatsapp?.trim() || null;
   const phoneDigits = phone ? phone.replace(/\D/g, '') : '';
@@ -264,8 +262,8 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
 
   const tabs = [
     product.description_html ? { key: 'description', label: 'Description' } : null,
-    specGroups.length ? { key: 'specs', label: 'Specifications' } : null,
-    galleryUrls.length ? { key: 'galleries', label: 'Galleries' } : null,
+    product.specifications_html ? { key: 'specs', label: 'Specifications' } : null,
+    customerGalleryUrls.length ? { key: 'galleries', label: 'Galleries' } : null,
     video ? { key: 'video', label: 'Video' } : null,
     reviews.length ? { key: 'reviews', label: 'Reviews' } : null,
     faq.length ? { key: 'faq', label: 'FAQ' } : null,
@@ -302,28 +300,11 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
           />
         )}
 
-        {active === 'specs' && (
-          <div className="space-y-6">
-            {specGroups.map((g, gi) => (
-              <div key={gi}>
-                {g.title && (
-                  <h3 className="mb-2 text-sm font-bold text-slate-900">{g.title}</h3>
-                )}
-                {g.rows.length > 0 && (
-                  <table className="w-full overflow-hidden rounded-xl text-sm ring-1 ring-slate-100">
-                    <tbody>
-                      {g.rows.map((r, ri) => (
-                        <tr key={ri} className="border-b border-slate-100 last:border-0 even:bg-slate-50/60">
-                          <th className="w-2/5 px-4 py-2.5 text-left align-top font-semibold text-slate-600">{r.label}</th>
-                          <td className="px-4 py-2.5 align-top text-slate-800">{r.value}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            ))}
-          </div>
+        {active === 'specs' && product.specifications_html && (
+          <div
+            className="prose prose-sm max-w-none text-slate-600 prose-headings:text-slate-900 prose-a:text-brand-600 prose-table:text-sm"
+            dangerouslySetInnerHTML={{ __html: product.specifications_html }}
+          />
         )}
 
         {active === 'video' && video && (
@@ -354,7 +335,7 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
 
         {active === 'galleries' && (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {galleryUrls.map((src, i) => (
+            {customerGalleryUrls.map((src, i) => (
               <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
                 <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
               </div>

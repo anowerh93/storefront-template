@@ -166,17 +166,19 @@ export type ProductCard = {
 export type ProductDetail = ProductCard & {
   brand: string | null;
   warranty: string | null;
-  /** Grouped spec sections: [{ title, rows: [{label, value}] }]. */
-  specifications: { title: string; rows: { label: string; value: string }[] }[];
   video_url: string | null;
   /** Raw Markdown (kept for fallbacks). */
   support_info: string | null;
   description: string | null;
   /** Server-rendered, sanitized HTML from the Markdown source. */
+  specifications_html: string | null;
   support_info_html: string | null;
   description_html: string | null;
   currency: string;
+  /** Product's own photos (shown in the buy-box gallery). */
   gallery_urls: string[];
+  /** Customer / lifestyle photos (shown in the Galleries tab). */
+  customer_gallery_urls: string[];
   variants: ProductVariant[];
   reviews: { count: number; average: number | null; items: ProductReview[] };
   related_products: ProductCard[];
