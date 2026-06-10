@@ -20,6 +20,12 @@ export type StorefrontMeta = {
    * compatibility with cached API payloads that predate the field.
    */
   business_type?: 'ecommerce' | 'service';
+  /**
+   * Canonical site origin (custom domain when verified, else subdomain /
+   * deployment URL). Used for <link rel="canonical">. Optional for cached
+   * payloads that predate the field.
+   */
+  public_url?: string | null;
   name: string;
   logo_url: string | null;
   theme_color: string | null;

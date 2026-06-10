@@ -10,7 +10,7 @@ import { getStorefront } from '../lib/api';
  */
 export const prerender = false;
 
-export const GET: APIRoute = async () => {
+export const GET: APIRoute = async ({ url }) => {
   let discourage = false;
   try {
     const meta = await getStorefront();
@@ -19,9 +19,12 @@ export const GET: APIRoute = async () => {
     // API unreachable — fail open (allow); the meta tag is the backstop.
   }
 
+  // Sitemap URL uses this request's origin — correct on both the custom
+  // domain and the pages.dev mirror. Omitted while discouraged so crawlers
+  // aren't handed a URL list alongside the Disallow.
   const body = discourage
     ? 'User-agent: *\nDisallow: /\n'
-    : 'User-agent: *\nAllow: /\n';
+    : `User-agent: *\nAllow: /\n\nSitemap: ${url.origin}/sitemap.xml\n`;
 
   return new Response(body, {
     headers: { 'Content-Type': 'text/plain; charset=utf-8' },

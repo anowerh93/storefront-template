@@ -159,6 +159,17 @@ export function getFunnel(funnelSlug: string) {
   });
 }
 
+export type SitemapPage = { path: string; lastmod: string | null };
+
+/**
+ * Page inventory for sitemap.xml. Paths only — the SSR route prefixes its
+ * own request origin so URLs match whichever host the crawler fetched from.
+ * Empty when the tenant has "Discourage search engines" on.
+ */
+export function getSitemap() {
+  return apiFetch<{ pages: SitemapPage[] }>('/sitemap');
+}
+
 export function getMessengerLink(opts: { productId?: number; variant?: string } = {}) {
   return apiFetch<{ url: string }>('/messenger-link', {
     params: { product_id: opts.productId, variant: opts.variant },
