@@ -9,7 +9,7 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getCategory, getStorefront, getCategories, type ProductSort } from '../../lib/api';
+import { getCategory, getStorefront, getCategories, resolvePath, type ProductSort } from '../../lib/api';
 import { breadcrumbSchema, collectionPageSchema } from '../../lib/schema';
 import { CategoryDetailPage } from '../../views/category-detail';
 import type { StorefrontMeta, Category, Paginated, ProductCard } from '../../lib/types';
@@ -27,6 +27,16 @@ try {
   res = await getCategory(slug, { sort, page });
 } catch (err) {
   console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
+}
+
+// Slug renames leave a 301 behind — same contract as products/[slug].astro.
+if (!res) {
+  const redirect = await resolvePath(`/categories/${slug}`);
+  if (redirect?.to?.startsWith('/')) {
+    return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
+  }
+  // Real 404 status, not a soft 404 (see products/[slug].astro).
+  Astro.response.status = 404;
 }
 
 try {

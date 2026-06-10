@@ -170,6 +170,20 @@ export function getSitemap() {
   return apiFetch<{ pages: SitemapPage[] }>('/sitemap');
 }
 
+/**
+ * Redirect lookup for missed pages (slug renames leave 301s behind on the
+ * Laravel side). Returns null on no-redirect / API failure — callers fall
+ * through to their normal 404 render. The miss itself is recorded in the
+ * tenant's 404 log server-side by this same call.
+ */
+export async function resolvePath(path: string): Promise<{ to: string; status: number } | null> {
+  try {
+    return await apiFetch<{ to: string; status: number }>('/resolve', { params: { path } });
+  } catch {
+    return null;
+  }
+}
+
 export function getMessengerLink(opts: { productId?: number; variant?: string } = {}) {
   return apiFetch<{ url: string }>('/messenger-link', {
     params: { product_id: opts.productId, variant: opts.variant },
