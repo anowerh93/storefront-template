@@ -41,6 +41,8 @@ export type StorefrontMeta = {
     title: string | null;
     description: string | null;
     og_image: string | null;
+    /** WordPress-style "discourage search engines" (build/demo mode). */
+    discourage?: boolean;
   };
   pixel: { id: string | null };
   /**

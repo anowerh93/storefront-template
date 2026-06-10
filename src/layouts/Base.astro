@@ -60,7 +60,9 @@ const favicon = meta?.logo_url ?? null;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{finalTitle}</title>
     {finalDescription && <meta name="description" content={finalDescription} />}
-    {noindex && <meta name="robots" content="noindex,nofollow" />}
+    {/* noindex: per-page (funnels) OR the tenant's WordPress-style
+        "discourage search engines" toggle (build/demo mode). */}
+    {(noindex || meta?.seo?.discourage) && <meta name="robots" content="noindex,nofollow" />}
 
     {/* OpenGraph + Twitter — built-in defaults so social shares look right */}
     <meta property="og:title" content={finalTitle} />
