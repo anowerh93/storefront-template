@@ -84,6 +84,12 @@
    (style="color:…") still win. */
 .funnel-dark :is(h1, h2, h3, h4, p, span, li, summary) { color: #fff; }
 
+/* WHITE CARDS inside a dark section (service-site contact form, service +
+   testimonial cards) keep dark text — .sv-card opts a card out of the
+   whitening above. Inline rich-text colours still win (style attr). */
+.funnel-dark .sv-card,
+.funnel-dark .sv-card :is(h1, h2, h3, h4, p, span, li, summary, label) { color: #0f172a; }
+
 /* transforms need inline-block; fade (opacity only) stays inline so it wraps */
 [data-anim="slide-up"],
 [data-anim="pop"],

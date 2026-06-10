@@ -27,7 +27,8 @@ export async function HomePage() {
   ]);
 
   const all = productsRes.data;
-  const home = meta.homepage;
+  // Legacy view (superseded by index.astro) — e-commerce config only.
+  const home = meta.homepage!;
   const byId = new Map(all.map((p) => [p.id, p]));
 
   const resolve = (ids: number[]): ProductCard[] =>

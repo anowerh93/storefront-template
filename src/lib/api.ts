@@ -193,10 +193,59 @@ export async function submitOrder(input: CreateOrderInput): Promise<OrderRespons
     body: JSON.stringify(input),
     cache: 'no-store',
   });
-  const json = await res.json();
+  // Parse defensively: an HTML error page (502, maintenance) would make
+  // res.json() throw a raw "not valid JSON" parse error into the shopper's
+  // error box. Shoppers get plain language; status codes stay internal.
+  const json = await res.json().catch(() => null);
   if (!res.ok) {
-    const msg = json?.message ?? json?.error ?? `Order failed (${res.status})`;
+    const msg =
+      json?.message ?? json?.error ?? 'Sorry, your order could not be placed. Please try again in a minute.';
     throw new Error(msg);
   }
+  if (!json) {
+    throw new Error('Sorry, your order could not be placed. Please try again in a minute.');
+  }
   return (json.data ?? json) as OrderResponse;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Service-tenant inquiry form (POST /storefronts/{slug}/leads)
+// ──────────────────────────────────────────────────────────────
+
+export type CreateLeadInput = {
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  /** Which service the visitor is asking about (from the services block). */
+  service?: string;
+  message?: string;
+  source_url?: string;
+  /** Honeypot — leave empty; bots fill it. */
+  company?: string;
+  cf_turnstile_response?: string;
+};
+
+/**
+ * Submit a website inquiry (service tenants). Same defensive parsing and
+ * plain-language errors as submitOrder — shoppers never see status codes.
+ */
+export async function submitLead(input: CreateLeadInput): Promise<{ ok: boolean }> {
+  const url = buildUrl('/leads');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(input.cf_turnstile_response ? { 'cf-turnstile-response': input.cf_turnstile_response } : {}),
+    },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg =
+      json?.message ?? json?.error ?? 'Sorry, your inquiry could not be sent. Please try again in a minute.';
+    throw new Error(msg);
+  }
+  return { ok: true };
 }

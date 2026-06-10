@@ -15,6 +15,9 @@ export function Footer({
 }) {
   const social = (meta.social_links ?? {}) as Record<string, string>;
   const footerLinks = meta.footer_links ?? [];
+  // Service-tenant websites have no catalog — swap the shop columns for
+  // on-page anchors so the footer never links to empty product pages.
+  const isService = meta.business_type === 'service';
 
   return (
     <footer className="mt-16 bg-brand-900 text-brand-50">
@@ -56,28 +59,43 @@ export function Footer({
             )}
           </div>
 
-          {/* Department = live categories */}
-          <FooterCol title="Department">
-            {categories.slice(0, 6).map((c) => (
-              <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
-            ))}
-            {categories.length === 0 && (
-              <FooterLink href="/products">All products</FooterLink>
-            )}
-          </FooterCol>
+          {isService ? (
+            <FooterCol title="Quick links">
+              <FooterLink href="/#about">About</FooterLink>
+              <FooterLink href="/#services">Services</FooterLink>
+              <FooterLink href="/#contact">Contact</FooterLink>
+              {meta.messenger?.url && (
+                <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
+                  Contact via Messenger
+                </a>
+              )}
+            </FooterCol>
+          ) : (
+            <>
+              {/* Department = live categories */}
+              <FooterCol title="Department">
+                {categories.slice(0, 6).map((c) => (
+                  <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
+                ))}
+                {categories.length === 0 && (
+                  <FooterLink href="/products">All products</FooterLink>
+                )}
+              </FooterCol>
 
-          {/* Shop = real, working links only */}
-          <FooterCol title="Shop">
-            <FooterLink href="/products">All products</FooterLink>
-            <FooterLink href="/categories">Categories</FooterLink>
-            <FooterLink href="/order/lookup">Track Order</FooterLink>
-            <FooterLink href="/about">About {meta.name}</FooterLink>
-            {meta.messenger?.url && (
-              <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
-                Contact via Messenger
-              </a>
-            )}
-          </FooterCol>
+              {/* Shop = real, working links only */}
+              <FooterCol title="Shop">
+                <FooterLink href="/products">All products</FooterLink>
+                <FooterLink href="/categories">Categories</FooterLink>
+                <FooterLink href="/order/lookup">Track Order</FooterLink>
+                <FooterLink href="/about">About {meta.name}</FooterLink>
+                {meta.messenger?.url && (
+                  <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
+                    Contact via Messenger
+                  </a>
+                )}
+              </FooterCol>
+            </>
+          )}
 
           {/* Tenant-defined links (Privacy / Terms / FAQ …) — only if set */}
           {footerLinks.length > 0 && (

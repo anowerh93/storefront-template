@@ -66,7 +66,9 @@ function resolveParentOrigin(): string {
 
 export function HomePreview({ meta, products, categories }: Props) {
   // Seed from the live config; replaced wholesale on each dashboard push.
-  const [home, setHome] = useState<HomepageConfig>(meta.homepage);
+  // The preview island only mounts for e-commerce tenants (service tenants
+  // have meta.homepage = null and never load /preview/home).
+  const [home, setHome] = useState<HomepageConfig>(meta.homepage!);
 
   useEffect(() => {
     const parentOrigin = resolveParentOrigin();

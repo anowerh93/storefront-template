@@ -14,6 +14,12 @@
 
 export type StorefrontMeta = {
   slug: string;
+  /**
+   * 'ecommerce' renders the product storefront; 'service' renders the
+   * block-based service website (service_home). Optional for backward
+   * compatibility with cached API payloads that predate the field.
+   */
+  business_type?: 'ecommerce' | 'service';
   name: string;
   logo_url: string | null;
   theme_color: string | null;
@@ -38,11 +44,84 @@ export type StorefrontMeta = {
   };
   pixel: { id: string | null };
   /**
-   * Per-tenant homepage customization. Always present (Laravel merges
-   * defaults from HomepageConfig::default()), so the template can render
-   * sections without null-checking the top-level field.
+   * Per-tenant homepage customization. Present (defaults merged) for
+   * e-commerce tenants; NULL for service tenants, who get `service_home`.
    */
-  homepage: HomepageConfig;
+  homepage: HomepageConfig | null;
+  /** Service-tenant website blocks. NULL for e-commerce tenants. */
+  service_home?: ServiceHomeConfig | null;
+};
+
+// ──────────────────────────────────────────────────────────────
+// Service-tenant website (ServiceSiteConfig::forApi)
+// ──────────────────────────────────────────────────────────────
+
+export type ServiceSectionKey =
+  | 'hero' | 'about' | 'services' | 'portfolio'
+  | 'stats' | 'testimonials' | 'faq' | 'contact';
+
+/** Per-section background (same contract as funnel blocks / SectionBg). */
+export type ServiceSectionBg = {
+  bg_type?: 'none' | 'color' | 'gradient' | 'image';
+  bg_color?: string;
+  bg_gradient_from?: string;
+  bg_gradient_to?: string;
+  bg_gradient_angle?: number;
+  bg_image_url?: string | null;
+};
+
+export type ServiceHomeConfig = {
+  section_order: ServiceSectionKey[];
+  /** Fade/slide blocks in on scroll (also triggers per-word data-anim). */
+  animate?: boolean;
+  hero: ServiceSectionBg & {
+    visible: boolean;
+    eyebrow: string;
+    headline: string;
+    subheadline: string;
+    cta_label: string;
+    image_url: string | null;
+  };
+  about: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    body: string;
+    image_url: string | null;
+    highlights: string[];
+  };
+  services: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    subtitle: string;
+    items: { icon: string; title: string; body: string }[];
+  };
+  portfolio: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    subtitle: string;
+    items: { image_url: string; caption: string }[];
+  };
+  stats: ServiceSectionBg & {
+    visible: boolean;
+    items: { number: string; label: string }[];
+  };
+  testimonials: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    items: { name: string; role: string; body: string; rating: number }[];
+  };
+  faq: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    items: { q: string; a: string }[];
+  };
+  contact: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    subtitle: string;
+    button_label: string;
+    success_message: string;
+  };
 };
 
 /**

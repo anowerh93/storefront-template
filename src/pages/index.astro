@@ -19,6 +19,7 @@ import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
+import { ServiceHome } from '../views/service-home';
 import { HeroGrid } from '../components/home/hero-grid';
 import { CategoryStrip } from '../components/home/category-strip';
 import { ProductRow } from '../components/home/product-row';
@@ -48,6 +49,12 @@ if (!meta) {
   console.error('[index.astro] getStorefront() returned null — tenant API unreachable. Rendering placeholder.');
 }
 
+// Service tenants get a block-based service website (ServiceSiteConfig)
+// instead of the product storefront — own sticky anchor-nav header, lead
+// form instead of checkout. The product/category data fetched above is
+// simply unused (service tenants have none).
+const isServiceSite = meta?.business_type === 'service' && !!meta?.service_home;
+
 const all = productsRes.data ?? [];
 const home = meta?.homepage ?? null;
 
@@ -67,10 +74,14 @@ const {
 ---
 
 <Base title={meta?.name} description={meta?.about}>
-  {meta && <Header client:load meta={meta} categories={categories} />}
+  {/* Service tenants: block-based service website with its own anchor-nav
+      header — the product Header/sections below never render for them. */}
+  {meta && isServiceSite && <ServiceHome client:load meta={meta} config={meta.service_home!} />}
+
+  {meta && !isServiceSite && <Header client:load meta={meta} categories={categories} />}
 
   <main class="pb-12">
-    {meta && home && sectionOrder.map((key: HomepageSectionKey) => {
+    {meta && !isServiceSite && home && sectionOrder.map((key: HomepageSectionKey) => {
       switch (key) {
         case 'hero':
           return home.hero.visible && (home.hero.image_url || heroProducts.length > 0)
@@ -151,15 +162,14 @@ const {
     {/* Fallback when the API is unreachable or returned no homepage config */}
     {!meta && (
       <div class="mx-auto max-w-2xl px-4 py-16 text-center">
-        <h1 class="text-2xl font-bold text-slate-900">Storefront unavailable</h1>
+        <h1 class="text-2xl font-bold text-slate-900">This shop is temporarily unavailable</h1>
         <p class="mt-2 text-sm text-slate-500">
-          We couldn't reach the storefront API while building this page.
-          Try again in a minute, or contact the shop owner.
+          Please try again in a minute, or contact the shop owner.
         </p>
       </div>
     )}
   </main>
 
-  {meta && <Footer meta={meta} categories={categories} />}
+  {meta && <Footer meta={meta} categories={isServiceSite ? [] : categories} />}
   {meta?.messenger?.url && <MessengerCTA client:visible href={meta.messenger.url} />}
 </Base>
