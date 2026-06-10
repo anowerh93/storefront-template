@@ -21,9 +21,11 @@ export interface Props {
   ogImage?: string;
   /** Funnel/landing pages set this so they don't compete with the catalog in search. */
   noindex?: boolean;
+  /** JSON-LD objects (lib/schema.ts builders) rendered as ld+json scripts. */
+  schema?: Record<string, unknown>[];
 }
 
-const { title, description, ogImage, noindex } = Astro.props;
+const { title, description, ogImage, noindex, schema = [] } = Astro.props;
 
 // Fetch tenant metadata. If it fails (API down, slug mis-set), render a
 // graceful skeleton rather than crashing the build — matches the Next.js
@@ -51,6 +53,21 @@ const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = meta?.pixel?.id ?? null;
 const siteName = meta?.name ?? '';
 const favicon = meta?.logo_url ?? null;
+
+// Canonical — always the tenant's PUBLIC origin (custom domain when
+// verified), never this request's host, so the pages.dev mirror points
+// search engines at the real domain instead of competing with it.
+// Pathname only (query stripped); skipped on noindex pages — a canonical
+// on a page that says "don't index me" is a mixed signal.
+const canonicalBase = (meta?.public_url ?? '').replace(/\/+$/, '');
+const canonical =
+  canonicalBase && !noindex && !meta?.seo?.discourage
+    ? canonicalBase + (Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, ''))
+    : null;
+
+// JSON-LD: escape `<` so user-authored content (review bodies, FAQ answers)
+// can never break out of the script tag.
+const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
 ---
 
 <!doctype html>
@@ -63,6 +80,18 @@ const favicon = meta?.logo_url ?? null;
     {/* noindex: per-page (funnels) OR the tenant's WordPress-style
         "discourage search engines" toggle (build/demo mode). */}
     {(noindex || meta?.seo?.discourage) && <meta name="robots" content="noindex,nofollow" />}
+    {canonical && <link rel="canonical" href={canonical} />}
+
+    {/* Search-engine ownership verification (Google Search Console / Bing).
+        Rendered even in discourage mode — tenants verify BEFORE launch. */}
+    {meta?.verification?.google && <meta name="google-site-verification" content={meta.verification.google} />}
+    {meta?.verification?.bing && <meta name="msvalidate.01" content={meta.verification.bing} />}
+
+    {/* Structured data (JSON-LD) — pages pass lib/schema.ts builders via the
+        `schema` prop. Makes products/FAQs ELIGIBLE for rich results. */}
+    {ldJson.map((json) => (
+      <script type="application/ld+json" set:html={json} is:inline />
+    ))}
 
     {/* OpenGraph + Twitter — built-in defaults so social shares look right */}
     <meta property="og:title" content={finalTitle} />

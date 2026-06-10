@@ -15,6 +15,7 @@
  */
 import Base from '../layouts/Base.astro';
 import { getStorefront, getProducts, getCategories } from '../lib/api';
+import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
 import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -71,9 +72,28 @@ const {
   homepageCategories,
   sectionOrder,
 } = resolveHomeData(home, all, categories);
+
+// JSON-LD. This page is PRERENDERED, so the request origin is meaningless
+// at build time — schemas only render once the tenant has a public_url
+// (i.e. after the first deploy), which is exactly when they matter.
+const origin = (meta?.public_url ?? '').replace(/\/+$/, '');
+const serviceFaq = meta?.service_home?.faq;
+const schemas: Record<string, unknown>[] =
+  meta && origin
+    ? isServiceSite
+      ? [
+          orgSchema(meta, origin),
+          ...(serviceFaq?.visible && serviceFaq.items?.length
+            ? [faqSchema(serviceFaq.items)].filter(
+                (s): s is Record<string, unknown> => s !== null,
+              )
+            : []),
+        ]
+      : [orgSchema(meta, origin), websiteSchema(meta, origin)]
+    : [];
 ---
 
-<Base title={meta?.name} description={meta?.about}>
+<Base title={meta?.name} description={meta?.about} schema={schemas}>
   {/* Service tenants: block-based service website with its own anchor-nav
       header — the product Header/sections below never render for them. */}
   {meta && isServiceSite && <ServiceHome client:load meta={meta} config={meta.service_home!} />}

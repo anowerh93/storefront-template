@@ -51,6 +51,8 @@ export type StorefrontMeta = {
     discourage?: boolean;
   };
   pixel: { id: string | null };
+  /** Search-engine ownership codes (Google Search Console / Bing). */
+  verification?: { google: string | null; bing: string | null };
   /**
    * Per-tenant homepage customization. Present (defaults merged) for
    * e-commerce tenants; NULL for service tenants, who get `service_home`.
@@ -296,12 +298,18 @@ export type ProductVariant = {
   image_url: string | null;
 };
 
+// Matches StorefrontController::reviewPayload() exactly — the previous
+// shape (`author`, `title`) never existed on the API and left review
+// author names rendering blank on the PDP.
 export type ProductReview = {
   id: number;
-  author: string;
+  author_name: string;
+  location: string | null;
+  avatar_url: string | null;
   rating: number;
-  title: string | null;
   body: string;
+  images: string[];
+  is_featured: boolean;
   created_at: string;
 };
 

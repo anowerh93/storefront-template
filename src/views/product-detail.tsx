@@ -361,9 +361,8 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
                       <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
                     ))}
                   </div>
-                  <span className="text-sm font-medium text-slate-900">{r.author}</span>
+                  <span className="text-sm font-medium text-slate-900">{r.author_name}</span>
                 </div>
-                {r.title && <p className="text-sm font-semibold text-slate-900">{r.title}</p>}
                 <p className="text-sm leading-relaxed text-slate-600">{r.body}</p>
               </article>
             ))}

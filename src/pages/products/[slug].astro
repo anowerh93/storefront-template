@@ -21,6 +21,7 @@ export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
 import { getProduct, getStorefront } from '../../lib/api';
+import { breadcrumbSchema, faqSchema, productSchema } from '../../lib/schema';
 import { ProductDetailPage } from '../../views/product-detail';
 import type { ProductDetail, StorefrontMeta } from '../../lib/types';
 
@@ -42,12 +43,30 @@ try {
 } catch (err) {
   console.warn('[products/[slug].astro] getStorefront() failed:', err);
 }
+
+// JSON-LD: Product (+ratings/reviews) + breadcrumb trail (+FAQ when the
+// funnel has one). URLs use the canonical origin so rich results point
+// at the real domain; SSR pages can fall back to the request origin.
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const productUrl = `${origin}/products/${encodeURIComponent(slug)}`;
+const schemas = product
+  ? [
+      productSchema(product, productUrl),
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Products', url: `${origin}/products` },
+        { name: product.name },
+      ]),
+      ...(product.funnel?.faq?.length ? [faqSchema(product.funnel.faq)] : []),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
 ---
 
 <Base
   title={product?.name}
   description={product?.short_description ?? product?.name}
   ogImage={product?.image_url ?? undefined}
+  schema={schemas}
 >
   <ProductDetailPage client:load product={product} meta={meta} />
 </Base>

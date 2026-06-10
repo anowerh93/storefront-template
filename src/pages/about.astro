@@ -5,6 +5,7 @@
  */
 import Base from '../layouts/Base.astro';
 import { getStorefront } from '../lib/api';
+import { breadcrumbSchema } from '../lib/schema';
 import { AboutPage } from '../views/about';
 import type { StorefrontMeta } from '../lib/types';
 
@@ -14,8 +15,14 @@ try {
 } catch (err) {
   console.warn('[about.astro] getStorefront() failed:', err);
 }
+
+// Prerendered page — breadcrumb only once a public origin exists.
+const origin = (meta?.public_url ?? '').replace(/\/+$/, '');
+const schemas = origin
+  ? [breadcrumbSchema([{ name: 'Home', url: `${origin}/` }, { name: 'About' }])]
+  : [];
 ---
 
-<Base title="About">
+<Base title="About" schema={schemas}>
   <AboutPage meta={meta} />
 </Base>

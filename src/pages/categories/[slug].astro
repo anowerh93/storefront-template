@@ -10,6 +10,7 @@ export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
 import { getCategory, getStorefront, getCategories, type ProductSort } from '../../lib/api';
+import { breadcrumbSchema, collectionPageSchema } from '../../lib/schema';
 import { CategoryDetailPage } from '../../views/category-detail';
 import type { StorefrontMeta, Category, Paginated, ProductCard } from '../../lib/types';
 
@@ -36,9 +37,22 @@ try {
 } catch (err) {
   console.warn('[categories/[slug].astro] getStorefront() failed:', err);
 }
+
+// JSON-LD: CollectionPage + breadcrumb trail on the canonical origin.
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = res
+  ? [
+      collectionPageSchema(res.category, `${origin}/categories/${encodeURIComponent(slug)}`),
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Categories', url: `${origin}/categories` },
+        { name: res.category.name },
+      ]),
+    ]
+  : [];
 ---
 
-<Base title={res?.category?.name ?? 'Category'}>
+<Base title={res?.category?.name ?? 'Category'} schema={schemas}>
   <CategoryDetailPage
     client:load
     searchParams={{ sort, page: String(page) }}
