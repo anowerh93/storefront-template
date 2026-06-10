@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag } from 'lucide-react';
 import { formatBDT, discountPct } from '../lib/format';
+import { getIcon } from '../lib/icons';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -135,16 +136,23 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
         </div>
       )}
 
-      {/* Feature list (from Benefit Bullets) */}
+      {/* Feature list (Key selling points — {icon, title}; legacy rows were strings) */}
       {benefits.length > 0 && (
-        <ol className="space-y-2.5">
-          {benefits.map((b, i) => (
-            <li key={i} className="flex gap-2.5 text-sm text-slate-700">
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-brand-100 text-[11px] font-bold text-brand-700">{i + 1}</span>
-              <span className="leading-relaxed">{typeof b === 'string' ? b : ((b as any)?.title ?? '')}</span>
-            </li>
-          ))}
-        </ol>
+        <ul className="space-y-2.5">
+          {benefits.map((b, i) => {
+            const title = typeof b === 'string' ? b : (b?.title ?? '');
+            if (!title) return null;
+            const Icon = getIcon(typeof b === 'string' ? 'badge-check' : (b?.icon || 'badge-check'));
+            return (
+              <li key={i} className="flex gap-2.5 text-sm text-slate-700">
+                <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+                  <Icon className="h-3.5 w-3.5" />
+                </span>
+                <span className="leading-relaxed pt-0.5">{title}</span>
+              </li>
+            );
+          })}
+        </ul>
       )}
 
       {/* Contact line */}

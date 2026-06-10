@@ -306,7 +306,9 @@ export type ProductReview = {
 export type FunnelPayload = {
   headline: string | null;
   subheadline: string | null;
-  benefits: string[];
+  /** Key selling points. The API normalises to {icon, title}; legacy cached
+   *  payloads may still contain plain strings. */
+  benefits: ({ icon?: string; title: string } | string)[];
   faq: { q: string; a: string }[];
 };
 
