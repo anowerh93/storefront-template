@@ -53,6 +53,8 @@ export type StorefrontMeta = {
   pixel: { id: string | null };
   /** Search-engine ownership codes (Google Search Console / Bing). */
   verification?: { google: string | null; bing: string | null };
+  /** IndexNow key — served back at /indexnow-key.txt (public by design). */
+  indexnow_key?: string | null;
   /**
    * Per-tenant homepage customization. Present (defaults merged) for
    * e-commerce tenants; NULL for service tenants, who get `service_home`.
