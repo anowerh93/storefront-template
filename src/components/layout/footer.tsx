@@ -32,9 +32,26 @@ export function Footer({
   // on-page anchors so the footer never links to empty product pages.
   const isService = meta.business_type === 'service';
 
+  // Custom backdrop (builder → Footer & Social → Footer background).
+  // Whenever the chosen mode is missing its value, fall back to brand.
+  const bg = meta.footer_nav?.bg;
+  const bgImage = bg?.type === 'image' && bg.image_url ? bg.image_url : null;
+  const bgColor = bg?.type === 'color' && bg.color ? bg.color : null;
+
   return (
-    <footer className="mt-16 bg-brand-900 text-brand-50">
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 py-12 sm:py-14">
+    <footer
+      className={`relative mt-16 text-brand-50 ${bgImage || bgColor ? '' : 'bg-brand-900'}`}
+      style={
+        bgImage
+          ? { backgroundImage: `url(${bgImage})`, backgroundSize: 'cover', backgroundPosition: 'center' }
+          : bgColor
+            ? { backgroundColor: bgColor }
+            : undefined
+      }
+    >
+      {/* Dark scrim keeps the light footer text readable on any image */}
+      {bgImage && <div className="absolute inset-0 bg-black/65" aria-hidden="true" />}
+      <div className="relative mx-auto max-w-[1280px] px-4 sm:px-6 py-12 sm:py-14">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-8">
           {/* Brand + contact */}
           <div className="col-span-2">
@@ -50,10 +67,10 @@ export function Footer({
                 <span className="font-bold text-white text-lg">{meta.name}</span>
               )}
             </div>
-            {meta.about && (
-              // Short summary only — hard-capped at 7 lines (the API already
-              // sends a 300-char excerpt; the clamp guards the visual height).
-              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs line-clamp-7">{meta.about}</p>
+            {meta.footer_about && (
+              // ONLY the hand-written footer summary renders here — never the
+              // About article. Clamped at 7 lines as a visual safety net.
+              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs line-clamp-7">{meta.footer_about}</p>
             )}
             {(meta.location || meta.whatsapp || meta.email) && (
               <ul className="space-y-2 text-sm">

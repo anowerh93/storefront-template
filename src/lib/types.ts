@@ -33,8 +33,10 @@ export type StorefrontMeta = {
   /** Dedicated site icon; API falls back to the logo when unset. */
   favicon_url?: string | null;
   theme_color: string | null;
-  /** Plain-text excerpt (footer + meta-description fallbacks). */
+  /** Plain-text excerpt of the About article (meta-description fallbacks only). */
   about: string | null;
+  /** Hand-written footer summary — the ONLY text the footer paragraph shows. */
+  footer_about?: string | null;
   /** Optional About-page H1; falls back to the store name. */
   about_title?: string | null;
   /** Full About article — sanitized HTML rendered from tenant Markdown. */
@@ -51,6 +53,8 @@ export type StorefrontMeta = {
     shop: { visible: boolean; heading: string; links: { label: string; url: string }[] };
     /** WhatsApp newsletter signup box (numbers POST to /subscribers). */
     newsletter?: { visible: boolean; heading: string; text: string };
+    /** Footer backdrop: theme default, solid colour, or image (dark-scrimmed). */
+    bg?: { type: 'brand' | 'color' | 'image'; color: string | null; image_url: string | null };
   };
   social_links: Record<string, string> | object;
   messenger: { url: string | null; handle: string | null } | null;
