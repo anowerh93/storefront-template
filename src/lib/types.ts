@@ -49,6 +49,8 @@ export type StorefrontMeta = {
     /** items = tenant-picked categories in picked order (or auto first 6), resolved server-side. */
     department: { visible: boolean; heading: string; items?: { label: string; url: string }[] };
     shop: { visible: boolean; heading: string; links: { label: string; url: string }[] };
+    /** WhatsApp newsletter signup box (numbers POST to /subscribers). */
+    newsletter?: { visible: boolean; heading: string; text: string };
   };
   social_links: Record<string, string> | object;
   messenger: { url: string | null; handle: string | null } | null;

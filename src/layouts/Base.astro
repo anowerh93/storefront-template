@@ -157,5 +157,59 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
   </head>
   <body class="bg-white text-slate-900 overflow-x-hidden">
     <slot />
+
+    <script>
+      // Footer WhatsApp newsletter — global delegated handler so it works
+      // whether the footer arrived as static HTML or inside a hydrated
+      // island. POSTs to the platform API; success swaps the form for a
+      // confirmation line.
+      const NL_API = (import.meta.env.PUBLIC_API_BASE ?? '').replace(/\/$/, '');
+      const NL_SLUG = import.meta.env.PUBLIC_STOREFRONT_SLUG ?? '';
+      document.addEventListener('submit', async (e) => {
+        const form = (e.target as HTMLElement | null)?.closest?.('[data-newsletter-form]') as HTMLFormElement | null;
+        if (!form) return;
+        e.preventDefault();
+        if (form.dataset.busy) return;
+
+        const box = form.parentElement!;
+        const ok = box.querySelector('[data-newsletter-ok]') as HTMLElement | null;
+        const err = box.querySelector('[data-newsletter-err]') as HTMLElement | null;
+        const input = form.querySelector('input[name="whatsapp"]') as HTMLInputElement | null;
+        const honeypot = form.querySelector('input[name="company"]') as HTMLInputElement | null;
+        if (err) err.hidden = true;
+
+        form.dataset.busy = '1';
+        const button = form.querySelector('button');
+        if (button) button.disabled = true;
+        try {
+          const res = await fetch(`${NL_API}/api/v1/storefronts/${NL_SLUG}/subscribers`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ whatsapp: input?.value ?? '', company: honeypot?.value ?? '' }),
+          });
+          if (res.ok) {
+            form.hidden = true;
+            if (ok) ok.hidden = false;
+          } else {
+            const body = await res.json().catch(() => null);
+            if (err) {
+              err.textContent =
+                body?.errors?.whatsapp?.[0] ??
+                body?.message ??
+                'Something went wrong — please try again.';
+              err.hidden = false;
+            }
+          }
+        } catch {
+          if (err) {
+            err.textContent = 'Network problem — please try again.';
+            err.hidden = false;
+          }
+        } finally {
+          delete form.dataset.busy;
+          if (button) button.disabled = false;
+        }
+      });
+    </script>
   </body>
 </html>
