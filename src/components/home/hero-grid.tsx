@@ -81,7 +81,7 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
     >
       <img
         src={hero.image_url!}
-        alt={hero.headline || ''}
+        alt={hero.headline || 'Featured offer'}
         loading="eager"
         className="block w-full h-auto"
       />
@@ -103,7 +103,7 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
           upload fills with no crop; off-ratio images lose a sliver of an edge. */}
       <img
         src={tile.image_url!}
-        alt=""
+        alt="Promotional banner"
         loading="eager"
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
       />

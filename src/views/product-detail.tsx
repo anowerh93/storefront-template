@@ -96,7 +96,7 @@ function ProductGallery({ product }: { product: ProductDetail }) {
               aria-label={`View image ${i + 1}`}
               className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-2 transition ${i === active ? 'ring-brand-500' : 'ring-slate-200 hover:ring-slate-300'}`}
             >
-              <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />
+              <img src={src} alt={`${product.name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />
             </button>
           ))}
         </div>
@@ -345,7 +345,7 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {customerGalleryUrls.map((src, i) => (
               <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
+                <img src={src} alt={`${product.name} — customer photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
               </div>
             ))}
           </div>
@@ -453,7 +453,7 @@ function Sidebar({
             {related.map((p) => (
               <a key={p.slug} href={`/products/${p.slug}`} className="flex items-center gap-3 rounded-xl p-1.5 hover:bg-slate-50">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                  {p.image_url && <img src={p.image_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
+                  {p.image_url && <img src={p.image_url} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
                 </div>
                 <div className="min-w-0">
                   <p className="line-clamp-2 text-xs font-semibold text-slate-900">{p.name}</p>

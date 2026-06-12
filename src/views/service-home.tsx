@@ -139,7 +139,7 @@ export function ServiceHome({ meta, config }: Props) {
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
           <a href="/" className="flex items-center gap-2.5 min-w-0">
-            {meta.logo_url && <img src={meta.logo_url} alt="" className="h-9 w-9 rounded-lg object-cover" />}
+            {meta.logo_url && <img src={meta.logo_url} alt={meta.name} className="h-9 w-9 rounded-lg object-cover" />}
             <span className="font-bold text-slate-900 truncate">{meta.name}</span>
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
@@ -211,7 +211,7 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
           )}
         </div>
         {b.image_url && (
-          <img src={b.image_url} alt="" loading="eager"
+          <img src={b.image_url} alt={plain(b.headline) || 'Hero photo'} loading="eager"
                className="w-full rounded-2xl object-cover aspect-[4/3] ring-1 ring-slate-200 shadow-sm" />
         )}
       </div>
@@ -224,7 +224,7 @@ function About({ block }: { block: ServiceHomeConfig['about'] }) {
     <section id="about" className="scroll-mt-20">
       <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-14 sm:py-20 grid lg:grid-cols-2 gap-10 items-center">
         {block.image_url && (
-          <img src={block.image_url} alt="" loading="lazy"
+          <img src={block.image_url} alt={plain(block.title) || 'About us'} loading="lazy"
                className="w-full rounded-2xl object-cover aspect-[4/3] ring-1 ring-slate-200" />
         )}
         <div>
@@ -288,7 +288,7 @@ function Portfolio({ block }: { block: ServiceHomeConfig['portfolio'] }) {
         <div className="mt-10 grid grid-cols-2 lg:grid-cols-3 gap-4">
           {block.items.map((item, i) => (
             <figure key={i} className="group relative rounded-2xl overflow-hidden ring-1 ring-slate-200">
-              <img src={item.image_url} alt={plain(item.caption) || ''} loading="lazy"
+              <img src={item.image_url} alt={plain(item.caption) || 'Portfolio photo'} loading="lazy"
                    className="w-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-300" />
               {item.caption && (
                 <figcaption className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-slate-900/80 to-transparent text-white text-xs sm:text-sm font-medium px-3 pb-2.5 pt-8">

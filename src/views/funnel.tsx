@@ -94,7 +94,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         return config.benefits.visible && config.benefits.items.length ? <Benefits config={config.benefits} /> : null;
       case 'gallery': {
         const imgs = config.gallery.image_urls?.length ? config.gallery.image_urls : product.gallery_urls;
-        return config.gallery.visible && imgs.length ? <Gallery images={imgs} /> : null;
+        return config.gallery.visible && imgs.length ? <Gallery images={imgs} name={product.name} /> : null;
       }
       case 'price':
         return config.price.visible ? <PriceBlock config={config.price} product={product} /> : null;
@@ -278,12 +278,12 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
   );
 }
 
-function Gallery({ images }: { images: string[] }) {
+function Gallery({ images, name }: { images: string[]; name: string }) {
   return (
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
       {images.slice(0, 8).map((src, i) => (
         <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-          <img src={src} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={src} alt={`${name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         </div>
       ))}
     </section>
