@@ -29,7 +29,12 @@ export type StorefrontMeta = {
   name: string;
   logo_url: string | null;
   theme_color: string | null;
+  /** Plain-text excerpt (footer + meta-description fallbacks). */
   about: string | null;
+  /** Optional About-page H1; falls back to the store name. */
+  about_title?: string | null;
+  /** Full About article — sanitized HTML rendered from tenant Markdown. */
+  about_html?: string | null;
   currency: string;
   whatsapp: string | null;
   email: string | null;

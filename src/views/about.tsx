@@ -12,9 +12,16 @@ export function AboutPage({ meta }: { meta: StorefrontMeta | null }) {
   return (
     <>
       <Header meta={meta} />
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-10 sm:py-16">
-        <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.name}</h1>
-        {meta.about ? (
+      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
+        <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.about_title || meta.name}</h1>
+        {meta.about_html ? (
+          // Sanitized server-side: tenant Markdown → HTML via Markdown::toHtml
+          // (raw HTML stripped, unsafe links neutralised) — safe to inject.
+          <div
+            className="prose prose-slate max-w-none mt-6"
+            dangerouslySetInnerHTML={{ __html: meta.about_html }}
+          />
+        ) : meta.about ? (
           <div className="prose prose-slate max-w-none mt-6">
             <p className="text-base text-slate-700 leading-relaxed whitespace-pre-line">{meta.about}</p>
           </div>
