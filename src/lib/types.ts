@@ -46,7 +46,8 @@ export type StorefrontMeta = {
   footer_links: { label: string; url: string }[];
   /** Footer menu columns — API merges defaults, so headings/links are always set. */
   footer_nav?: {
-    department: { visible: boolean; heading: string };
+    /** items = tenant-picked categories in picked order (or auto first 6), resolved server-side. */
+    department: { visible: boolean; heading: string; items?: { label: string; url: string }[] };
     shop: { visible: boolean; heading: string; links: { label: string; url: string }[] };
   };
   social_links: Record<string, string> | object;

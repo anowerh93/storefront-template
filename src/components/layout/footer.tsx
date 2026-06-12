@@ -87,17 +87,23 @@ export function Footer({
             </FooterCol>
           ) : (
             <>
-              {/* Department = live categories under an editable heading */}
-              {dept.visible && (
-                <FooterCol title={dept.heading}>
-                  {categories.slice(0, 6).map((c) => (
-                    <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
-                  ))}
-                  {categories.length === 0 && (
-                    <FooterLink href="/products">All products</FooterLink>
-                  )}
-                </FooterCol>
-              )}
+              {/* Department = categories under an editable heading. The API
+                  resolves the tenant's picked list + order into items; cached
+                  payloads without items fall back to the old auto slice. */}
+              {dept.visible && (() => {
+                const items = dept.items
+                  ?? categories.slice(0, 6).map((c) => ({ label: c.name, url: `/categories/${c.slug}` }));
+                return (
+                  <FooterCol title={dept.heading}>
+                    {items.map((l, i) => (
+                      <FooterLink key={i} href={l.url}>{l.label}</FooterLink>
+                    ))}
+                    {items.length === 0 && (
+                      <FooterLink href="/products">All products</FooterLink>
+                    )}
+                  </FooterCol>
+                );
+              })()}
 
               {/* Shop = tenant-editable links (defaults merged by the API) */}
               {shop.visible && (
