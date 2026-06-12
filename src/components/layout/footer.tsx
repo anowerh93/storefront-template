@@ -38,7 +38,9 @@ export function Footer({
               )}
             </div>
             {meta.about && (
-              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs">{meta.about}</p>
+              // Short summary only — hard-capped at 7 lines (the API already
+              // sends a 300-char excerpt; the clamp guards the visual height).
+              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs line-clamp-7">{meta.about}</p>
             )}
             {(meta.location || meta.whatsapp || meta.email) && (
               <ul className="space-y-2 text-sm">
