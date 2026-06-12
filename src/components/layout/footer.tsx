@@ -15,6 +15,19 @@ export function Footer({
 }) {
   const social = (meta.social_links ?? {}) as Record<string, string>;
   const footerLinks = meta.footer_links ?? [];
+  // Editable menu columns; fallbacks keep cached payloads (no footer_nav
+  // yet) rendering exactly the old hardcoded columns.
+  const dept = meta.footer_nav?.department ?? { visible: true, heading: 'Department' };
+  const shop = meta.footer_nav?.shop ?? {
+    visible: true,
+    heading: 'Shop',
+    links: [
+      { label: 'All products', url: '/products' },
+      { label: 'Categories', url: '/categories' },
+      { label: 'Track Order', url: '/order/lookup' },
+      { label: `About ${meta.name}`, url: '/about' },
+    ],
+  };
   // Service-tenant websites have no catalog — swap the shop columns for
   // on-page anchors so the footer never links to empty product pages.
   const isService = meta.business_type === 'service';
@@ -74,28 +87,31 @@ export function Footer({
             </FooterCol>
           ) : (
             <>
-              {/* Department = live categories */}
-              <FooterCol title="Department">
-                {categories.slice(0, 6).map((c) => (
-                  <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
-                ))}
-                {categories.length === 0 && (
-                  <FooterLink href="/products">All products</FooterLink>
-                )}
-              </FooterCol>
+              {/* Department = live categories under an editable heading */}
+              {dept.visible && (
+                <FooterCol title={dept.heading}>
+                  {categories.slice(0, 6).map((c) => (
+                    <FooterLink key={c.slug} href={`/categories/${c.slug}`}>{c.name}</FooterLink>
+                  ))}
+                  {categories.length === 0 && (
+                    <FooterLink href="/products">All products</FooterLink>
+                  )}
+                </FooterCol>
+              )}
 
-              {/* Shop = real, working links only */}
-              <FooterCol title="Shop">
-                <FooterLink href="/products">All products</FooterLink>
-                <FooterLink href="/categories">Categories</FooterLink>
-                <FooterLink href="/order/lookup">Track Order</FooterLink>
-                <FooterLink href="/about">About {meta.name}</FooterLink>
-                {meta.messenger?.url && (
-                  <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
-                    Contact via Messenger
-                  </a>
-                )}
-              </FooterCol>
+              {/* Shop = tenant-editable links (defaults merged by the API) */}
+              {shop.visible && (
+                <FooterCol title={shop.heading}>
+                  {shop.links.map((l, i) => (
+                    <FooterLink key={i} href={l.url}>{l.label}</FooterLink>
+                  ))}
+                  {meta.messenger?.url && (
+                    <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
+                      Contact via Messenger
+                    </a>
+                  )}
+                </FooterCol>
+              )}
             </>
           )}
 

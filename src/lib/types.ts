@@ -44,6 +44,11 @@ export type StorefrontMeta = {
   email: string | null;
   location: string | null;
   footer_links: { label: string; url: string }[];
+  /** Footer menu columns — API merges defaults, so headings/links are always set. */
+  footer_nav?: {
+    department: { visible: boolean; heading: string };
+    shop: { visible: boolean; heading: string; links: { label: string; url: string }[] };
+  };
   social_links: Record<string, string> | object;
   messenger: { url: string | null; handle: string | null } | null;
   turnstile: { site_key: string | null };
