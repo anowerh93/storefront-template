@@ -176,8 +176,12 @@ export function Header({
                   href={`https://wa.me/${meta.whatsapp.replace(/\D/g, '')}`}
                   target="_blank"
                   rel="noopener"
-                  className="text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition"
                 >
+                  {/* em-sized so the icon always matches the pill's font size */}
+                  <svg className="h-[1.2em] w-[1.2em] shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path d="M12 2a10 10 0 00-8.65 15.02L2 22l5.13-1.33A10 10 0 1012 2zm5.46 14.12c-.23.65-1.35 1.24-1.86 1.28-.5.05-.97.23-3.27-.68-2.77-1.09-4.53-3.9-4.67-4.08-.13-.18-1.11-1.48-1.11-2.82 0-1.34.7-2 .95-2.27.25-.27.54-.34.72-.34l.52.01c.17.01.39-.06.61.47.23.54.77 1.87.84 2.01.07.13.11.29.02.47-.09.18-.13.29-.27.45l-.4.47c-.13.13-.27.28-.12.54.16.27.7 1.16 1.5 1.88 1.03.92 1.9 1.2 2.17 1.34.27.13.42.11.58-.07.16-.18.67-.78.85-1.05.18-.27.36-.22.6-.13.25.09 1.57.74 1.84.88.27.13.45.2.51.31.07.11.07.65-.16 1.3z" />
+                  </svg>
                   Need help? +{meta.whatsapp}
                 </a>
               )}
