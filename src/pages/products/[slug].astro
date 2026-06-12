@@ -79,6 +79,7 @@ const schemas = product
   title={product?.name}
   description={product?.short_description ?? product?.name}
   ogImage={product?.image_url ?? undefined}
+  noindex={product?.seo?.noindex}
   schema={schemas}
 >
   <ProductDetailPage client:load product={product} meta={meta} />

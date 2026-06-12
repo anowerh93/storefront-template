@@ -278,6 +278,8 @@ export type ProductDetail = ProductCard & {
     title: string | null;
     description: string | null;
     og_image: string | null;
+    /** Per-product "Hide from search results" — render robots noindex. */
+    noindex?: boolean;
   };
 };
 
@@ -416,6 +418,8 @@ export type Category = {
   slug: string;
   name: string;
   product_count: number;
+  /** Present on the category DETAIL payload (flat on data). */
+  noindex?: boolean;
 };
 
 // ──────────────────────────────────────────────────────────────

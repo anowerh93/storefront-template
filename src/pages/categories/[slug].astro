@@ -62,7 +62,7 @@ const schemas = res
   : [];
 ---
 
-<Base title={res?.category?.name ?? 'Category'} schema={schemas}>
+<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas}>
   <CategoryDetailPage
     client:load
     searchParams={{ sort, page: String(page) }}
