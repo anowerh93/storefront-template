@@ -115,13 +115,27 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
 
     {favicon && <link rel="icon" href={favicon} />}
 
-    {/* Inter font, swap-loaded so first paint isn't blocked */}
+    {/* Inter font, loaded ASYNC so first paint isn't blocked. A plain
+        stylesheet <link> blocks rendering until Google's CSS arrives —
+        300-800ms of white screen on BD connections (display=swap only
+        prevents invisible TEXT, not the blocking fetch). media="print"
+        makes the browser fetch it at low priority without blocking
+        paint; onload flips it live and the page re-renders with Inter.
+        The system font shows in the meantime. */}
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
       href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      media="print"
+      onload="this.media='all'"
     />
+    <noscript>
+      <link
+        rel="stylesheet"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
+      />
+    </noscript>
 
     {/* Per-tenant brand color CSS variables — server-rendered, no flash on
         first paint. Variables are read by Tailwind v4's @theme directive in
