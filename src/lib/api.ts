@@ -15,11 +15,19 @@
  * Cache strategy difference vs. the Next.js original:
  *   - The previous Next.js version used `fetch(url, { next: { tags, revalidate: 60 } })`
  *     to opt into Next's ISR cache with tag-based invalidation. That whole
- *     subsystem doesn't exist on Astro/CF. We drop the cache hint here and
- *     rely on Astro's BUILD-TIME static generation: each page is fetched
- *     once at `astro build`, baked into HTML, then served as a static asset
- *     from Cloudflare's edge. Freshness happens via a full CF Pages rebuild
- *     triggered by the Laravel revalidate webhook (see `pages/api/revalidate.ts`).
+ *     subsystem doesn't exist on Astro/CF. Prerendered pages rely on Astro's
+ *     BUILD-TIME static generation: fetched once at `astro build`, baked into
+ *     HTML, served static from Cloudflare's edge. Freshness happens via a full
+ *     CF Pages rebuild triggered by the Laravel revalidate webhook.
+ *   - SSR routes (product/category/checkout/funnel pages) fetch per request.
+ *     Those reads go through the Workers Cache API (`caches.default`) with a
+ *     60s TTL matching Laravel's server-side StorefrontCache — repeat views
+ *     within a minute skip the origin round-trip entirely. The cache is
+ *     per-colo and the worst-case staleness is 60s edge + 60s StorefrontCache.
+ *     Endpoints with side effects or per-customer data (`/resolve` logs 404s;
+ *     order lookup returns live status) opt out via `cache: false`.
+ *     `caches` only exists on the Workers runtime, so Node (astro dev/build)
+ *     transparently bypasses it.
  *   - The `tags` parameter is preserved in the API surface so callers don't
  *     have to change shape, but it's a no-op now. We can wire it up to CF
  *     KV-keyed cache invalidation later if rebuild latency becomes a pain.
@@ -57,18 +65,74 @@ function buildUrl(path: string, params?: Record<string, string | number | undefi
   return `${API_BASE}/api/v1/storefronts/${STOREFRONT_SLUG}${path}${qs}`;
 }
 
+/** Edge-cache TTL for API reads, matching Laravel's StorefrontCache (60s). */
+const EDGE_CACHE_TTL = 60;
+
+/**
+ * The Workers Cache API, when running on the Cloudflare runtime. Node
+ * (astro dev / astro build) has no `caches` global → undefined → bypass.
+ */
+function edgeCache(): { match(url: string): Promise<Response | undefined>; put(url: string, res: Response): Promise<void> } | undefined {
+  return (globalThis as { caches?: { default?: any } }).caches?.default;
+}
+
 async function apiFetch<T>(
   path: string,
-  options: { params?: Record<string, string | number | undefined>; tags?: string[]; unwrap?: boolean } = {},
+  options: {
+    params?: Record<string, string | number | undefined>;
+    tags?: string[];
+    unwrap?: boolean;
+    /** Set false for endpoints with side effects or per-customer data. */
+    cache?: boolean;
+  } = {},
 ): Promise<T> {
   const url = buildUrl(path, options.params);
+  const cache = options.cache === false ? undefined : edgeCache();
+
+  // Edge-cache lookup. Cache failures must never break a render — treat
+  // any throw as a miss and fall through to the origin fetch.
+  if (cache) {
+    try {
+      const hit = await cache.match(url);
+      if (hit) {
+        const json = await hit.json();
+        if (options.unwrap === false) return json as T;
+        return (json.data ?? json) as T;
+      }
+    } catch {
+      // miss
+    }
+  }
+
   const res = await fetch(url, {
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
     throw new Error(`API ${path} failed: ${res.status} ${res.statusText}`);
   }
-  const json = await res.json();
+  // Read as text so the same body can be parsed AND stored: the Laravel API
+  // sends `Cache-Control: no-cache, private` (correct for direct browser
+  // hits), which cache.put() would refuse to store — so we re-wrap the body
+  // in a fresh Response carrying our own TTL instead of storing `res`.
+  const text = await res.text();
+  const json = JSON.parse(text);
+
+  if (cache) {
+    try {
+      await cache.put(
+        url,
+        new Response(text, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Cache-Control': `public, max-age=${EDGE_CACHE_TTL}`,
+          },
+        }),
+      );
+    } catch {
+      // best-effort — a full cache or oversized body never breaks the page
+    }
+  }
+
   // Two response shapes from Laravel:
   //   - Single resource:  { data: { ... } }              → unwrap
   //   - Paginated list:   { data: [...], meta: {...} }   → keep as-is (caller wants both fields)
@@ -178,7 +242,10 @@ export function getSitemap() {
  */
 export async function resolvePath(path: string): Promise<{ to: string; status: number } | null> {
   try {
-    return await apiFetch<{ to: string; status: number }>('/resolve', { params: { path } });
+    // cache:false — every call has a server-side effect (404 logging /
+    // redirect hit counting), and a cached miss would mask a redirect the
+    // tenant just created.
+    return await apiFetch<{ to: string; status: number }>('/resolve', { params: { path }, cache: false });
   } catch {
     return null;
   }
@@ -192,8 +259,11 @@ export function getMessengerLink(opts: { productId?: number; variant?: string } 
 }
 
 export function lookupOrder(orderNumber: string, phoneLast4: string) {
+  // cache:false — live order status, and it's one customer's private data;
+  // an edge-cached copy could be served to a different visitor in the colo.
   return apiFetch<OrderResponse>(`/orders/${encodeURIComponent(orderNumber)}`, {
     params: { phone: phoneLast4 },
+    cache: false,
   });
 }
 
