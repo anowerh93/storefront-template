@@ -23,18 +23,31 @@ export interface Props {
   noindex?: boolean;
   /** JSON-LD objects (lib/schema.ts builders) rendered as ld+json scripts. */
   schema?: Record<string, unknown>[];
+  /**
+   * Storefront metadata fetched by the page. Pages that already call
+   * getStorefront() MUST pass it through — on SSR routes a second fetch
+   * here costs a full extra round-trip to the Laravel origin per page
+   * view (this duplicate was the single biggest TTFB cost). Pass `null`
+   * to mean "I fetched and it failed" — only `undefined` (prop omitted)
+   * falls back to fetching here.
+   */
+  meta?: StorefrontMeta | null;
 }
 
 const { title, description, ogImage, noindex, schema = [] } = Astro.props;
 
-// Fetch tenant metadata. If it fails (API down, slug mis-set), render a
-// graceful skeleton rather than crashing the build — matches the Next.js
-// original's behaviour.
+// Tenant metadata: prefer the page's already-fetched copy; fetch only when
+// the page didn't pass one (e.g. 404.astro). If the fallback fails (API
+// down, slug mis-set), render a graceful skeleton rather than crashing.
 let meta: StorefrontMeta | null = null;
-try {
-  meta = await getStorefront();
-} catch (err) {
-  console.warn('[Base.astro] getStorefront() failed — rendering without tenant chrome:', err);
+if (Astro.props.meta !== undefined) {
+  meta = Astro.props.meta;
+} else {
+  try {
+    meta = await getStorefront();
+  } catch (err) {
+    console.warn('[Base.astro] getStorefront() failed — rendering without tenant chrome:', err);
+  }
 }
 
 const finalTitle = title

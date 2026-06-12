@@ -27,16 +27,19 @@ import type { ProductDetail, StorefrontMeta } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
-let product: ProductDetail | null = null;
-let meta: StorefrontMeta | null = null;
-
-// Two independent fetches — if the product 404s we still want meta for
-// the layout/branding on the rendered NotFoundPage.
-try {
-  product = await getProduct(slug);
-} catch (err) {
-  console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
-}
+// Two independent fetches, run in PARALLEL — sequential awaits here cost a
+// full extra origin round-trip per page view. If the product 404s we still
+// want meta for the layout/branding on the rendered NotFoundPage.
+const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Promise.all([
+  getProduct(slug).catch((err) => {
+    console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
+    return null;
+  }),
+  getStorefront().catch((err) => {
+    console.warn('[products/[slug].astro] getStorefront() failed:', err);
+    return null;
+  }),
+]);
 
 // Slug renames leave a 301 behind — ask the redirect table before rendering
 // a 404 (the miss is logged server-side either way). Local paths only; a
@@ -49,12 +52,6 @@ if (!product) {
   // Real 404 status — the in-place not-found view with a 200 is a "soft
   // 404" that search engines flag and keep crawling.
   Astro.response.status = 404;
-}
-
-try {
-  meta = await getStorefront();
-} catch (err) {
-  console.warn('[products/[slug].astro] getStorefront() failed:', err);
 }
 
 // JSON-LD: Product (+ratings/reviews) + breadcrumb trail (+FAQ when the
@@ -81,6 +78,7 @@ const schemas = product
   ogImage={product?.image_url ?? undefined}
   noindex={product?.seo?.noindex}
   schema={schemas}
+  meta={meta}
 >
   <ProductDetailPage client:load product={product} meta={meta} />
 </Base>

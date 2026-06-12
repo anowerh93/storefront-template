@@ -37,7 +37,7 @@ try {
 const searchParams = { search, category, page: String(page), sort };
 ---
 
-<Base title="All products">
+<Base title="All products" meta={meta}>
   <ProductListPage
     client:load
     searchParams={searchParams}

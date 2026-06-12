@@ -19,15 +19,23 @@ const sp   = Astro.url.searchParams;
 const sort = (sp.get('sort') ?? 'newest') as ProductSort;
 const page = parseInt(sp.get('page') ?? '1', 10);
 
-let res: { category: Category; products: Paginated<ProductCard> } | null = null;
-let meta: StorefrontMeta | null = null;
-let categories: Category[] = [];
-
-try {
-  res = await getCategory(slug, { sort, page });
-} catch (err) {
-  console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
-}
+// All three fetches in PARALLEL — sequential awaits here cost extra origin
+// round-trips per page view (meta/categories are independent of the category).
+const [res, meta, categories]: [
+  { category: Category; products: Paginated<ProductCard> } | null,
+  StorefrontMeta | null,
+  Category[],
+] = await Promise.all([
+  getCategory(slug, { sort, page }).catch((err) => {
+    console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
+    return null;
+  }),
+  getStorefront().catch((err) => {
+    console.warn('[categories/[slug].astro] getStorefront() failed:', err);
+    return null;
+  }),
+  getCategories().catch(() => []),
+]);
 
 // Slug renames leave a 301 behind — same contract as products/[slug].astro.
 if (!res) {
@@ -37,15 +45,6 @@ if (!res) {
   }
   // Real 404 status, not a soft 404 (see products/[slug].astro).
   Astro.response.status = 404;
-}
-
-try {
-  [meta, categories] = await Promise.all([
-    getStorefront(),
-    getCategories().catch(() => []),
-  ]);
-} catch (err) {
-  console.warn('[categories/[slug].astro] getStorefront() failed:', err);
 }
 
 // JSON-LD: CollectionPage + breadcrumb trail on the canonical origin.
@@ -62,7 +61,7 @@ const schemas = res
   : [];
 ---
 
-<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas}>
+<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas} meta={meta}>
   <CategoryDetailPage
     client:load
     searchParams={{ sort, page: String(page) }}
