@@ -105,3 +105,27 @@
 @media (prefers-reduced-motion: reduce) {
   .funnel-revealed [data-anim] { animation: none !important; }
 }
+
+/* ── Markdown tables (Specifications / Support / Description) ─────────────
+   Tailwind Typography only draws bottom borders under rows — markdown spec
+   tables had NO outer or column borders at all. Give them the full grid a
+   spec sheet needs: boxed outline, vertical separators, shaded header,
+   rounded corners (border-radius needs border-collapse: separate). */
+.prose table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  width: 100%;
+}
+.prose th,
+.prose td {
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+}
+.prose th:last-child,
+.prose td:last-child { border-right: 0; }
+.prose tr:last-child td { border-bottom: 0; }
+.prose thead th { background: #f8fafc; }
