@@ -50,9 +50,12 @@ if (Astro.props.meta !== undefined) {
   }
 }
 
+// Homepage (no page title): "Site title — Tagline", WordPress-style.
+// Inner pages: "Page — Site name".
+const homeTitle = meta?.seo.title ?? meta?.name ?? 'Storefront';
 const finalTitle = title
   ? (meta ? `${title} — ${meta.name}` : title)
-  : meta?.seo.title ?? meta?.name ?? 'Storefront';
+  : (meta?.tagline ? `${homeTitle} — ${meta.tagline}` : homeTitle);
 
 const finalDescription = description
   ?? meta?.seo.description
@@ -65,7 +68,7 @@ const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
 const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = meta?.pixel?.id ?? null;
 const siteName = meta?.name ?? '';
-const favicon = meta?.logo_url ?? null;
+const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;
 
 // Canonical — always the tenant's PUBLIC origin (custom domain when
 // verified), never this request's host, so the pages.dev mirror points

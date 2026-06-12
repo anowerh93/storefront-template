@@ -27,7 +27,11 @@ export type StorefrontMeta = {
    */
   public_url?: string | null;
   name: string;
+  /** Short phrase after the site title in the homepage <title>; description fallback. */
+  tagline?: string | null;
   logo_url: string | null;
+  /** Dedicated site icon; API falls back to the logo when unset. */
+  favicon_url?: string | null;
   theme_color: string | null;
   /** Plain-text excerpt (footer + meta-description fallbacks). */
   about: string | null;

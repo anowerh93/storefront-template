@@ -93,7 +93,9 @@ const schemas: Record<string, unknown>[] =
     : [];
 ---
 
-<Base title={meta?.name} description={meta?.about} schema={schemas} meta={meta}>
+{/* No title prop: Base renders the homepage <title> as "Site title — Tagline"
+    (passing meta.name here used to produce the duplicated "name — name"). */}
+<Base description={meta?.about} schema={schemas} meta={meta}>
   {/* Service tenants: block-based service website with its own anchor-nav
       header — the product Header/sections below never render for them. */}
   {meta && isServiceSite && <ServiceHome client:load meta={meta} config={meta.service_home!} />}
