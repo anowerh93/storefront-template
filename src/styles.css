@@ -90,6 +90,16 @@
 .funnel-dark .sv-card,
 .funnel-dark .sv-card :is(h1, h2, h3, h4, p, span, li, summary, label) { color: #0f172a; }
 
+/* Footer with a LIGHT custom background → dark text (the default footer text
+   is light for the dark brand backdrop). Unlayered low-specificity override
+   that beats Tailwind's text-brand-* utilities. The social-icon chips keep
+   their own dark bg-brand-800 background, so their light icons are excluded
+   (:not) — otherwise dark-on-dark would hide them. Image backgrounds carry a
+   dark scrim and never get this class, so they stay light. */
+.footer-on-light :is(h1, h2, h3, h4, p, span, li, label),
+.footer-on-light a:not(.bg-brand-800) { color: #1e293b; }
+.footer-on-light a:not(.bg-brand-800):hover { color: #0f172a; }
+
 /* transforms need inline-block; fade (opacity only) stays inline so it wraps */
 [data-anim="slide-up"],
 [data-anim="pop"],
