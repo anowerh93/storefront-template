@@ -11,7 +11,7 @@
  */
 
 export function brandCssVars(themeColor: string | null): string {
-  const hex = (themeColor ?? '#F07F13').replace(/^#/, '');
+  const hex = (themeColor ?? '#0b1a3a').replace(/^#/, '');
   if (!/^[0-9a-fA-F]{6}$/.test(hex)) return '';
 
   const r = parseInt(hex.slice(0, 2), 16);
