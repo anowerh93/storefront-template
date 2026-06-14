@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
-import { Mail, Phone, Clock, Facebook, Instagram, Youtube, MessageCircle } from 'lucide-react';
 import { getIcon } from '../lib/icons';
 import { submitLead } from '../lib/api';
+import { ServiceHeader } from '../components/layout/service-header';
 import type { ServiceHomeConfig, ServiceSectionBg, ServiceSectionKey, StorefrontMeta } from '../lib/types';
 
 /**
@@ -86,16 +86,6 @@ function Reveal({ enabled, children }: { enabled: boolean; children: ReactNode }
   );
 }
 
-/** Section key → nav anchor label. Only visible sections become nav items. */
-const NAV_LABELS: Partial<Record<ServiceSectionKey, string>> = {
-  about: 'About',
-  services: 'Services',
-  portfolio: 'Our work',
-  testimonials: 'Reviews',
-  faq: 'FAQ',
-  contact: 'Contact',
-};
-
 /** Default block backgrounds when the tenant hasn't set a custom one. */
 const FALLBACK_BG: Record<ServiceSectionKey, string> = {
   hero: 'bg-slate-50',
@@ -109,16 +99,7 @@ const FALLBACK_BG: Record<ServiceSectionKey, string> = {
 };
 
 export function ServiceHome({ meta, config }: Props) {
-  const [menuOpen, setMenuOpen] = useState(false);
   const animate = config.animate !== false;
-
-  const navItems = useMemo(
-    () =>
-      config.section_order
-        .filter((key) => NAV_LABELS[key] && (config[key] as { visible?: boolean })?.visible)
-        .map((key) => ({ key, label: NAV_LABELS[key]! })),
-    [config],
-  );
 
   const renderSection = (key: ServiceSectionKey) => {
     switch (key) {
@@ -136,44 +117,7 @@ export function ServiceHome({ meta, config }: Props) {
 
   return (
     <div>
-      <TopBar meta={meta} hero={config.hero} />
-      {/* ── Sticky anchor-nav header ─────────────────────────────── */}
-      <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
-        <div className="mx-auto max-w-[1100px] px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-          <a href="/" className="flex items-center gap-2.5 min-w-0">
-            {meta.logo_url && <img src={meta.logo_url} alt={meta.name} className="h-9 w-9 rounded-lg object-cover" />}
-            <span className="font-bold text-slate-900 truncate">{meta.name}</span>
-          </a>
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            {navItems.map((item) => (
-              <a key={item.key} href={item.key === 'services' ? '/services' : `#${item.key}`} className="hover:text-slate-900 transition">{item.label}</a>
-            ))}
-          </nav>
-          <div className="flex items-center gap-2">
-            {config.contact.visible && (
-              <a href="#contact"
-                 className="hidden sm:inline-flex bg-brand-600 hover:bg-brand-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition">
-                {plain(config.hero.cta_label) || 'Contact us'}
-              </a>
-            )}
-            <button type="button" aria-label="Menu" onClick={() => setMenuOpen((v) => !v)}
-                    className="md:hidden p-2 text-slate-700">
-              <svg className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                <path strokeLinecap="round" d={menuOpen ? 'M6 18L18 6M6 6l12 12' : 'M4 7h16M4 12h16M4 17h16'} />
-              </svg>
-            </button>
-          </div>
-        </div>
-        {menuOpen && (
-          <nav className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1">
-            {navItems.map((item) => (
-              <a key={item.key} href={item.key === 'services' ? '/services' : `#${item.key}`} onClick={() => setMenuOpen(false)}
-                 className="block py-2 text-sm font-medium text-slate-700">{item.label}</a>
-            ))}
-          </nav>
-        )}
-      </header>
-
+      <ServiceHeader meta={meta} />
       <main>
         {config.section_order.map((key) => {
           const node = renderSection(key);
@@ -186,74 +130,11 @@ export function ServiceHome({ meta, config }: Props) {
           ) : null;
         })}
       </main>
-      <FloatingButtons meta={meta} hero={config.hero} />
     </div>
   );
 }
 
 // ── Blocks ─────────────────────────────────────────────────────
-
-/** Brand-coloured top contact bar: note · email · availability · phones ·
- *  social + business name. Phones come from the hero config; the rest from
- *  the tenant meta. Hidden entirely when there's nothing to show. */
-function TopBar({ meta, hero }: { meta: StorefrontMeta; hero: ServiceHomeConfig['hero'] }) {
-  const phones = (hero.phones ?? []).filter(Boolean);
-  const social = (meta.social_links ?? {}) as Record<string, string>;
-  const tel = (p: string) => `tel:${p.replace(/[^\d+]/g, '')}`;
-  const has = hero.top_note || meta.email || hero.support_label || phones.length || social.facebook || meta.name;
-  if (!has) return null;
-  return (
-    <div className="bg-brand-600 text-white text-xs sm:text-sm">
-      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5">
-        {hero.top_note && <RT html={hero.top_note} className="font-semibold hidden sm:inline" />}
-        {meta.email && (
-          <a href={`mailto:${meta.email}`} className="inline-flex items-center gap-1.5 hover:text-white/80 transition">
-            <Mail className="h-4 w-4 shrink-0" /> <span className="truncate max-w-[180px]">{meta.email}</span>
-          </a>
-        )}
-        {hero.support_label && (
-          <span className="inline-flex items-center gap-1.5">
-            <Clock className="h-4 w-4 shrink-0" /> <RT html={hero.support_label} />
-          </span>
-        )}
-        {phones.length > 0 && (
-          <a href={tel(phones[0])} className="inline-flex items-center gap-1.5 hover:text-white/80 transition">
-            <Phone className="h-4 w-4 shrink-0" /> <span>{phones.join(' · ')}</span>
-          </a>
-        )}
-        <div className="ml-auto inline-flex items-center gap-3">
-          {social.facebook && <a href={social.facebook} target="_blank" rel="noopener" aria-label="Facebook" className="hover:text-white/80"><Facebook className="h-4 w-4" /></a>}
-          {social.instagram && <a href={social.instagram} target="_blank" rel="noopener" aria-label="Instagram" className="hover:text-white/80"><Instagram className="h-4 w-4" /></a>}
-          {social.youtube && <a href={social.youtube} target="_blank" rel="noopener" aria-label="YouTube" className="hover:text-white/80"><Youtube className="h-4 w-4" /></a>}
-          <span className="hidden md:inline font-semibold">{meta.name}</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/** Floating call + WhatsApp buttons (bottom-right, all pages). */
-function FloatingButtons({ meta, hero }: { meta: StorefrontMeta; hero: ServiceHomeConfig['hero'] }) {
-  const callNumber = (hero.phones ?? []).filter(Boolean)[0] || meta.whatsapp || '';
-  const wa = meta.whatsapp ? meta.whatsapp.replace(/\D/g, '') : '';
-  if (!callNumber && !wa) return null;
-  return (
-    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3">
-      {callNumber && (
-        <a href={`tel:${callNumber.replace(/[^\d+]/g, '')}`} aria-label="Call us"
-           className="w-12 h-12 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-lg ring-4 ring-brand-600/20 flex items-center justify-center transition">
-          <Phone className="h-5 w-5" />
-        </a>
-      )}
-      {wa && (
-        <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener" aria-label="WhatsApp"
-           className="w-12 h-12 rounded-full bg-[#25D366] hover:brightness-95 text-white shadow-lg ring-4 ring-[#25D366]/20 flex items-center justify-center transition">
-          <MessageCircle className="h-5 w-5" />
-        </a>
-      )}
-    </div>
-  );
-}
 
 function Hero({ config }: { config: ServiceHomeConfig }) {
   const b = config.hero;

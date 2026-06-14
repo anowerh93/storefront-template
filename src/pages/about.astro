@@ -7,6 +7,7 @@ import Base from '../layouts/Base.astro';
 import { getStorefront } from '../lib/api';
 import { breadcrumbSchema } from '../lib/schema';
 import { AboutPage } from '../views/about';
+import { ServiceAboutPage } from '../views/service-about';
 import type { StorefrontMeta } from '../lib/types';
 
 let meta: StorefrontMeta | null = null;
@@ -16,6 +17,13 @@ try {
   console.warn('[about.astro] getStorefront() failed:', err);
 }
 
+// Service tenants get a service-appropriate About (built from the
+// service_home.about block) instead of the e-commerce product about article.
+const isService = meta?.business_type === 'service' && !!meta?.service_home;
+const aboutTitle = isService
+  ? (meta!.service_home!.about?.title?.replace(/<[^>]*>/g, '') || `About ${meta!.name}`)
+  : (meta?.about_title || 'About');
+
 // Prerendered page — breadcrumb only once a public origin exists.
 const origin = (meta?.public_url ?? '').replace(/\/+$/, '');
 const schemas = origin
@@ -23,6 +31,6 @@ const schemas = origin
   : [];
 ---
 
-<Base title={meta?.about_title || 'About'} schema={schemas} meta={meta}>
-  <AboutPage meta={meta} />
+<Base title={aboutTitle} schema={schemas} meta={meta}>
+  {isService ? <ServiceAboutPage meta={meta} /> : <AboutPage meta={meta} />}
 </Base>
