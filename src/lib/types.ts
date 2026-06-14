@@ -114,6 +114,14 @@ export type ServiceHomeConfig = {
     subheadline: string;
     cta_label: string;
     image_url: string | null;
+    // Segunbagicha-style hero additions (optional — older cached payloads omit them).
+    services_heading?: string;
+    key_services?: string[];
+    closing_line?: string;
+    premium_label?: string;
+    top_note?: string;
+    support_label?: string;
+    phones?: string[];
   };
   about: ServiceSectionBg & {
     visible: boolean;

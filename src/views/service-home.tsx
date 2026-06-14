@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CSSProperties, FormEvent, ReactNode } from 'react';
+import { Mail, Phone, Clock, Facebook, Instagram, Youtube, MessageCircle } from 'lucide-react';
 import { getIcon } from '../lib/icons';
 import { submitLead } from '../lib/api';
 import type { ServiceHomeConfig, ServiceSectionBg, ServiceSectionKey, StorefrontMeta } from '../lib/types';
@@ -135,6 +136,7 @@ export function ServiceHome({ meta, config }: Props) {
 
   return (
     <div>
+      <TopBar meta={meta} hero={config.hero} />
       {/* ── Sticky anchor-nav header ─────────────────────────────── */}
       <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-200">
         <div className="mx-auto max-w-[1100px] px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
@@ -184,36 +186,146 @@ export function ServiceHome({ meta, config }: Props) {
           ) : null;
         })}
       </main>
+      <FloatingButtons meta={meta} hero={config.hero} />
     </div>
   );
 }
 
 // ── Blocks ─────────────────────────────────────────────────────
 
+/** Brand-coloured top contact bar: note · email · availability · phones ·
+ *  social + business name. Phones come from the hero config; the rest from
+ *  the tenant meta. Hidden entirely when there's nothing to show. */
+function TopBar({ meta, hero }: { meta: StorefrontMeta; hero: ServiceHomeConfig['hero'] }) {
+  const phones = (hero.phones ?? []).filter(Boolean);
+  const social = (meta.social_links ?? {}) as Record<string, string>;
+  const tel = (p: string) => `tel:${p.replace(/[^\d+]/g, '')}`;
+  const has = hero.top_note || meta.email || hero.support_label || phones.length || social.facebook || meta.name;
+  if (!has) return null;
+  return (
+    <div className="bg-brand-600 text-white text-xs sm:text-sm">
+      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-2 flex flex-wrap items-center gap-x-5 gap-y-1.5">
+        {hero.top_note && <RT html={hero.top_note} className="font-semibold hidden sm:inline" />}
+        {meta.email && (
+          <a href={`mailto:${meta.email}`} className="inline-flex items-center gap-1.5 hover:text-white/80 transition">
+            <Mail className="h-4 w-4 shrink-0" /> <span className="truncate max-w-[180px]">{meta.email}</span>
+          </a>
+        )}
+        {hero.support_label && (
+          <span className="inline-flex items-center gap-1.5">
+            <Clock className="h-4 w-4 shrink-0" /> <RT html={hero.support_label} />
+          </span>
+        )}
+        {phones.length > 0 && (
+          <a href={tel(phones[0])} className="inline-flex items-center gap-1.5 hover:text-white/80 transition">
+            <Phone className="h-4 w-4 shrink-0" /> <span>{phones.join(' · ')}</span>
+          </a>
+        )}
+        <div className="ml-auto inline-flex items-center gap-3">
+          {social.facebook && <a href={social.facebook} target="_blank" rel="noopener" aria-label="Facebook" className="hover:text-white/80"><Facebook className="h-4 w-4" /></a>}
+          {social.instagram && <a href={social.instagram} target="_blank" rel="noopener" aria-label="Instagram" className="hover:text-white/80"><Instagram className="h-4 w-4" /></a>}
+          {social.youtube && <a href={social.youtube} target="_blank" rel="noopener" aria-label="YouTube" className="hover:text-white/80"><Youtube className="h-4 w-4" /></a>}
+          <span className="hidden md:inline font-semibold">{meta.name}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Floating call + WhatsApp buttons (bottom-right, all pages). */
+function FloatingButtons({ meta, hero }: { meta: StorefrontMeta; hero: ServiceHomeConfig['hero'] }) {
+  const callNumber = (hero.phones ?? []).filter(Boolean)[0] || meta.whatsapp || '';
+  const wa = meta.whatsapp ? meta.whatsapp.replace(/\D/g, '') : '';
+  if (!callNumber && !wa) return null;
+  return (
+    <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3">
+      {callNumber && (
+        <a href={`tel:${callNumber.replace(/[^\d+]/g, '')}`} aria-label="Call us"
+           className="w-12 h-12 rounded-full bg-brand-600 hover:bg-brand-700 text-white shadow-lg ring-4 ring-brand-600/20 flex items-center justify-center transition">
+          <Phone className="h-5 w-5" />
+        </a>
+      )}
+      {wa && (
+        <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener" aria-label="WhatsApp"
+           className="w-12 h-12 rounded-full bg-[#25D366] hover:brightness-95 text-white shadow-lg ring-4 ring-[#25D366]/20 flex items-center justify-center transition">
+          <MessageCircle className="h-5 w-5" />
+        </a>
+      )}
+    </div>
+  );
+}
+
 function Hero({ config }: { config: ServiceHomeConfig }) {
   const b = config.hero;
+  const keyServices = (b.key_services ?? []).filter(Boolean);
   return (
-    <section id="hero">
-      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-14 sm:py-20 grid lg:grid-cols-2 gap-10 items-center">
+    <section id="hero" className="relative overflow-hidden">
+      {/* Decorative brand-tinted triangles (rotated squares) — like the reference. */}
+      <div aria-hidden className="pointer-events-none absolute -left-20 -top-12 h-72 w-72 rotate-45 bg-brand-100/60" />
+      <div aria-hidden className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rotate-45 bg-brand-100/40 hidden lg:block" />
+
+      <div className="relative mx-auto max-w-[1100px] px-4 sm:px-6 py-12 sm:py-16 grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+        {/* ── Left: title → key services → CTA ── */}
         <div>
           {b.eyebrow && (
             <p className="inline-flex bg-brand-100 text-brand-800 text-xs font-semibold px-3 py-1 rounded-full mb-4">
               <RT html={b.eyebrow} />
             </p>
           )}
-          <RT as="h1" html={b.headline} className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight" />
-          {b.subheadline && <RT as="p" html={b.subheadline} className="mt-4 text-base sm:text-lg text-slate-600 max-w-xl block" />}
+          <RT as="h1" html={b.headline} className="text-3xl sm:text-4xl lg:text-5xl font-extrabold tracking-tight text-brand-600 leading-tight" />
+          {b.subheadline && <RT as="p" html={b.subheadline} className="mt-3 text-lg sm:text-xl font-bold text-slate-800 block" />}
+
+          {keyServices.length > 0 && (
+            <div className="mt-6">
+              {b.services_heading && (
+                <RT as="h2" html={b.services_heading}
+                    className="text-base font-bold text-brand-700 underline underline-offset-4 decoration-2 block" />
+              )}
+              <ul className="mt-3 space-y-2.5">
+                {keyServices.map((s, i) => (
+                  <li key={i} className="flex items-start gap-2.5 text-sm sm:text-[15px] text-slate-700 leading-relaxed">
+                    <span className="mt-0.5 shrink-0 inline-flex items-center justify-center w-5 h-5 rounded-full bg-brand-100 text-brand-700">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={3} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </span>
+                    <RT html={s} />
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {b.closing_line && <RT as="p" html={b.closing_line} className="mt-5 text-sm text-slate-700 font-medium block" />}
+
           {config.contact.visible && (
             <a href="#contact"
-               className="mt-7 inline-flex bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-3 rounded-xl transition">
+               className="mt-7 inline-flex bg-brand-600 hover:bg-brand-700 text-white font-semibold px-6 py-3 rounded-xl transition shadow-sm">
               <RT html={b.cta_label || 'Contact us'} />
             </a>
           )}
         </div>
-        {b.image_url && (
-          <img src={b.image_url} alt={plain(b.headline) || 'Hero photo'} loading="eager"
-               className="w-full rounded-2xl object-cover aspect-[4/3] ring-1 ring-slate-200 shadow-sm" />
-        )}
+
+        {/* ── Right: "premium consultation" labelled card ── */}
+        <div className="relative">
+          {b.premium_label && (
+            <div className="inline-block bg-slate-900 text-white text-xs sm:text-sm font-bold uppercase tracking-wide px-5 py-2.5 rounded-t-xl">
+              <RT html={b.premium_label} />
+            </div>
+          )}
+          <div className={`ring-1 ring-slate-200 bg-white p-3 sm:p-4 shadow-sm rounded-2xl ${b.premium_label ? 'rounded-tl-none' : ''}`}>
+            {b.image_url ? (
+              <img src={b.image_url} alt={plain(b.headline) || 'Consultation'} loading="eager"
+                   className="w-full rounded-xl object-cover aspect-[4/3]" />
+            ) : (
+              <div className="w-full aspect-[4/3] rounded-xl bg-brand-50 flex items-center justify-center text-brand-300">
+                <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                </svg>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </section>
   );
