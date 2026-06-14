@@ -306,26 +306,48 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
           )}
         </div>
 
-        {/* ── Right: "premium consultation" labelled card ── */}
-        <div className="relative">
-          {b.premium_label && (
-            <div className="inline-block bg-slate-900 text-white text-xs sm:text-sm font-bold uppercase tracking-wide px-5 py-2.5 rounded-t-xl">
-              <RT html={b.premium_label} />
-            </div>
-          )}
-          <div className={`ring-1 ring-slate-200 bg-white p-3 sm:p-4 shadow-sm rounded-2xl ${b.premium_label ? 'rounded-tl-none' : ''}`}>
-            {b.image_url ? (
-              <img src={b.image_url} alt={plain(b.headline) || 'Consultation'} loading="eager"
-                   className="w-full rounded-xl object-cover aspect-[4/3]" />
-            ) : (
-              <div className="w-full aspect-[4/3] rounded-xl bg-brand-50 flex items-center justify-center text-brand-300">
-                <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
-                </svg>
+        {/* ── Right: "premium consultation" card. Clickable → booking form
+              (#contact) when the contact block is on the page; otherwise a
+              plain card so we never render a dead link. ── */}
+        {(() => {
+          const cardInner = (
+            <>
+              {b.premium_label && (
+                <div className="inline-block bg-slate-900 group-hover:bg-slate-800 text-white text-xs sm:text-sm font-bold uppercase tracking-wide px-5 py-2.5 rounded-t-xl transition">
+                  <RT html={b.premium_label} />
+                </div>
+              )}
+              <div className={`ring-1 ring-slate-200 group-hover:ring-brand-300 bg-white p-3 sm:p-4 shadow-sm group-hover:shadow-md transition rounded-2xl ${b.premium_label ? 'rounded-tl-none' : ''}`}>
+                {b.image_url ? (
+                  <img src={b.image_url} alt={plain(b.headline) || 'Consultation'} loading="eager"
+                       className="w-full rounded-xl object-cover aspect-[4/3]" />
+                ) : (
+                  <div className="w-full aspect-[4/3] rounded-xl bg-brand-50 flex items-center justify-center text-brand-300">
+                    <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
+                    </svg>
+                  </div>
+                )}
+                {config.contact.visible && (
+                  <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700">
+                    {plain(b.cta_label) || 'Book now'}
+                    <svg className="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </span>
+                )}
               </div>
-            )}
-          </div>
-        </div>
+            </>
+          );
+          return config.contact.visible ? (
+            <a href="#contact" aria-label={plain(b.premium_label || '') || 'Book a consultation'}
+               className="group relative block cursor-pointer">
+              {cardInner}
+            </a>
+          ) : (
+            <div className="group relative">{cardInner}</div>
+          );
+        })()}
       </div>
     </section>
   );
