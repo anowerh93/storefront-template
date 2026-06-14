@@ -122,6 +122,8 @@ export type ServiceHomeConfig = {
     top_note?: string;
     support_label?: string;
     phones?: string[];
+    /** Where the consultation card links; blank → the inquiry form (#contact). */
+    card_url?: string;
   };
   about: ServiceSectionBg & {
     visible: boolean;

@@ -306,10 +306,13 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
           )}
         </div>
 
-        {/* ── Right: "premium consultation" card. Clickable → booking form
-              (#contact) when the contact block is on the page; otherwise a
-              plain card so we never render a dead link. ── */}
+        {/* ── Right: "premium consultation" card. Links to the tenant's own
+              card_url when set (e.g. an external booking page, opened in a new
+              tab), else the inquiry form (#contact) when it's on the page,
+              else a plain card so we never render a dead link. ── */}
         {(() => {
+          const cardUrl = (b.card_url || '').trim() || (config.contact.visible ? '#contact' : '');
+          const external = /^https?:\/\//i.test(cardUrl);
           const cardInner = (
             <>
               {b.premium_label && (
@@ -328,7 +331,7 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
                     </svg>
                   </div>
                 )}
-                {config.contact.visible && (
+                {cardUrl && (
                   <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700">
                     {plain(b.cta_label) || 'Book now'}
                     <svg className="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
@@ -339,8 +342,11 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
               </div>
             </>
           );
-          return config.contact.visible ? (
-            <a href="#contact" aria-label={plain(b.premium_label || '') || 'Book a consultation'}
+          return cardUrl ? (
+            <a href={cardUrl}
+               target={external ? '_blank' : undefined}
+               rel={external ? 'noopener noreferrer' : undefined}
+               aria-label={plain(b.premium_label || '') || 'Book a consultation'}
                className="group relative block cursor-pointer">
               {cardInner}
             </a>
