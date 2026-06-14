@@ -91,6 +91,8 @@ const FALLBACK_BG: Record<ServiceSectionKey, string> = {
   hero: 'bg-slate-50',
   about: '',
   services: 'bg-slate-50',
+  process: '',
+  clients: 'bg-slate-50',
   portfolio: '',
   stats: '',
   testimonials: 'bg-slate-50',
@@ -106,6 +108,8 @@ export function ServiceHome({ meta, config }: Props) {
       case 'hero':         return config.hero.visible         ? <Hero config={config} />                : null;
       case 'about':        return config.about.visible        ? <About block={config.about} />          : null;
       case 'services':     return config.services.visible     ? <Services block={config.services} />    : null;
+      case 'process':      return config.process.visible      ? <Process block={config.process} />      : null;
+      case 'clients':      return config.clients.visible      ? <Clients block={config.clients} />      : null;
       case 'portfolio':    return config.portfolio.visible    ? <Portfolio block={config.portfolio} />  : null;
       case 'stats':        return config.stats.visible        ? <Stats block={config.stats} />          : null;
       case 'testimonials': return config.testimonials.visible ? <Testimonials block={config.testimonials} /> : null;
@@ -283,6 +287,54 @@ function Services({ block }: { block: ServiceHomeConfig['services'] }) {
               </div>
             );
           })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** "How we work" — numbered steps with an icon each (Segunbagicha-style). */
+function Process({ block }: { block: ServiceHomeConfig['process'] }) {
+  if (block.steps.length === 0) return null;
+  return (
+    <section id="process" className="scroll-mt-20">
+      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-14 sm:py-20">
+        <div className="text-center max-w-2xl mx-auto">
+          <RT as="h2" html={block.title} className="text-2xl sm:text-3xl font-bold text-slate-900" />
+          {block.subtitle && <RT as="p" html={block.subtitle} className="mt-3 text-slate-600 block" />}
+        </div>
+        <div className="mt-10 grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {block.steps.map((step, i) => {
+            const Icon = getIcon(step.icon);
+            return (
+              <div key={i} className="relative sv-card bg-white rounded-2xl ring-1 ring-slate-200 p-6">
+                <span className="absolute top-3 right-5 text-4xl font-extrabold text-brand-100 leading-none select-none">{i + 1}</span>
+                <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-brand-100 text-brand-700 mb-4">
+                  <Icon className="h-6 w-6" />
+                </div>
+                <RT as="h3" html={step.title} className="font-bold text-slate-900" />
+                {step.body && <RT as="p" html={step.body} className="mt-1.5 text-sm text-slate-600 leading-relaxed block" />}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/** Client-logo strip — grayscale logos that colour on hover. */
+function Clients({ block }: { block: ServiceHomeConfig['clients'] }) {
+  if (block.logos.length === 0) return null;
+  return (
+    <section id="clients" className="scroll-mt-20">
+      <div className="mx-auto max-w-[1100px] px-4 sm:px-6 py-12 sm:py-16">
+        {block.title && <RT as="h2" html={block.title} className="text-center text-lg sm:text-xl font-semibold text-slate-500 block" />}
+        <div className="mt-8 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-8 items-center">
+          {block.logos.map((logo, i) => (
+            <img key={i} src={logo.image_url} alt={logo.name || 'Client logo'} loading="lazy"
+                 className="h-12 w-full object-contain opacity-70 hover:opacity-100 grayscale hover:grayscale-0 transition" />
+          ))}
         </div>
       </div>
     </section>

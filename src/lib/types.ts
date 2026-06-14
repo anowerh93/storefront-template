@@ -90,7 +90,7 @@ export type StorefrontMeta = {
 // ──────────────────────────────────────────────────────────────
 
 export type ServiceSectionKey =
-  | 'hero' | 'about' | 'services' | 'portfolio'
+  | 'hero' | 'about' | 'services' | 'process' | 'clients' | 'portfolio'
   | 'stats' | 'testimonials' | 'faq' | 'contact';
 
 /** Per-section background (same contract as funnel blocks / SectionBg). */
@@ -158,6 +158,17 @@ export type ServiceHomeConfig = {
     title: string;
     subtitle: string;
     items: { icon: string; title: string; body: string }[];
+  };
+  process: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    subtitle: string;
+    steps: { icon: string; title: string; body: string }[];
+  };
+  clients: ServiceSectionBg & {
+    visible: boolean;
+    title: string;
+    logos: { image_url: string; name: string }[];
   };
   portfolio: ServiceSectionBg & {
     visible: boolean;
