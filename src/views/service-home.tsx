@@ -264,7 +264,7 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
       <div aria-hidden className="pointer-events-none absolute -left-20 -top-12 h-72 w-72 rotate-45 bg-brand-100/60" />
       <div aria-hidden className="pointer-events-none absolute -right-16 bottom-0 h-80 w-80 rotate-45 bg-brand-100/40 hidden lg:block" />
 
-      <div className="relative mx-auto max-w-[1100px] px-4 sm:px-6 py-12 sm:py-16 grid lg:grid-cols-2 gap-10 lg:gap-12 items-center">
+      <div className="relative mx-auto max-w-[1100px] px-4 sm:px-6 py-12 sm:py-16 grid lg:grid-cols-2 gap-10 lg:gap-20 items-center">
         {/* ── Left: title → key services → CTA ── */}
         <div>
           {b.eyebrow && (
@@ -330,14 +330,6 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z" />
                     </svg>
                   </div>
-                )}
-                {cardUrl && (
-                  <span className="mt-3 inline-flex items-center gap-1.5 text-sm font-semibold text-brand-700">
-                    {plain(b.cta_label) || 'Book now'}
-                    <svg className="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </span>
                 )}
               </div>
             </>
