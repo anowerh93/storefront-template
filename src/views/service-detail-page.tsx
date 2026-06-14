@@ -31,7 +31,7 @@ export function ServiceDetailPage({ meta, service }: { meta: StorefrontMeta | nu
           {/* ── Left: media + description + FAQ ── */}
           <div>
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-slate-900">{service.name}</h1>
-            {service.summary && <p className="mt-2 text-slate-600 leading-relaxed">{service.summary}</p>}
+            {service.summary && <p className="mt-2 text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: service.summary }} />}
 
             {hero && (
               <div className="mt-6">
@@ -61,12 +61,12 @@ export function ServiceDetailPage({ meta, service }: { meta: StorefrontMeta | nu
                   {service.faq.map((f, i) => (
                     <details key={i} className="group bg-white">
                       <summary className="flex items-center justify-between gap-3 cursor-pointer px-5 py-4 text-sm font-semibold text-slate-900">
-                        {f.q}
+                        <span dangerouslySetInnerHTML={{ __html: f.q }} />
                         <svg className="h-4 w-4 shrink-0 text-slate-400 transition group-open:rotate-180" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
                         </svg>
                       </summary>
-                      <p className="px-5 pb-4 text-sm text-slate-600 leading-relaxed whitespace-pre-line">{f.a}</p>
+                      <p className="px-5 pb-4 text-sm text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: f.a }} />
                     </details>
                   ))}
                 </div>

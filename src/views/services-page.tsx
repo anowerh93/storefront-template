@@ -36,7 +36,7 @@ export function ServicesPage({ meta, services }: { meta: StorefrontMeta | null; 
                   )}
                   <div className="p-5">
                     <h2 className="font-bold text-slate-900 group-hover:text-brand-700 transition">{s.name}</h2>
-                    {s.summary && <p className="mt-1.5 text-sm text-slate-600 leading-relaxed">{s.summary}</p>}
+                    {s.summary && <p className="mt-1.5 text-sm text-slate-600 leading-relaxed" dangerouslySetInnerHTML={{ __html: s.summary }} />}
                     <span className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-brand-700">
                       Read more
                       <svg className="w-4 h-4 transition group-hover:translate-x-0.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
