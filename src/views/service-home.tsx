@@ -146,7 +146,7 @@ export function ServiceHome({ meta, config }: Props) {
           </a>
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
             {navItems.map((item) => (
-              <a key={item.key} href={`#${item.key}`} className="hover:text-slate-900 transition">{item.label}</a>
+              <a key={item.key} href={item.key === 'services' ? '/services' : `#${item.key}`} className="hover:text-slate-900 transition">{item.label}</a>
             ))}
           </nav>
           <div className="flex items-center gap-2">
@@ -167,7 +167,7 @@ export function ServiceHome({ meta, config }: Props) {
         {menuOpen && (
           <nav className="md:hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1">
             {navItems.map((item) => (
-              <a key={item.key} href={`#${item.key}`} onClick={() => setMenuOpen(false)}
+              <a key={item.key} href={item.key === 'services' ? '/services' : `#${item.key}`} onClick={() => setMenuOpen(false)}
                  className="block py-2 text-sm font-medium text-slate-700">{item.label}</a>
             ))}
           </nav>

@@ -41,6 +41,8 @@ import type {
   Paginated,
   ProductCard,
   ProductDetail,
+  ServiceCard,
+  ServiceDetail,
   StorefrontMeta,
 } from './types';
 
@@ -180,6 +182,16 @@ export function getProduct(slug: string) {
 export function getCategories() {
   return apiFetch<Category[]>('/categories', {
     tags: ['categories'],
+  });
+}
+
+export function getServices() {
+  return apiFetch<ServiceCard[]>('/services', { tags: ['services'] });
+}
+
+export function getService(slug: string) {
+  return apiFetch<ServiceDetail>(`/services/${encodeURIComponent(slug)}`, {
+    tags: ['services', `service:${slug}`],
   });
 }
 

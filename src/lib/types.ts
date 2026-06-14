@@ -103,6 +103,27 @@ export type ServiceSectionBg = {
   bg_image_url?: string | null;
 };
 
+/** A service in the catalog grid (/services). */
+export type ServiceCard = {
+  name: string;
+  slug: string;
+  summary: string | null;
+  icon: string | null;
+  image_url: string | null;
+};
+
+/** A single service detail page (/services/[slug]). */
+export type ServiceDetail = {
+  name: string;
+  slug: string;
+  summary: string | null;
+  description_html: string | null;
+  image_url: string | null;
+  gallery_urls: string[];
+  faq: { q: string; a: string }[];
+  seo: { title: string; description: string | null; noindex: boolean };
+};
+
 export type ServiceHomeConfig = {
   section_order: ServiceSectionKey[];
   /** Fade/slide blocks in on scroll (also triggers per-word data-anim). */
