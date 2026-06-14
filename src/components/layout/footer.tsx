@@ -155,14 +155,16 @@ export function Footer({
               inbox. Submit handling lives in Base.astro (global listener on
               [data-newsletter-form]) because this footer is usually static. */}
           {!isService && (meta.footer_nav?.newsletter?.visible ?? false) && (
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <h4 className="font-semibold text-white text-sm mb-3 uppercase tracking-wide">
                 {meta.footer_nav!.newsletter!.heading}
               </h4>
-              <p className="text-sm text-brand-200 leading-relaxed mb-3">
+              <p className="text-sm text-brand-200 leading-relaxed mb-3 max-w-xs">
                 {meta.footer_nav!.newsletter!.text}
               </p>
-              <form data-newsletter-form className="flex gap-2" noValidate>
+              {/* Stacked so the number field + button stay full-size and easy
+                  to tap on mobile, where this column is otherwise cramped. */}
+              <form data-newsletter-form className="flex flex-col gap-2 max-w-xs" noValidate>
                 <label className="sr-only" htmlFor="footer-whatsapp">WhatsApp number</label>
                 <input
                   id="footer-whatsapp"
@@ -172,13 +174,13 @@ export function Footer({
                   autoComplete="tel"
                   required
                   placeholder="01XXXXXXXXX"
-                  className="min-w-0 flex-1 rounded-lg border border-brand-700 bg-brand-800 px-3 py-2 text-sm text-white placeholder:text-brand-400 focus:outline-none focus:ring-2 focus:ring-white/40"
+                  className="w-full rounded-lg border border-brand-700 bg-brand-800 px-3.5 py-2.5 text-base sm:text-sm text-white placeholder:text-brand-400 focus:outline-none focus:ring-2 focus:ring-white/40"
                 />
                 {/* Honeypot — hidden from humans, bots fill it */}
                 <input type="text" name="company" tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
                 <button
                   type="submit"
-                  className="shrink-0 rounded-lg bg-white px-3.5 py-2 text-sm font-semibold text-brand-900 transition hover:bg-brand-100"
+                  className="w-full rounded-lg bg-white px-4 py-2.5 text-sm font-semibold text-brand-900 transition hover:bg-brand-100"
                 >
                   Sign up
                 </button>
