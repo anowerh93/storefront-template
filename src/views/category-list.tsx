@@ -54,6 +54,10 @@ export function CategoryListPage({
                 <div className="absolute top-3 right-3 h-8 w-8 rounded-full bg-brand-500/10 group-hover:bg-brand-500 transition flex items-center justify-center">
                   <ArrowRight className="h-4 w-4 text-brand-600 group-hover:text-white transition" />
                 </div>
+                {c.image_url && (
+                  <img src={c.image_url} alt={c.name} loading="lazy"
+                       className="h-12 w-12 object-contain rounded-lg mb-3" />
+                )}
                 <h3 className="font-semibold text-slate-900 group-hover:text-brand-700 transition pr-8">{c.name}</h3>
                 <p className="text-xs text-slate-500 mt-1">
                   {c.product_count} {c.product_count === 1 ? 'product' : 'products'}

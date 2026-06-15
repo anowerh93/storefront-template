@@ -52,7 +52,14 @@ export function CategoryStrip({
               href={`/categories/${c.slug}`}
               className={`group flex flex-col items-center justify-center gap-2 rounded-2xl bg-gradient-to-br ${tileCls} aspect-square p-3 hover:shadow-md hover:-translate-y-0.5 transition`}
             >
-              <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
+              {c.image_url ? (
+                // Tenant's uploaded category image takes precedence over the
+                // generated icon so their branding shows on the storefront.
+                <img src={c.image_url} alt={c.name} loading="lazy"
+                     className="h-9 w-9 sm:h-11 sm:w-11 object-contain" />
+              ) : (
+                <Icon className="h-8 w-8 sm:h-10 sm:w-10" />
+              )}
               <span className="text-xs sm:text-sm font-semibold text-slate-900 line-clamp-1 text-center">{c.name}</span>
             </a>
           );

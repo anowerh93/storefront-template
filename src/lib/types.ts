@@ -492,6 +492,9 @@ export type Category = {
   id: number;
   slug: string;
   name: string;
+  description?: string | null;
+  /** Uploaded category image; storefront falls back to a generated tile/icon when null. */
+  image_url?: string | null;
   product_count: number;
   /** Present on the category DETAIL payload (flat on data). */
   noindex?: boolean;
