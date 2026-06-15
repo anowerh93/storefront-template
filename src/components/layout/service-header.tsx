@@ -21,17 +21,19 @@ function RT({ html, className }: { html: string; className?: string }) {
 }
 const plain = (html?: string) => (html || '').replace(/<[^>]*>/g, '');
 
-/** Shared nav — works from any page (no anchor-only cross-page links). */
-const NAV = [
-  { label: 'Home', href: '/' },
-  { label: 'About', href: '/about' },
-  { label: 'Services', href: '/services' },
-  { label: 'Contact', href: '/#contact' },
-];
-
 export function ServiceHeader({ meta }: { meta: StorefrontMeta }) {
   const hero = meta.service_home?.hero;
   const ctaLabel = plain(hero?.cta_label) || 'Book now';
+
+  // Full page routes so links work from any page. Team appears only when the
+  // tenant has visible members (meta.has_team) — no dead link otherwise.
+  const nav = [
+    { label: 'Home', href: '/' },
+    { label: 'About', href: '/about' },
+    { label: 'Services', href: '/services' },
+    ...(meta.has_team ? [{ label: 'Team', href: '/team' }] : []),
+    { label: 'Contact', href: '/#contact' },
+  ];
 
   return (
     <>
@@ -49,7 +51,7 @@ export function ServiceHeader({ meta }: { meta: StorefrontMeta }) {
           </a>
 
           <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-slate-600">
-            {NAV.map((item) => (
+            {nav.map((item) => (
               <a key={item.href} href={item.href} className="hover:text-slate-900 transition">{item.label}</a>
             ))}
           </nav>
@@ -71,7 +73,7 @@ export function ServiceHeader({ meta }: { meta: StorefrontMeta }) {
         {/* Mobile dropdown — shown only while #svc-nav is checked. md:!hidden
             forces it gone on desktop regardless of the checkbox state. */}
         <nav className="hidden peer-checked:block md:!hidden border-t border-slate-100 bg-white px-4 py-3 space-y-1">
-          {NAV.map((item) => (
+          {nav.map((item) => (
             <a key={item.href} href={item.href} className="block py-2 text-sm font-medium text-slate-700">{item.label}</a>
           ))}
           <a href="/#contact"

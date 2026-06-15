@@ -44,6 +44,7 @@ import type {
   ServiceCard,
   ServiceDetail,
   StorefrontMeta,
+  TeamMember,
 } from './types';
 
 const API_BASE = (import.meta.env.PUBLIC_API_BASE ?? '').replace(/\/$/, '');
@@ -187,6 +188,10 @@ export function getCategories() {
 
 export function getServices() {
   return apiFetch<ServiceCard[]>('/services', { tags: ['services'] });
+}
+
+export function getTeam() {
+  return apiFetch<TeamMember[]>('/team', { tags: ['team'] });
 }
 
 export function getService(slug: string) {

@@ -83,6 +83,8 @@ export type StorefrontMeta = {
   homepage: HomepageConfig | null;
   /** Service-tenant website blocks. NULL for e-commerce tenants. */
   service_home?: ServiceHomeConfig | null;
+  /** Service tenant has ≥1 visible team member → show the /team nav link. */
+  has_team?: boolean;
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -109,6 +111,14 @@ export type ServiceCard = {
   slug: string;
   summary: string | null;
   icon: string | null;
+  image_url: string | null;
+};
+
+/** A staff member shown on the /team page. */
+export type TeamMember = {
+  name: string;
+  role: string | null;
+  bio: string | null;
   image_url: string | null;
 };
 

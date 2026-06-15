@@ -1,0 +1,31 @@
+---
+/**
+ * Team page (service tenants). SSR — fetched per request and CDN-cached.
+ * Service-tenant only; e-commerce tenants have no team and the nav never
+ * links here. noindex when there are no members (avoids a thin/soft page).
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getTeam, getStorefront } from '../lib/api';
+import { breadcrumbSchema } from '../lib/schema';
+import { TeamPage } from '../views/team-page';
+import type { StorefrontMeta, TeamMember } from '../lib/types';
+
+const [team, meta]: [TeamMember[] | null, StorefrontMeta | null] = await Promise.all([
+  getTeam().catch((err) => { console.warn('[team] getTeam failed:', err); return null; }),
+  getStorefront().catch((err) => { console.warn('[team] getStorefront failed:', err); return null; }),
+]);
+
+const members = team ?? [];
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = meta
+  ? [breadcrumbSchema([{ name: 'Home', url: `${origin}/` }, { name: 'Team' }])].filter(
+      (s): s is Record<string, unknown> => s !== null,
+    )
+  : [];
+---
+
+<Base title="Our team" noindex={members.length === 0} schema={schemas} meta={meta}>
+  <TeamPage team={members} meta={meta} />
+</Base>
