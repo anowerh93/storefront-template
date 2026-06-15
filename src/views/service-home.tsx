@@ -207,8 +207,11 @@ function Hero({ config }: { config: ServiceHomeConfig }) {
               )}
               <div className={`ring-1 ring-slate-200 group-hover:ring-brand-300 bg-white p-3 sm:p-4 shadow-sm group-hover:shadow-md transition rounded-2xl ${b.premium_label ? 'rounded-tl-none' : ''}`}>
                 {b.image_url ? (
+                  // Natural aspect ratio (no fixed box, no crop) so ANY image
+                  // the tenant uploads — tall, wide, or a full banner with text
+                  // baked in — fits fully instead of being cropped to 4:3.
                   <img src={b.image_url} alt={plain(b.headline) || 'Consultation'} loading="eager"
-                       className="w-full rounded-xl object-cover aspect-[4/3]" />
+                       className="block w-full h-auto rounded-xl" />
                 ) : (
                   <div className="w-full aspect-[4/3] rounded-xl bg-brand-50 flex items-center justify-center text-brand-300">
                     <svg className="w-16 h-16" fill="none" stroke="currentColor" strokeWidth={1.5} viewBox="0 0 24 24">
