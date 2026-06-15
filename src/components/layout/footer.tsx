@@ -99,6 +99,7 @@ export function Footer({
             <FooterCol title="Quick links">
               <FooterLink href="/about">About</FooterLink>
               <FooterLink href="/services">Services</FooterLink>
+              {meta.has_team && <FooterLink href="/team">Team</FooterLink>}
               <FooterLink href="/#contact">Contact</FooterLink>
               {meta.messenger?.url && (
                 <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
