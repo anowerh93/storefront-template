@@ -1,0 +1,56 @@
+---
+/**
+ * Blog post detail (/blog/[slug]). SSR — fetched per request, CDN-cached.
+ * Follows the redirect table on a slug rename (301) and sets a REAL 404
+ * otherwise (no soft 404s). Shared by both business types.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getBlogPost, getStorefront, getCategories, resolvePath } from '../../lib/api';
+import { articleSchema, breadcrumbSchema } from '../../lib/schema';
+import { BlogDetailPage } from '../../views/blog-detail-page';
+import type { BlogPostDetail, Category, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+const [post, meta, categories]: [BlogPostDetail | null, StorefrontMeta | null, Category[]] = await Promise.all([
+  getBlogPost(slug).catch((err) => { console.warn(`[blog/[slug]] getBlogPost(${slug}) failed:`, err); return null; }),
+  getStorefront().catch((err) => { console.warn('[blog/[slug]] getStorefront failed:', err); return null; }),
+  getCategories().catch(() => []),
+]);
+
+// Slug renames leave a 301 behind — ask the redirect table before 404ing.
+// Local paths only; a poisoned to_path must never become an open redirect.
+if (!post) {
+  const redirect = await resolvePath(`/blog/${slug}`);
+  if (redirect?.to?.startsWith('/')) {
+    return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
+  }
+  Astro.response.status = 404;
+}
+
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const postUrl = `${origin}/blog/${encodeURIComponent(slug)}`;
+const schemas = post && meta
+  ? [
+      articleSchema(post, postUrl, meta),
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Blog', url: `${origin}/blog` },
+        { name: post.title },
+      ]),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
+---
+
+<Base
+  title={post?.seo?.title}
+  description={post?.seo?.description ?? undefined}
+  ogImage={post?.image_url ?? undefined}
+  noindex={post?.seo?.noindex}
+  schema={schemas}
+  meta={meta}
+>
+  <BlogDetailPage client:load meta={meta} post={post} categories={categories} />
+</Base>

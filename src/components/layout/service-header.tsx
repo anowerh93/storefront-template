@@ -32,6 +32,7 @@ export function ServiceHeader({ meta }: { meta: StorefrontMeta }) {
     { label: 'About', href: '/about' },
     { label: 'Services', href: '/services' },
     ...(meta.has_team ? [{ label: 'Team', href: '/team' }] : []),
+    ...(meta.has_blog ? [{ label: 'Blog', href: '/blog' }] : []),
     { label: 'Contact', href: '/#contact' },
   ];
 

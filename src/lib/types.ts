@@ -85,6 +85,8 @@ export type StorefrontMeta = {
   service_home?: ServiceHomeConfig | null;
   /** Service tenant has ≥1 visible team member → show the /team nav link. */
   has_team?: boolean;
+  /** Tenant has ≥1 published blog post (BOTH business types) → show /blog nav. */
+  has_blog?: boolean;
 };
 
 // ──────────────────────────────────────────────────────────────
@@ -120,6 +122,28 @@ export type TeamMember = {
   role: string | null;
   bio: string | null;
   image_url: string | null;
+};
+
+/** A blog post card on the /blog listing. */
+export type BlogPostCard = {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  image_url: string | null;
+  published_at: string | null;   // ISO 8601
+};
+
+/** A single blog post detail page (/blog/[slug]). */
+export type BlogPostDetail = {
+  title: string;
+  slug: string;
+  excerpt: string | null;
+  /** Server-rendered, sanitized HTML from the Markdown source. */
+  body_html: string | null;
+  image_url: string | null;
+  published_at: string | null;
+  updated_at: string | null;
+  seo: { title: string; description: string | null; noindex: boolean };
 };
 
 /** A single service detail page (/services/[slug]). */

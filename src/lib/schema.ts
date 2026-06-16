@@ -18,7 +18,7 @@
  *     results; never present it as a guarantee.
  */
 
-import type { ProductDetail, StorefrontMeta } from './types';
+import type { BlogPostDetail, ProductDetail, StorefrontMeta } from './types';
 
 export type Schema = Record<string, unknown>;
 
@@ -179,6 +179,49 @@ export function faqSchema(items: { q: string; a: string }[]): Schema | null {
       acceptedAnswer: { '@type': 'Answer', text: f.a },
     })),
   };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Article — a single blog post (/blog/[slug])
+// ──────────────────────────────────────────────────────────────
+
+export function articleSchema(post: BlogPostDetail, url: string, meta: StorefrontMeta): Schema {
+  const description =
+    post.seo?.description ||
+    plainText(post.excerpt) ||
+    plainText(post.body_html).slice(0, 300) ||
+    post.title;
+
+  return compact({
+    '@context': 'https://schema.org',
+    '@type': 'Article',
+    headline: post.title,
+    url,
+    image: post.image_url ? [post.image_url] : undefined,
+    description,
+    datePublished: post.published_at ? post.published_at.slice(0, 10) : undefined,
+    dateModified: post.updated_at ? post.updated_at.slice(0, 10) : undefined,
+    author: { '@type': 'Organization', name: meta.name },
+    publisher: compact({
+      '@type': 'Organization',
+      name: meta.name,
+      logo: meta.logo_url ?? undefined,
+    }),
+  });
+}
+
+// ──────────────────────────────────────────────────────────────
+// Blog — the /blog listing page
+// ──────────────────────────────────────────────────────────────
+
+export function blogSchema(meta: StorefrontMeta, url: string): Schema {
+  return compact({
+    '@context': 'https://schema.org',
+    '@type': 'Blog',
+    name: `${meta.name} Blog`,
+    url,
+    description: plainText(meta.seo?.description ?? meta.about).slice(0, 300) || undefined,
+  });
 }
 
 // ──────────────────────────────────────────────────────────────

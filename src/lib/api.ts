@@ -34,6 +34,8 @@
  */
 
 import type {
+  BlogPostCard,
+  BlogPostDetail,
   Category,
   CreateOrderInput,
   FunnelData,
@@ -197,6 +199,20 @@ export function getTeam() {
 export function getService(slug: string) {
   return apiFetch<ServiceDetail>(`/services/${encodeURIComponent(slug)}`, {
     tags: ['services', `service:${slug}`],
+  });
+}
+
+export function getBlogPosts(opts: { page?: number; perPage?: number } = {}) {
+  return apiFetch<Paginated<BlogPostCard>>('/blog', {
+    params: { page: opts.page, per_page: opts.perPage },
+    tags: ['blog'],
+    unwrap: false,   // keep the pagination meta
+  });
+}
+
+export function getBlogPost(slug: string) {
+  return apiFetch<BlogPostDetail>(`/blog/${encodeURIComponent(slug)}`, {
+    tags: ['blog', `blog:${slug}`],
   });
 }
 

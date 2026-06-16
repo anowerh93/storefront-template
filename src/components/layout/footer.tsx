@@ -100,6 +100,7 @@ export function Footer({
               <FooterLink href="/about">About</FooterLink>
               <FooterLink href="/services">Services</FooterLink>
               {meta.has_team && <FooterLink href="/team">Team</FooterLink>}
+              {meta.has_blog && <FooterLink href="/blog">Blog</FooterLink>}
               <FooterLink href="/#contact">Contact</FooterLink>
               {meta.messenger?.url && (
                 <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
@@ -133,6 +134,7 @@ export function Footer({
                   {shop.links.map((l, i) => (
                     <FooterLink key={i} href={l.url}>{l.label}</FooterLink>
                   ))}
+                  {meta.has_blog && <FooterLink href="/blog">Blog</FooterLink>}
                   {meta.messenger?.url && (
                     <a href={meta.messenger.url} target="_blank" rel="noopener" className="block py-1 text-sm text-brand-200 hover:text-white transition">
                       Contact via Messenger
