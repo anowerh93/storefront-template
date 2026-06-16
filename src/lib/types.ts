@@ -467,6 +467,8 @@ export type FunnelBlockConfig = {
   font?: 'default' | 'bengali';
   hero: {
     visible: boolean;
+    /** centered (default) or split: text + accent-boxed sub on the left, framed image on the right. */
+    layout?: 'centered' | 'split';
     eyebrow: string;
     headline: string;
     headline_style?: 'plain' | 'gradient' | 'highlight';

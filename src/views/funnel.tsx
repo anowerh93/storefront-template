@@ -264,54 +264,84 @@ function SectionBg({ bg, children }: { bg?: SectionBgFields; children: ReactNode
 function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
   const img = config.image_url || product.image_url;
   const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
+  const split = config.layout === 'split';
+  const slides = config.slide_urls && config.slide_urls.length > 0 ? config.slide_urls : (img ? [img] : []);
+
+  // headline is sanitized inline HTML (bold/underline/highlight/colour);
+  // fall back to the plain product name when empty.
+  const html = (config.headline || '').trim();
+  const hs = config.headline_style || 'plain';
+  const headline = (() => {
+    if (hs === 'gradient') {
+      const cls = `${base} bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-transparent`;
+      return html ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} /> : <h1 className={cls}>{product.name}</h1>;
+    }
+    if (hs === 'highlight') {
+      return (
+        <h1 className={base}>
+          <span className="box-decoration-clone rounded bg-brand-100 px-2 text-brand-900">
+            {html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : product.name}
+          </span>
+        </h1>
+      );
+    }
+    const cls = `${base} text-slate-900`;
+    return html ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} /> : <h1 className={cls}>{product.name}</h1>;
+  })();
+
+  // Media: slider (>1 slide) / single image / nothing. The frame (white border)
+  // is added by the SPLIT layout; centred shows it plain (unchanged look).
+  const media = slides.length > 1
+    ? <HeroSlider images={slides} alt={product.name} />
+    : slides.length === 1
+      ? (
+        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+          <FitImage src={slides[0]} alt={product.name} eager />
+        </div>
+      )
+      : null;
+
+  const eyebrow = config.eyebrow
+    ? <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />
+    : null;
+  const cta = (
+    <a href="#funnel-order" className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-7 py-3 text-base font-bold text-white shadow transition hover:bg-brand-700">
+      <ShoppingBag className="h-5 w-5" /> <RT html={config.cta_label || 'Order Now'} />
+    </a>
+  );
+
+  // SPLIT — text + accent-boxed sub on the left, framed image card on the right
+  // (stacks on mobile). The white p-2 frame mimics the teachek-style card.
+  if (split) {
+    return (
+      <section className="grid items-center gap-8 lg:grid-cols-2">
+        <div className="text-center lg:text-left">
+          {eyebrow}
+          {headline}
+          {config.subheadline && (
+            <div className="mx-auto mt-4 max-w-xl rounded-r-xl border-l-4 border-brand-500 bg-white px-4 py-3 text-left shadow-sm lg:mx-0">
+              <p className="text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />
+            </div>
+          )}
+          <div className="mt-6">{cta}</div>
+        </div>
+        {media && (
+          <div className="rounded-2xl bg-white p-2 shadow-lg ring-1 ring-slate-200">
+            <div className="overflow-hidden rounded-xl">{media}</div>
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  // CENTERED (default — unchanged)
   return (
     <section className="text-center">
-      {config.eyebrow && <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />}
-      {(() => {
-        // headline is sanitized inline HTML (bold/underline/highlight/colour);
-        // fall back to the plain product name when empty.
-        const html = (config.headline || '').trim();
-        const hs = config.headline_style || 'plain';
-        if (hs === 'gradient') {
-          const cls = `${base} bg-gradient-to-r from-brand-500 to-amber-500 bg-clip-text text-transparent`;
-          return html
-            ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
-            : <h1 className={cls}>{product.name}</h1>;
-        }
-        if (hs === 'highlight') {
-          return (
-            <h1 className={base}>
-              <span className="box-decoration-clone rounded bg-brand-100 px-2 text-brand-900">
-                {html ? <span dangerouslySetInnerHTML={{ __html: html }} /> : product.name}
-              </span>
-            </h1>
-          );
-        }
-        const cls = `${base} text-slate-900`;
-        return html
-          ? <h1 className={cls} dangerouslySetInnerHTML={{ __html: html }} />
-          : <h1 className={cls}>{product.name}</h1>;
-      })()}
+      {eyebrow}
+      {headline}
       {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
-      {(() => {
-        // Slider when the hero has >1 uploaded slide; otherwise the single
-        // hero/product image (unchanged behaviour).
-        const slides = config.slide_urls && config.slide_urls.length > 0 ? config.slide_urls : (img ? [img] : []);
-        if (slides.length > 1) {
-          return <div className="mx-auto mt-5 max-w-2xl"><HeroSlider images={slides} alt={product.name} /></div>;
-        }
-        if (slides.length === 1) {
-          return (
-            <div className="relative mx-auto mt-5 aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-              <FitImage src={slides[0]} alt={product.name} eager />
-            </div>
-          );
-        }
-        return null;
-      })()}
-      <a href="#funnel-order" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-7 py-3 text-base font-bold text-white shadow transition hover:bg-brand-700">
-        <ShoppingBag className="h-5 w-5" /> <RT html={config.cta_label || 'Order Now'} />
-      </a>
+      {media && <div className="mx-auto mt-5 max-w-2xl">{media}</div>}
+      <div className="mt-5">{cta}</div>
     </section>
   );
 }
