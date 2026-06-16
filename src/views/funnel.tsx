@@ -120,7 +120,8 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
 
   return (
     <div className={fontClass}>
-      <SlimHeader meta={meta} />
+      {/* No site header/nav — a funnel is a standalone landing page that opens
+          straight into the hero (matches single-product COD landers). */}
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
@@ -141,27 +142,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
   );
 }
 
-/* ── Header / Footer (minimal) ────────────────────────────────────────── */
-function SlimHeader({ meta }: { meta: StorefrontMeta }) {
-  const phone = meta.whatsapp?.trim() || null;
-  return (
-    <header className="border-b border-slate-100 bg-white">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-4 py-3">
-        <a href="/" className="flex items-center gap-2">
-          {meta.logo_url
-            ? <img src={meta.logo_url} alt={meta.name} className="h-8 w-auto" />
-            : <span className="font-bold text-slate-900">{meta.name}</span>}
-        </a>
-        {phone && (
-          <a href={`tel:${phone.replace(/\s/g, '')}`} className="inline-flex items-center gap-1.5 text-sm font-semibold text-brand-600">
-            <Phone className="h-4 w-4" /> {phone}
-          </a>
-        )}
-      </div>
-    </header>
-  );
-}
-
+/* ── Footer (minimal) ─────────────────────────────────────────────────── */
 function SlimFooter({ meta }: { meta: StorefrontMeta }) {
   return (
     <footer className="border-t border-slate-100 py-8 text-center text-xs text-slate-400">
