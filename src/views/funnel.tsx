@@ -6,6 +6,7 @@ import {
   ShoppingBag, Truck, Minus, Plus, Star, Check, Clock,
   ShieldCheck, RefreshCw, Headphones, Package, CreditCard, Gift,
   Award, Phone, Heart, Sparkles, BadgeCheck, ThumbsUp,
+  ChevronLeft, ChevronRight,
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
 import { submitOrder } from '../lib/api';
@@ -403,17 +404,63 @@ function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
   );
 }
 
-/* Image-based review screenshots — a swipeable, snap-scrolling strip (social
-   proof from FB/WhatsApp screenshots). Manual scroll keeps it robust for tall,
-   varied-aspect images. */
+/* Image-based review screenshots — a swipeable carousel (social proof from
+   FB/WhatsApp screenshots). Works on every device: native touch swipe, plus
+   mouse drag-to-scroll and prev/next arrows on desktop (where touch isn't
+   available, so the bare CSS strip felt broken). */
 function ReviewScreenshots({ images }: { images: string[] }) {
+  const ref = useRef<HTMLDivElement>(null);
+  // Mouse-only drag-to-scroll. Touch keeps the browser's native snap scroll —
+  // hijacking it with pointer capture would fight the OS swipe.
+  const drag = useRef({ active: false, startX: 0, startLeft: 0 });
+
+  const nudge = (dir: number) => {
+    const el = ref.current;
+    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
+  };
+
   return (
-    <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
-      {images.map((src, i) => (
-        <div key={i} className="shrink-0 basis-[68%] snap-center sm:basis-[42%]">
-          <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" className="w-full rounded-xl ring-1 ring-slate-200" />
-        </div>
-      ))}
+    <div className="relative">
+      <div
+        ref={ref}
+        className="no-scrollbar -mx-1 flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 active:cursor-grabbing"
+        onPointerDown={(e) => {
+          if (e.pointerType !== 'mouse') return;
+          const el = ref.current;
+          if (!el) return;
+          drag.current = { active: true, startX: e.clientX, startLeft: el.scrollLeft };
+          el.setPointerCapture(e.pointerId);
+        }}
+        onPointerMove={(e) => {
+          if (!drag.current.active) return;
+          const el = ref.current;
+          if (el) el.scrollLeft = drag.current.startLeft - (e.clientX - drag.current.startX);
+        }}
+        onPointerUp={(e) => {
+          drag.current.active = false;
+          ref.current?.releasePointerCapture(e.pointerId);
+        }}
+        onPointerCancel={() => { drag.current.active = false; }}
+      >
+        {images.map((src, i) => (
+          <div key={i} className="shrink-0 basis-[72%] snap-center sm:basis-[40%] lg:basis-[28%]">
+            <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="w-full select-none rounded-xl ring-1 ring-slate-200" />
+          </div>
+        ))}
+      </div>
+
+      {images.length > 1 && (
+        <>
+          <button type="button" aria-label="Previous reviews" onClick={() => nudge(-1)}
+                  className="absolute left-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button type="button" aria-label="Next reviews" onClick={() => nudge(1)}
+                  className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </>
+      )}
     </div>
   );
 }
