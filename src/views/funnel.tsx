@@ -360,7 +360,7 @@ function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; pro
               <p className="text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />
             </div>
           )}
-          <div className="mt-6">{cta}</div>
+          <div className="mt-6 flex justify-center lg:justify-start">{cta}</div>
         </div>
         {media && (
           <div className="rounded-2xl bg-white p-2 shadow-lg ring-1 ring-slate-200">
