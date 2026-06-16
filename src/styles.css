@@ -101,6 +101,11 @@
 .fnl-bg-pattern { animation: fnl-bg-scroll 60s linear infinite; }
 @media (prefers-reduced-motion: reduce) { .fnl-bg-pattern { animation: none; } }
 
+/* Full-bleed: break a section out of its max-width column to span the full
+   viewport width (the split hero). The body has overflow-x:hidden so the
+   100vw width never introduces a horizontal scrollbar. */
+.fnl-full-bleed { position: relative; left: 50%; right: 50%; width: 100vw; margin-left: -50vw; margin-right: -50vw; }
+
 /* Footer with a LIGHT custom background → dark text (the default footer text
    is light for the dark brand backdrop). Unlayered low-specificity override
    that beats Tailwind's text-brand-* utilities. The social-icon chips keep

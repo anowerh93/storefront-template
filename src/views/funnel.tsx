@@ -124,11 +124,15 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
-          return node ? (
+          if (!node) return null;
+          // The split hero spans full width on wide screens (edge-to-edge bg,
+          // wider content) — the rest of the funnel stays a focused column.
+          const bleed = key === 'hero' && config.hero.layout === 'split';
+          return (
             <Reveal key={key} enabled={config.animate !== false}>
-              <SectionBg bg={(config as unknown as Record<string, SectionBgFields>)[key]}>{node}</SectionBg>
+              <SectionBg bg={(config as unknown as Record<string, SectionBgFields>)[key]} bleed={bleed}>{node}</SectionBg>
             </Reveal>
-          ) : null;
+          );
         })}
       </main>
       <SlimFooter meta={meta} />
@@ -221,18 +225,23 @@ function patternUrl(motif: string, hex: string): string {
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 100 100'>${g}</svg>`;
   return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
 }
-function SectionBg({ bg, children }: { bg?: SectionBgFields; children: ReactNode }) {
+function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; bleed?: boolean; children: ReactNode }) {
   const t = bg?.bg_type || 'none';
+  // bleed → the background spans the full viewport width (edge-to-edge) and the
+  // content is re-centred in a wider container. Used by the split hero so it
+  // looks full-width on desktop instead of a narrow centred card.
+  const padded = bleed ? 'fnl-full-bleed px-4 sm:px-6 py-12 sm:py-16' : 'rounded-3xl px-5 py-8 sm:py-10';
+  const inner = (node: ReactNode) => (bleed ? <div className="mx-auto max-w-6xl">{node}</div> : node);
 
   // Pattern: a light wash of the colour + a faint tiled motif that slowly
   // drifts. Two layers (wash + pattern) so text on top stays dark & readable.
   if (t === 'pattern') {
     const color = bg!.bg_color || '#0f172a';
     return (
-      <div className="relative overflow-hidden rounded-3xl px-5 py-8 sm:py-10" style={{ backgroundColor: hexA(color, 0.10) }}>
+      <div className={`relative overflow-hidden ${padded}`} style={{ backgroundColor: hexA(color, 0.10) }}>
         <div className="fnl-bg-pattern pointer-events-none absolute inset-0" aria-hidden="true"
              style={{ backgroundImage: patternUrl(bg!.bg_pattern || 'leaves', color), backgroundRepeat: 'repeat' }} />
-        <div className="relative">{children}</div>
+        <div className="relative">{inner(children)}</div>
       </div>
     );
   }
@@ -257,8 +266,13 @@ function SectionBg({ bg, children }: { bg?: SectionBgFields; children: ReactNode
     dark = true;
     has = true;
   }
-  if (!has) return <>{children}</>;
-  return <div className={`rounded-3xl px-5 py-8 sm:py-10 ${dark ? 'funnel-dark' : ''}`} style={style}>{children}</div>;
+  if (!has) {
+    // No background. bleed still widens the content (split hero) edge-to-edge.
+    return bleed
+      ? <div className="fnl-full-bleed px-4 sm:px-6"><div className="mx-auto max-w-6xl">{children}</div></div>
+      : <>{children}</>;
+  }
+  return <div className={`${padded} ${dark ? 'funnel-dark' : ''}`} style={style}>{inner(children)}</div>;
 }
 
 function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
