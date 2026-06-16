@@ -465,6 +465,9 @@ export type FunnelBlockConfig = {
   animate?: boolean;
   /** Body font for the funnel: default (Inter) or Bengali (Hind Siliguri). */
   font?: 'default' | 'bengali';
+  /** Funnel-wide button theme — applied to every CTA. Blank = brand / white. */
+  button_bg?: string;
+  button_text?: string;
   hero: {
     visible: boolean;
     /** centered (default) or split: text + accent-boxed sub on the left, framed image on the right. */

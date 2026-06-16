@@ -86,11 +86,12 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
   const { config, product } = funnel;
   const order = config.section_order ?? [];
   const fontClass = config.font === 'bengali' ? 'funnel-font-bn' : '';
+  const btn: BtnTheme = { bg: (config.button_bg || '').trim(), text: (config.button_text || '').trim() };
 
   const renderBlock = (key: string) => {
     switch (key) {
       case 'hero':
-        return config.hero.visible ? <Hero config={config.hero} product={product} /> : null;
+        return config.hero.visible ? <Hero config={config.hero} product={product} btn={btn} /> : null;
       case 'benefits':
         return config.benefits.visible && config.benefits.items.length ? <Benefits config={config.benefits} /> : null;
       case 'gallery': {
@@ -102,7 +103,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       case 'urgency':
         return config.urgency.visible ? <Urgency config={config.urgency} /> : null;
       case 'order_form':
-        return config.order_form.visible ? <OrderForm config={config.order_form} product={product} meta={meta} /> : null;
+        return config.order_form.visible ? <OrderForm config={config.order_form} product={product} meta={meta} btn={btn} /> : null;
       case 'why_us':
         return config.why_us.visible && config.why_us.items.length ? <WhyUs config={config.why_us} /> : null;
       case 'reviews': {
@@ -122,7 +123,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
     <div className={fontClass}>
       {/* No site header/nav — a funnel is a standalone landing page that opens
           straight into the hero (matches single-product COD landers). */}
-      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
           if (!node) return null;
@@ -132,15 +133,20 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
           // bleeds even without one. Content re-centres in the max-w-6xl column.
           const hasBg = !!bg && !!bg.bg_type && bg.bg_type !== 'none';
           const bleed = hasBg || (key === 'hero' && config.hero.layout === 'split');
+          // Per-section spacing preset → top/bottom padding on the wrapper
+          // (replaces the old uniform gap, so each section is independent).
+          const pad = `${PAD_TOP[bg?.space_top ?? 'md'] ?? PAD_TOP.md} ${PAD_BOTTOM[bg?.space_bottom ?? 'md'] ?? PAD_BOTTOM.md}`;
           return (
-            <Reveal key={key} enabled={config.animate !== false}>
-              <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
-            </Reveal>
+            <div key={key} className={pad}>
+              <Reveal enabled={config.animate !== false}>
+                <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
+              </Reveal>
+            </div>
           );
         })}
       </main>
       <SlimFooter meta={meta} />
-      <StickyCta label={config.hero.cta_label || 'Order Now'} />
+      <StickyCta label={config.hero.cta_label || 'Order Now'} btn={btn} />
     </div>
   );
 }
@@ -154,10 +160,10 @@ function SlimFooter({ meta }: { meta: StorefrontMeta }) {
   );
 }
 
-function StickyCta({ label }: { label: string }) {
+function StickyCta({ label, btn }: { label: string; btn: BtnTheme }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 p-3 backdrop-blur sm:hidden">
-      <a href="#funnel-order" className="block w-full rounded-xl bg-brand-600 py-3 text-center text-base font-bold text-white shadow">{label}</a>
+      <a href="#funnel-order" className={ctaClass('block w-full rounded-xl py-3 text-center text-base font-bold shadow', btn)} style={ctaStyle(btn)}>{label}</a>
     </div>
   );
 }
@@ -183,7 +189,33 @@ type SectionBgFields = {
   bg_gradient_angle?: number;
   bg_image_url?: string | null;
   bg_pattern?: string;
+  space_top?: 'none' | 'sm' | 'md' | 'lg';
+  space_bottom?: 'none' | 'sm' | 'md' | 'lg';
 };
+
+// Per-section spacing presets → vertical padding on the block wrapper. The gap
+// between two sections is the bottom pad of one + the top pad of the next.
+const PAD_TOP: Record<string, string> = { none: 'pt-0', sm: 'pt-3', md: 'pt-6', lg: 'pt-12' };
+const PAD_BOTTOM: Record<string, string> = { none: 'pb-0', sm: 'pb-3', md: 'pb-6', lg: 'pb-12' };
+
+// Funnel-wide button (CTA) theme. Blank values fall back to the brand colour
+// (via Tailwind classes) / white, so an unconfigured funnel looks unchanged.
+type BtnTheme = { bg: string; text: string };
+function ctaClass(base: string, b: BtnTheme): string {
+  return [
+    base,
+    b.bg ? '' : 'bg-brand-600 hover:bg-brand-700',
+    b.text ? '' : 'text-white',
+    (b.bg || b.text) ? 'hover:opacity-90' : '',
+  ].filter(Boolean).join(' ');
+}
+function ctaStyle(b: BtnTheme): CSSProperties | undefined {
+  if (!b.bg && !b.text) return undefined;
+  const s: CSSProperties = {};
+  if (b.bg) s.backgroundColor = b.bg;
+  if (b.text) s.color = b.text;
+  return s;
+}
 
 /** Hex (#rrggbb) → rgba() string at the given alpha (for the pattern's light wash). */
 function hexA(hex: string, a: number): string {
@@ -259,7 +291,7 @@ function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; blee
   return <div className={`${padded} ${dark ? 'funnel-dark' : ''}`} style={style}>{inner(children)}</div>;
 }
 
-function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product: FunnelProduct }) {
+function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; product: FunnelProduct; btn: BtnTheme }) {
   const img = config.image_url || product.image_url;
   const base = 'mt-1 text-2xl font-extrabold leading-tight sm:text-4xl';
   const split = config.layout === 'split';
@@ -303,7 +335,7 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
     ? <RT as="p" className="text-sm font-semibold uppercase tracking-wide text-brand-600" html={config.eyebrow} />
     : null;
   const cta = (
-    <a href="#funnel-order" className="inline-flex items-center gap-2 rounded-xl bg-brand-600 px-7 py-3 text-base font-bold text-white shadow transition hover:bg-brand-700">
+    <a href="#funnel-order" className={ctaClass('inline-flex items-center gap-2 rounded-xl px-7 py-3 text-base font-bold shadow transition', btn)} style={ctaStyle(btn)}>
       <ShoppingBag className="h-5 w-5" /> <RT html={config.cta_label || 'Order Now'} />
     </a>
   );
@@ -518,7 +550,7 @@ function TrustBadges({ items }: { items: { icon: string; title: string }[] }) {
 }
 
 /* ── Order form (COD) — reuses the checkout schema + submitOrder ──────── */
-function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta }) {
+function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta; btn: BtnTheme }) {
   const [qty, setQty] = useState(1);
   const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
   const [submitting, setSubmitting] = useState(false);
@@ -662,7 +694,7 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
           </div>
         </div>
 
-        <Button type="submit" variant="brand" size="lg" className="w-full shadow-md" disabled={!inStock || submitting}>
+        <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting}>
           <ShoppingBag className="h-4 w-4" />
           {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : <RT html={config.button_label || 'Confirm Order'} />}
         </Button>
