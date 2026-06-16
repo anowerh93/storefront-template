@@ -463,6 +463,8 @@ export type FunnelProduct = {
 export type FunnelBlockConfig = {
   section_order: string[];
   animate?: boolean;
+  /** Body font for the funnel: default (Inter) or Bengali (Hind Siliguri). */
+  font?: 'default' | 'bengali';
   hero: {
     visible: boolean;
     eyebrow: string;
@@ -470,6 +472,8 @@ export type FunnelBlockConfig = {
     headline_style?: 'plain' | 'gradient' | 'highlight';
     subheadline: string;
     image_url: string | null;
+    /** Optional hero image slider — >1 slide → auto-fading carousel (falls back to image_url). */
+    slide_urls?: string[];
     cta_label: string;
     // Full-section background (one mode at a time)
     bg_type?: 'none' | 'color' | 'gradient' | 'image';
@@ -485,7 +489,7 @@ export type FunnelBlockConfig = {
   urgency: { visible: boolean; headline: string; stock_text: string; countdown_minutes: number };
   order_form: { visible: boolean; heading: string; button_label: string };
   why_us: { visible: boolean; title: string; items: { title: string; body: string }[] };
-  reviews: { visible: boolean; title: string };
+  reviews: { visible: boolean; title: string; screenshot_urls?: string[] };
   faq: { visible: boolean; items: { q: string; a: string }[] };
   trust_badges: { visible: boolean; items: { icon: string; title: string }[] };
 };

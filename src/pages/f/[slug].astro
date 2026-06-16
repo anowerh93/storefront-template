@@ -32,6 +32,6 @@ const [funnel, meta]: [FunnelPayload | null, StorefrontMeta | null] = await Prom
 if (!funnel) { Astro.response.status = 404; }
 ---
 
-<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} meta={meta}>
+<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} meta={meta} bengaliFont={funnel?.config?.font === 'bengali'}>
   <FunnelPage client:load funnel={funnel} meta={meta} />
 </Base>

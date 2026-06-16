@@ -23,6 +23,8 @@ export interface Props {
   noindex?: boolean;
   /** JSON-LD objects (lib/schema.ts builders) rendered as ld+json scripts. */
   schema?: Record<string, unknown>[];
+  /** Load the Hind Siliguri Bengali webfont (opt-in; used by Bengali funnels). */
+  bengaliFont?: boolean;
   /**
    * Storefront metadata fetched by the page. Pages that already call
    * getStorefront() MUST pass it through — on SSR routes a second fetch
@@ -34,7 +36,7 @@ export interface Props {
   meta?: StorefrontMeta | null;
 }
 
-const { title, description, ogImage, noindex, schema = [] } = Astro.props;
+const { title, description, ogImage, noindex, schema = [], bengaliFont = false } = Astro.props;
 
 // Tenant metadata: prefer the page's already-fetched copy; fetch only when
 // the page didn't pass one (e.g. 404.astro). If the fallback fails (API
@@ -139,6 +141,25 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
         href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap"
       />
     </noscript>
+
+    {/* Bengali webfont (Hind Siliguri) — opt-in per page (Bengali funnels).
+        Same async low-priority pattern as Inter so it never blocks paint. */}
+    {bengaliFont && (
+      <>
+        <link
+          rel="stylesheet"
+          href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap"
+          media="print"
+          onload="this.media='all'"
+        />
+        <noscript>
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Hind+Siliguri:wght@300;400;500;600;700&display=swap"
+          />
+        </noscript>
+      </>
+    )}
 
     {/* Per-tenant brand color CSS variables — server-rendered, no flash on
         first paint. Variables are read by Tailwind v4's @theme directive in

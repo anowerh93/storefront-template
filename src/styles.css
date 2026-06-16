@@ -90,6 +90,11 @@
 .funnel-dark .sv-card,
 .funnel-dark .sv-card :is(h1, h2, h3, h4, p, span, li, summary, label) { color: #0f172a; }
 
+/* Bengali funnel font — opt-in per funnel (config.font === 'bengali'). The
+   Hind Siliguri webfont is loaded by Base.astro (bengaliFont prop) only on
+   these pages; this just applies it to the funnel subtree. */
+.funnel-font-bn { font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif; }
+
 /* Footer with a LIGHT custom background → dark text (the default footer text
    is light for the dark brand backdrop). Unlayered low-specificity override
    that beats Tailwind's text-brand-* utilities. The social-icon chips keep

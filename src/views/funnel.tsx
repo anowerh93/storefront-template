@@ -85,6 +85,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
 
   const { config, product } = funnel;
   const order = config.section_order ?? [];
+  const fontClass = config.font === 'bengali' ? 'funnel-font-bn' : '';
 
   const renderBlock = (key: string) => {
     switch (key) {
@@ -104,8 +105,10 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         return config.order_form.visible ? <OrderForm config={config.order_form} product={product} meta={meta} /> : null;
       case 'why_us':
         return config.why_us.visible && config.why_us.items.length ? <WhyUs config={config.why_us} /> : null;
-      case 'reviews':
-        return config.reviews.visible && product.reviews.items.length ? <Reviews config={config.reviews} product={product} /> : null;
+      case 'reviews': {
+        const hasShots = (config.reviews.screenshot_urls?.length ?? 0) > 0;
+        return config.reviews.visible && (product.reviews.items.length || hasShots) ? <Reviews config={config.reviews} product={product} /> : null;
+      }
       case 'faq':
         return config.faq.visible && config.faq.items.length ? <Faq config={config.faq} /> : null;
       case 'trust_badges':
@@ -116,7 +119,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
   };
 
   return (
-    <>
+    <div className={fontClass}>
       <SlimHeader meta={meta} />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
@@ -130,7 +133,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       </main>
       <SlimFooter meta={meta} />
       <StickyCta label={config.hero.cta_label || 'Order Now'} />
-    </>
+    </div>
   );
 }
 
@@ -250,15 +253,65 @@ function Hero({ config, product }: { config: FunnelBlockConfig['hero']; product:
           : <h1 className={cls}>{product.name}</h1>;
       })()}
       {config.subheadline && <p className="mx-auto mt-3 max-w-2xl text-slate-600" dangerouslySetInnerHTML={{ __html: config.subheadline }} />}
-      {img && (
-        <div className="relative mx-auto mt-5 aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-          <FitImage src={img} alt={product.name} eager />
-        </div>
-      )}
+      {(() => {
+        // Slider when the hero has >1 uploaded slide; otherwise the single
+        // hero/product image (unchanged behaviour).
+        const slides = config.slide_urls && config.slide_urls.length > 0 ? config.slide_urls : (img ? [img] : []);
+        if (slides.length > 1) {
+          return <div className="mx-auto mt-5 max-w-2xl"><HeroSlider images={slides} alt={product.name} /></div>;
+        }
+        if (slides.length === 1) {
+          return (
+            <div className="relative mx-auto mt-5 aspect-[4/3] max-w-2xl overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+              <FitImage src={slides[0]} alt={product.name} eager />
+            </div>
+          );
+        }
+        return null;
+      })()}
       <a href="#funnel-order" className="mt-5 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-7 py-3 text-base font-bold text-white shadow transition hover:bg-brand-700">
         <ShoppingBag className="h-5 w-5" /> <RT html={config.cta_label || 'Order Now'} />
       </a>
     </section>
+  );
+}
+
+/* Auto-fading hero image slider (client island, so JS is fine). */
+function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    if (images.length <= 1) return;
+    const t = setInterval(() => setI((p) => (p + 1) % images.length), 3500);
+    return () => clearInterval(t);
+  }, [images.length]);
+  return (
+    <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
+      {images.map((src, idx) => (
+        <img key={idx} src={src} alt={alt} loading={idx === 0 ? 'eager' : 'lazy'}
+             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${idx === i ? 'opacity-100' : 'opacity-0'}`} />
+      ))}
+      <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
+        {images.map((_, idx) => (
+          <button key={idx} type="button" aria-label={`Slide ${idx + 1}`} onClick={() => setI(idx)}
+                  className={`h-2 rounded-full transition-all ${idx === i ? 'w-5 bg-white' : 'w-2 bg-white/60'}`} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* Image-based review screenshots — a swipeable, snap-scrolling strip (social
+   proof from FB/WhatsApp screenshots). Manual scroll keeps it robust for tall,
+   varied-aspect images. */
+function ReviewScreenshots({ images }: { images: string[] }) {
+  return (
+    <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+      {images.map((src, i) => (
+        <div key={i} className="shrink-0 basis-[68%] snap-center sm:basis-[42%]">
+          <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" className="w-full rounded-xl ring-1 ring-slate-200" />
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -342,10 +395,12 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
 }
 
 function Reviews({ config, product }: { config: FunnelBlockConfig['reviews']; product: FunnelProduct }) {
+  const shots = config.screenshot_urls ?? [];
   return (
     <section>
       {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
-      <div className="space-y-4">
+      {shots.length > 0 && <ReviewScreenshots images={shots} />}
+      <div className={`space-y-4 ${shots.length > 0 ? 'mt-4' : ''}`}>
         {product.reviews.items.slice(0, 10).map((r) => (
           <article key={r.id} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="mb-1 flex items-center gap-2">
@@ -469,9 +524,14 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
                       <span className="text-sm font-semibold text-slate-900">{v.label}</span>
                     </span>
                     <span className="shrink-0 text-right">
-                      <span className="text-sm font-bold text-rose-600">{formatBDT(vp, { currency: product.currency })}</span>
-                      {vc && vc > vp && <span className="ml-1 text-xs text-slate-400 line-through">{formatBDT(vc, { currency: product.currency })}</span>}
-                      {off && <span className="ml-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{off}%</span>}
+                      <span className="block">
+                        <span className="text-sm font-bold text-rose-600">{formatBDT(vp, { currency: product.currency })}</span>
+                        {vc && vc > vp && <span className="ml-1 text-xs text-slate-400 line-through">{formatBDT(vc, { currency: product.currency })}</span>}
+                        {off && <span className="ml-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{off}%</span>}
+                      </span>
+                      {vc && vc > vp && (
+                        <span className="mt-0.5 block text-[11px] font-semibold text-emerald-600">Save {formatBDT(vc - vp, { currency: product.currency })}</span>
+                      )}
                     </span>
                   </button>
                 );
