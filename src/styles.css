@@ -95,6 +95,12 @@
    these pages; this just applies it to the funnel subtree. */
 .funnel-font-bn { font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif; }
 
+/* Section "pattern" background — a tiled SVG motif (set inline per section)
+   that slowly drifts diagonally. Subtle, brand-coloured ambience. */
+@keyframes fnl-bg-scroll { from { background-position: 0 0; } to { background-position: 800px 800px; } }
+.fnl-bg-pattern { animation: fnl-bg-scroll 60s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .fnl-bg-pattern { animation: none; } }
+
 /* Footer with a LIGHT custom background → dark text (the default footer text
    is light for the dark brand backdrop). Unlayered low-specificity override
    that beats Tailwind's text-brand-* utilities. The social-icon chips keep

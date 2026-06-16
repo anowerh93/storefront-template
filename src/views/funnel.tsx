@@ -188,15 +188,55 @@ function isDarkHex(hex?: string): boolean {
 // CSS whitens text (inline rich-text colours still win); image gets a baked-in
 // dark scrim. No background → renders children untouched.
 type SectionBgFields = {
-  bg_type?: 'none' | 'color' | 'gradient' | 'image';
+  bg_type?: 'none' | 'color' | 'gradient' | 'image' | 'pattern';
   bg_color?: string;
   bg_gradient_from?: string;
   bg_gradient_to?: string;
   bg_gradient_angle?: number;
   bg_image_url?: string | null;
+  bg_pattern?: string;
 };
+
+/** Hex (#rrggbb) → rgba() string at the given alpha (for the pattern's light wash). */
+function hexA(hex: string, a: number): string {
+  const m = /^#?([0-9a-fA-F]{6})$/.exec((hex || '').trim());
+  if (!m) return `rgba(15,23,42,${a})`;
+  const n = parseInt(m[1], 16);
+  return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, ${a})`;
+}
+
+// Tiled-pattern motifs (100×100 tile). Rendered as a faint, tenant-coloured SVG
+// that slowly drifts (.fnl-bg-pattern). leaves → organic; dots/grid → geometric.
+const PATTERN_MOTIFS: Record<string, string> = {
+  leaves: "<path d='M50 18c-9 7-9 23 0 30 9-7 9-23 0-30z'/><path d='M22 64c-6 5-6 16 0 21 6-5 6-16 0-21z'/><circle cx='78' cy='30' r='4'/><circle cx='30' cy='86' r='3'/>",
+  dots:   "<circle cx='25' cy='25' r='4'/><circle cx='75' cy='75' r='4'/><circle cx='75' cy='25' r='2.5'/><circle cx='25' cy='75' r='2.5'/>",
+  grid:   "<path d='M0 50h100M50 0v100'/>",
+};
+
+function patternUrl(motif: string, hex: string): string {
+  const m = PATTERN_MOTIFS[motif] ?? PATTERN_MOTIFS.leaves;
+  const g = motif === 'grid'
+    ? `<g stroke='${hex}' stroke-opacity='0.06' stroke-width='2' fill='none'>${m}</g>`
+    : `<g fill='${hex}' fill-opacity='0.06'>${m}</g>`;
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 100 100'>${g}</svg>`;
+  return `url("data:image/svg+xml,${encodeURIComponent(svg)}")`;
+}
 function SectionBg({ bg, children }: { bg?: SectionBgFields; children: ReactNode }) {
   const t = bg?.bg_type || 'none';
+
+  // Pattern: a light wash of the colour + a faint tiled motif that slowly
+  // drifts. Two layers (wash + pattern) so text on top stays dark & readable.
+  if (t === 'pattern') {
+    const color = bg!.bg_color || '#0f172a';
+    return (
+      <div className="relative overflow-hidden rounded-3xl px-5 py-8 sm:py-10" style={{ backgroundColor: hexA(color, 0.10) }}>
+        <div className="fnl-bg-pattern pointer-events-none absolute inset-0" aria-hidden="true"
+             style={{ backgroundImage: patternUrl(bg!.bg_pattern || 'leaves', color), backgroundRepeat: 'repeat' }} />
+        <div className="relative">{children}</div>
+      </div>
+    );
+  }
+
   let style: CSSProperties = {};
   let dark = false;
   let has = false;
