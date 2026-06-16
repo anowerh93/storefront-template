@@ -408,71 +408,59 @@ function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
 }
 
 /* Image-based review screenshots — a 3D COVERFLOW carousel (the teachek look):
-   the centre card is upright + prominent, side cards rotate back in perspective.
-   Built on Embla (already a dependency) so it drags with a mouse on desktop AND
-   swipes on touch — the bare CSS strip only worked on touch. Auto-advances; the
-   per-slide 3D transform is tweened from Embla's scroll progress. */
+   centre card upright + prominent, side cards rotate back in perspective. Built
+   on Embla (already a dependency) so it drags with a mouse on desktop AND swipes
+   on touch. Cards are a FIXED height so Embla's geometry is stable even while
+   the tall screenshots are still loading (the earlier loop drifted off-screen
+   exactly because lazy images mis-measured the slides). No loop — autoplay wraps
+   back to the start; the 3D transform is tweened from scroll progress. */
 function ReviewScreenshots({ images }: { images: string[] }) {
-  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center', containScroll: false });
-  const tweenFactor = useRef(0);
+  const [emblaRef, emblaApi] = useEmblaCarousel({ align: 'center', containScroll: false });
   const cards = useRef<HTMLElement[]>([]);
+  const factor = useRef(1);
 
-  const setNodes = useCallback((api: any) => {
-    cards.current = api.slideNodes().map((s: HTMLElement) => s.querySelector('.cf-card') as HTMLElement);
-  }, []);
-  const setFactor = useCallback((api: any) => { tweenFactor.current = api.scrollSnapList().length; }, []);
-
-  // Map each slide's distance-from-centre (in slide units) → rotateY/translateZ/
-  // scale/opacity, mirroring Swiper's coverflow (rotate 50 / depth 100).
-  const tween = useCallback((api: any, eventName?: string) => {
+  const tween = useCallback((api: any) => {
     const engine = api.internalEngine();
     const progress = api.scrollProgress();
-    const inView = api.slidesInView();
-    const isScroll = eventName === 'scroll';
-
     api.scrollSnapList().forEach((snap: number, snapIndex: number) => {
-      let diff = snap - progress;
+      const diff = snap - progress;
       engine.slideRegistry[snapIndex].forEach((slideIndex: number) => {
-        if (isScroll && !inView.includes(slideIndex)) return;
-        if (engine.options.loop) {
-          engine.slideLooper.loopPoints.forEach((lp: any) => {
-            const target = lp.target();
-            if (slideIndex === lp.index && target !== 0) {
-              const sign = Math.sign(target);
-              if (sign === -1) diff = snap - (1 + progress);
-              if (sign === 1) diff = snap + (1 - progress);
-            }
-          });
-        }
-        const d = diff * tweenFactor.current;                 // ~0 centre, ±1 neighbour
-        const c = Math.max(-1.6, Math.min(1.6, d));
-        const rotateY = c * 45;
-        const translateZ = -Math.abs(c) * 90;
-        const scale = 1 - Math.min(Math.abs(d), 1) * 0.16;
         const node = cards.current[slideIndex];
-        if (node) {
-          node.style.transform = `rotateY(${rotateY}deg) translateZ(${translateZ}px) scale(${scale})`;
-          node.style.opacity = (1 - Math.min(Math.abs(d), 1.8) * 0.3).toFixed(3);
-          node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
-          const shade = node.querySelector('.cf-shade') as HTMLElement | null;
-          if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.32).toFixed(3);
-        }
+        if (!node) return;
+        const d = diff * factor.current;                 // ~0 centre, ±1 neighbour
+        const c = Math.max(-1.6, Math.min(1.6, d));
+        node.style.transform = `rotateY(${c * 45}deg) translateZ(${-Math.abs(c) * 90}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.16})`;
+        node.style.opacity = (1 - Math.min(Math.abs(d), 1.7) * 0.32).toFixed(3);
+        node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
+        const shade = node.querySelector('.cf-shade') as HTMLElement | null;
+        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.3).toFixed(3);
       });
     });
   }, []);
 
   useEffect(() => {
     if (!emblaApi) return;
-    setNodes(emblaApi);
-    setFactor(emblaApi);
-    tween(emblaApi);
-    emblaApi.on('reInit', (api: any) => { setNodes(api); setFactor(api); tween(api); });
-    emblaApi.on('scroll', tween);
-    emblaApi.on('slideFocus', tween);
+    const apply = () => {
+      cards.current = emblaApi.slideNodes().map((s: HTMLElement) => s.querySelector('.cf-card') as HTMLElement);
+      factor.current = Math.max(1, emblaApi.scrollSnapList().length - 1);
+      tween(emblaApi);
+    };
+    apply();
+    emblaApi.on('reInit', apply);
+    emblaApi.on('scroll', () => tween(emblaApi));
 
-    // Auto-advance every 3s; pause while the pointer is down or hovering.
+    // Re-measure once the lazy screenshots have loaded (Embla sizes the snaps
+    // at init, before tall images give the slides their real height).
+    const imgs = Array.from(emblaApi.rootNode().querySelectorAll('img')) as HTMLImageElement[];
+    let pending = imgs.length;
+    const onOne = () => { if (--pending <= 0) emblaApi.reInit(); };
+    imgs.forEach((img) => { if (img.complete) onOne(); else img.addEventListener('load', onOne, { once: true }); });
+
+    // Open balanced (middle card centred), then auto-advance; wrap at the end.
+    emblaApi.scrollTo(Math.floor(emblaApi.slideNodes().length / 2), true);
     let timer: ReturnType<typeof setInterval> | null = null;
-    const start = () => { if (!timer) timer = setInterval(() => emblaApi.scrollNext(), 3000); };
+    const tick = () => { if (emblaApi.canScrollNext()) emblaApi.scrollNext(); else emblaApi.scrollTo(0); };
+    const start = () => { if (!timer) timer = setInterval(tick, 3000); };
     const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
     start();
     emblaApi.on('pointerDown', stop);
@@ -481,15 +469,15 @@ function ReviewScreenshots({ images }: { images: string[] }) {
     root.addEventListener('mouseenter', stop);
     root.addEventListener('mouseleave', start);
     return () => { stop(); root.removeEventListener('mouseenter', stop); root.removeEventListener('mouseleave', start); };
-  }, [emblaApi, tween, setNodes, setFactor]);
+  }, [emblaApi, tween]);
 
   // One image → no carousel, just a centred card. (After the hooks so the
   // Rules of Hooks hold; Embla simply never mounts since emblaRef is unused.)
   if (images.length === 1) {
     return (
-      <div className="mx-auto max-w-sm">
-        <div className="overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-          <img src={images[0]} alt="Customer review" loading="lazy" className="block w-full" />
+      <div className="mx-auto max-w-xs">
+        <div className="h-[420px] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+          <img src={images[0]} alt="Customer review" loading="lazy" className="block h-full w-full object-cover object-top" />
         </div>
       </div>
     );
@@ -500,11 +488,11 @@ function ReviewScreenshots({ images }: { images: string[] }) {
       <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1600px' }}>
         <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
           {images.map((src, i) => (
-            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[80%] cursor-grab px-2 active:cursor-grabbing sm:basis-[52%] lg:basis-[38%]">
-              <div className="cf-card relative overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 will-change-transform"
+            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[72%] cursor-grab px-2 active:cursor-grabbing sm:basis-[44%] lg:basis-[32%]">
+              <div className="cf-card relative h-[420px] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
-                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="block w-full select-none" />
-                <div className="cf-shade pointer-events-none absolute inset-0 rounded-2xl bg-slate-900" style={{ opacity: 0 }} />
+                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="block h-full w-full select-none object-cover object-top" />
+                <div className="cf-shade pointer-events-none absolute inset-0 bg-slate-900" style={{ opacity: 0 }} />
               </div>
             </div>
           ))}
