@@ -476,8 +476,9 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   if (images.length === 1) {
     return (
       <div className="mx-auto max-w-xs">
-        <div className="h-[420px] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
-          <img src={images[0]} alt="Customer review" loading="lazy" className="block h-full w-full object-cover object-top" />
+        <div className="relative aspect-[3/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
+          <img src={images[0]} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+          <img src={images[0]} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
         </div>
       </div>
     );
@@ -488,11 +489,16 @@ function ReviewScreenshots({ images }: { images: string[] }) {
       <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1600px' }}>
         <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
           {images.map((src, i) => (
-            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[72%] cursor-grab px-2 active:cursor-grabbing sm:basis-[44%] lg:basis-[32%]">
-              <div className="cf-card relative h-[420px] overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 will-change-transform"
+            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[72%] cursor-grab px-2 active:cursor-grabbing sm:basis-[44%] lg:basis-[30%]">
+              {/* aspect-ratio (not a fixed px height) keeps cards a uniform shape
+                  AND gives Embla a stable size before images load. The full
+                  screenshot shows via object-contain over a blurred self-fill,
+                  so nothing is cropped regardless of the upload's dimensions. */}
+              <div className="cf-card relative aspect-[3/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
-                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="block h-full w-full select-none object-cover object-top" />
-                <div className="cf-shade pointer-events-none absolute inset-0 bg-slate-900" style={{ opacity: 0 }} />
+                <img src={src} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
+                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
+                <div className="cf-shade pointer-events-none absolute inset-0 z-[2] bg-slate-900" style={{ opacity: 0 }} />
               </div>
             </div>
           ))}
