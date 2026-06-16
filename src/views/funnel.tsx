@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef, type ReactNode, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, type ReactNode, type CSSProperties } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -404,63 +405,118 @@ function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
   );
 }
 
-/* Image-based review screenshots — a swipeable carousel (social proof from
-   FB/WhatsApp screenshots). Works on every device: native touch swipe, plus
-   mouse drag-to-scroll and prev/next arrows on desktop (where touch isn't
-   available, so the bare CSS strip felt broken). */
+/* Image-based review screenshots — a 3D COVERFLOW carousel (the teachek look):
+   the centre card is upright + prominent, side cards rotate back in perspective.
+   Built on Embla (already a dependency) so it drags with a mouse on desktop AND
+   swipes on touch — the bare CSS strip only worked on touch. Auto-advances; the
+   per-slide 3D transform is tweened from Embla's scroll progress. */
 function ReviewScreenshots({ images }: { images: string[] }) {
-  const ref = useRef<HTMLDivElement>(null);
-  // Mouse-only drag-to-scroll. Touch keeps the browser's native snap scroll —
-  // hijacking it with pointer capture would fight the OS swipe.
-  const drag = useRef({ active: false, startX: 0, startLeft: 0 });
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'center', containScroll: false });
+  const tweenFactor = useRef(0);
+  const cards = useRef<HTMLElement[]>([]);
 
-  const nudge = (dir: number) => {
-    const el = ref.current;
-    if (el) el.scrollBy({ left: dir * el.clientWidth * 0.85, behavior: 'smooth' });
-  };
+  const setNodes = useCallback((api: any) => {
+    cards.current = api.slideNodes().map((s: HTMLElement) => s.querySelector('.cf-card') as HTMLElement);
+  }, []);
+  const setFactor = useCallback((api: any) => { tweenFactor.current = api.scrollSnapList().length; }, []);
+
+  // Map each slide's distance-from-centre (in slide units) → rotateY/translateZ/
+  // scale/opacity, mirroring Swiper's coverflow (rotate 50 / depth 100).
+  const tween = useCallback((api: any, eventName?: string) => {
+    const engine = api.internalEngine();
+    const progress = api.scrollProgress();
+    const inView = api.slidesInView();
+    const isScroll = eventName === 'scroll';
+
+    api.scrollSnapList().forEach((snap: number, snapIndex: number) => {
+      let diff = snap - progress;
+      engine.slideRegistry[snapIndex].forEach((slideIndex: number) => {
+        if (isScroll && !inView.includes(slideIndex)) return;
+        if (engine.options.loop) {
+          engine.slideLooper.loopPoints.forEach((lp: any) => {
+            const target = lp.target();
+            if (slideIndex === lp.index && target !== 0) {
+              const sign = Math.sign(target);
+              if (sign === -1) diff = snap - (1 + progress);
+              if (sign === 1) diff = snap + (1 - progress);
+            }
+          });
+        }
+        const d = diff * tweenFactor.current;                 // ~0 centre, ±1 neighbour
+        const c = Math.max(-1.6, Math.min(1.6, d));
+        const rotateY = c * 45;
+        const translateZ = -Math.abs(c) * 90;
+        const scale = 1 - Math.min(Math.abs(d), 1) * 0.16;
+        const node = cards.current[slideIndex];
+        if (node) {
+          node.style.transform = `rotateY(${rotateY}deg) translateZ(${translateZ}px) scale(${scale})`;
+          node.style.opacity = (1 - Math.min(Math.abs(d), 1.8) * 0.3).toFixed(3);
+          node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
+          const shade = node.querySelector('.cf-shade') as HTMLElement | null;
+          if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.32).toFixed(3);
+        }
+      });
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!emblaApi) return;
+    setNodes(emblaApi);
+    setFactor(emblaApi);
+    tween(emblaApi);
+    emblaApi.on('reInit', (api: any) => { setNodes(api); setFactor(api); tween(api); });
+    emblaApi.on('scroll', tween);
+    emblaApi.on('slideFocus', tween);
+
+    // Auto-advance every 3s; pause while the pointer is down or hovering.
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = () => { if (!timer) timer = setInterval(() => emblaApi.scrollNext(), 3000); };
+    const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
+    start();
+    emblaApi.on('pointerDown', stop);
+    emblaApi.on('pointerUp', start);
+    const root = emblaApi.rootNode();
+    root.addEventListener('mouseenter', stop);
+    root.addEventListener('mouseleave', start);
+    return () => { stop(); root.removeEventListener('mouseenter', stop); root.removeEventListener('mouseleave', start); };
+  }, [emblaApi, tween, setNodes, setFactor]);
+
+  // One image → no carousel, just a centred card. (After the hooks so the
+  // Rules of Hooks hold; Embla simply never mounts since emblaRef is unused.)
+  if (images.length === 1) {
+    return (
+      <div className="mx-auto max-w-sm">
+        <div className="overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200">
+          <img src={images[0]} alt="Customer review" loading="lazy" className="block w-full" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative">
-      <div
-        ref={ref}
-        className="no-scrollbar -mx-1 flex cursor-grab snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2 active:cursor-grabbing"
-        onPointerDown={(e) => {
-          if (e.pointerType !== 'mouse') return;
-          const el = ref.current;
-          if (!el) return;
-          drag.current = { active: true, startX: e.clientX, startLeft: el.scrollLeft };
-          el.setPointerCapture(e.pointerId);
-        }}
-        onPointerMove={(e) => {
-          if (!drag.current.active) return;
-          const el = ref.current;
-          if (el) el.scrollLeft = drag.current.startLeft - (e.clientX - drag.current.startX);
-        }}
-        onPointerUp={(e) => {
-          drag.current.active = false;
-          ref.current?.releasePointerCapture(e.pointerId);
-        }}
-        onPointerCancel={() => { drag.current.active = false; }}
-      >
-        {images.map((src, i) => (
-          <div key={i} className="shrink-0 basis-[72%] snap-center sm:basis-[40%] lg:basis-[28%]">
-            <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="w-full select-none rounded-xl ring-1 ring-slate-200" />
-          </div>
-        ))}
+      <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1600px' }}>
+        <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
+          {images.map((src, i) => (
+            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[80%] cursor-grab px-2 active:cursor-grabbing sm:basis-[52%] lg:basis-[38%]">
+              <div className="cf-card relative overflow-hidden rounded-2xl bg-white shadow-xl ring-1 ring-slate-200 will-change-transform"
+                   style={{ transformOrigin: 'center center' }}>
+                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="block w-full select-none" />
+                <div className="cf-shade pointer-events-none absolute inset-0 rounded-2xl bg-slate-900" style={{ opacity: 0 }} />
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
-      {images.length > 1 && (
-        <>
-          <button type="button" aria-label="Previous reviews" onClick={() => nudge(-1)}
-                  className="absolute left-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-          <button type="button" aria-label="Next reviews" onClick={() => nudge(1)}
-                  className="absolute right-1 top-1/2 hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
-            <ChevronRight className="h-5 w-5" />
-          </button>
-        </>
-      )}
+      <button type="button" aria-label="Previous reviews" onClick={() => emblaApi?.scrollPrev()}
+              className="absolute left-1 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+        <ChevronLeft className="h-5 w-5" />
+      </button>
+      <button type="button" aria-label="Next reviews" onClick={() => emblaApi?.scrollNext()}
+              className="absolute right-1 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+        <ChevronRight className="h-5 w-5" />
+      </button>
     </div>
   );
 }
