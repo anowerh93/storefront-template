@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
-  ShoppingBag, Truck, Minus, Plus, Star, Check, Clock,
+  ShoppingBag, Truck, Minus, Plus, Check, Clock,
   ShieldCheck, RefreshCw, Headphones, Package, CreditCard, Gift,
   Award, Phone, Heart, Sparkles, BadgeCheck, ThumbsUp,
   ChevronLeft, ChevronRight,
@@ -109,8 +109,10 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       case 'why_us':
         return config.why_us.visible && config.why_us.items.length ? <WhyUs config={config.why_us} /> : null;
       case 'reviews': {
+        // Screenshots-only: the block shows when it's visible AND has uploaded
+        // review screenshots (product catalog reviews are not used on funnels).
         const hasShots = (config.reviews.screenshot_urls?.length ?? 0) > 0;
-        return config.reviews.visible && (product.reviews.items.length || hasShots) ? <Reviews config={config.reviews} product={product} /> : null;
+        return config.reviews.visible && hasShots ? <Reviews config={config.reviews} /> : null;
       }
       case 'faq':
         return config.faq.visible && config.faq.items.length ? <Faq config={config.faq} /> : null;
@@ -600,28 +602,17 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
   );
 }
 
-function Reviews({ config, product }: { config: FunnelBlockConfig['reviews']; product: FunnelProduct }) {
+// Funnel reviews = the curated screenshot carousel ONLY. The product's catalog
+// text reviews are deliberately NOT shown here — a funnel is a single-product ad
+// lander, and pulling in generic store reviews (often unrelated to this product)
+// reads as noise. Upload review screenshots for social proof instead.
+function Reviews({ config }: { config: FunnelBlockConfig['reviews'] }) {
   const shots = config.screenshot_urls ?? [];
+  if (shots.length === 0) return null;
   return (
     <section>
       {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
-      {shots.length > 0 && <ReviewScreenshots images={shots} />}
-      <div className={`grid items-start gap-4 sm:grid-cols-2 ${shots.length > 0 ? 'mt-4' : ''}`}>
-        {product.reviews.items.slice(0, 10).map((r) => (
-          <article key={r.id} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
-            <div className="mb-1 flex items-center gap-2">
-              <div className="flex">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <Star key={n} className={`h-4 w-4 ${n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                ))}
-              </div>
-              <span className="text-sm font-medium text-slate-900">{r.author_name}</span>
-              {r.location && <span className="text-xs text-slate-400">· {r.location}</span>}
-            </div>
-            <p className="text-sm leading-relaxed text-slate-600">{r.body}</p>
-          </article>
-        ))}
-      </div>
+      <ReviewScreenshots images={shots} />
     </section>
   );
 }
