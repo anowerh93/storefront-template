@@ -133,15 +133,12 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
           // bleeds even without one. Content re-centres in the max-w-6xl column.
           const hasBg = !!bg && !!bg.bg_type && bg.bg_type !== 'none';
           const bleed = hasBg || (key === 'hero' && config.hero.layout === 'split');
-          // Per-section spacing preset → top/bottom padding on the wrapper
-          // (replaces the old uniform gap, so each section is independent).
-          const pad = `${PAD_TOP[bg?.space_top ?? 'md'] ?? PAD_TOP.md} ${PAD_BOTTOM[bg?.space_bottom ?? 'md'] ?? PAD_BOTTOM.md}`;
+          // SectionBg owns the per-section vertical spacing now (it pads inside
+          // the band, so "Top: None" makes the hero flush — no outer wrapper).
           return (
-            <div key={key} className={pad}>
-              <Reveal enabled={config.animate !== false}>
-                <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
-              </Reveal>
-            </div>
+            <Reveal key={key} enabled={config.animate !== false}>
+              <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
+            </Reveal>
           );
         })}
       </main>
@@ -193,10 +190,12 @@ type SectionBgFields = {
   space_bottom?: 'none' | 'sm' | 'md' | 'lg';
 };
 
-// Per-section spacing presets → vertical padding on the block wrapper. The gap
-// between two sections is the bottom pad of one + the top pad of the next.
-const PAD_TOP: Record<string, string> = { none: 'pt-0', sm: 'pt-3', md: 'pt-6', lg: 'pt-12' };
-const PAD_BOTTOM: Record<string, string> = { none: 'pb-0', sm: 'pb-3', md: 'pb-6', lg: 'pb-12' };
+// Per-section spacing presets → the section's OWN top/bottom padding. For a
+// section with a background this is the padding INSIDE the band (so "Top: None"
+// makes content sit flush at the top); otherwise it's plain vertical spacing.
+// Default md is intentionally modest so heroes don't open with a tall gap.
+const PAD_TOP: Record<string, string> = { none: 'pt-0', sm: 'pt-4', md: 'pt-8', lg: 'pt-14' };
+const PAD_BOTTOM: Record<string, string> = { none: 'pb-0', sm: 'pb-4', md: 'pb-8', lg: 'pb-14' };
 
 // Funnel-wide button (CTA) theme. Blank values fall back to the brand colour
 // (via Tailwind classes) / white, so an unconfigured funnel looks unchanged.
@@ -243,10 +242,13 @@ function patternUrl(motif: string, hex: string): string {
 }
 function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; bleed?: boolean; children: ReactNode }) {
   const t = bg?.bg_type || 'none';
+  // Vertical padding comes from the per-section spacing preset (top + bottom
+  // independent); horizontal padding is fixed.
+  const vy = `${PAD_TOP[bg?.space_top ?? 'md'] ?? PAD_TOP.md} ${PAD_BOTTOM[bg?.space_bottom ?? 'md'] ?? PAD_BOTTOM.md}`;
   // bleed → the background spans the full viewport width (edge-to-edge) and the
   // content is re-centred in a wider container. Used by the split hero so it
   // looks full-width on desktop instead of a narrow centred card.
-  const padded = bleed ? 'fnl-full-bleed px-4 sm:px-6 py-12 sm:py-16' : 'rounded-3xl px-5 py-8 sm:py-10';
+  const padded = bleed ? `fnl-full-bleed px-4 sm:px-6 ${vy}` : `rounded-3xl px-5 ${vy}`;
   const inner = (node: ReactNode) => (bleed ? <div className="mx-auto max-w-6xl">{node}</div> : node);
 
   // Pattern: a light wash of the colour + a faint tiled motif that slowly
@@ -283,10 +285,11 @@ function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; blee
     has = true;
   }
   if (!has) {
-    // No background. bleed still widens the content (split hero) edge-to-edge.
+    // No background — still apply the section's own vertical spacing. bleed
+    // also widens the content (split hero) edge-to-edge.
     return bleed
-      ? <div className="fnl-full-bleed px-4 sm:px-6"><div className="mx-auto max-w-6xl">{children}</div></div>
-      : <>{children}</>;
+      ? <div className={`fnl-full-bleed px-4 sm:px-6 ${vy}`}><div className="mx-auto max-w-6xl">{children}</div></div>
+      : <div className={vy}>{children}</div>;
   }
   return <div className={`${padded} ${dark ? 'funnel-dark' : ''}`} style={style}>{inner(children)}</div>;
 }
