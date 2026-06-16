@@ -202,9 +202,9 @@ export function getService(slug: string) {
   });
 }
 
-export function getBlogPosts(opts: { page?: number; perPage?: number } = {}) {
+export function getBlogPosts(opts: { page?: number; perPage?: number; search?: string } = {}) {
   return apiFetch<Paginated<BlogPostCard>>('/blog', {
-    params: { page: opts.page, per_page: opts.perPage },
+    params: { page: opts.page, per_page: opts.perPage, search: opts.search },
     tags: ['blog'],
     unwrap: false,   // keep the pagination meta
   });

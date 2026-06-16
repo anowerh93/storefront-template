@@ -13,9 +13,10 @@ import { BlogListPage } from '../../views/blog-list';
 import type { BlogPostCard, Category, Paginated, StorefrontMeta } from '../../lib/types';
 
 const page = parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
+const search = (Astro.url.searchParams.get('search') ?? '').trim();
 
 const [posts, meta, categories]: [Paginated<BlogPostCard> | null, StorefrontMeta | null, Category[]] = await Promise.all([
-  getBlogPosts({ page, perPage: 12 }).catch((err) => { console.warn('[blog/index] getBlogPosts failed:', err); return null; }),
+  getBlogPosts({ page, perPage: 12, search: search || undefined }).catch((err) => { console.warn('[blog/index] getBlogPosts failed:', err); return null; }),
   getStorefront().catch((err) => { console.warn('[blog/index] getStorefront failed:', err); return null; }),
   getCategories().catch(() => []),
 ]);
@@ -30,5 +31,5 @@ const schemas = meta
 ---
 
 <Base title="Blog" description={meta?.seo?.description ?? meta?.about ?? undefined} schema={schemas} meta={meta}>
-  <BlogListPage client:load meta={meta} posts={posts} categories={categories} />
+  <BlogListPage client:load meta={meta} posts={posts} categories={categories} search={search} />
 </Base>
