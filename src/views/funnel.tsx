@@ -122,16 +122,19 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
     <div className={fontClass}>
       {/* No site header/nav — a funnel is a standalone landing page that opens
           straight into the hero (matches single-product COD landers). */}
-      <main className="mx-auto max-w-3xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
+      <main className="mx-auto max-w-6xl px-4 sm:px-6 py-6 space-y-10 pb-28 sm:pb-10">
         {order.map((key: string) => {
           const node = renderBlock(key);
           if (!node) return null;
-          // The split hero spans full width on wide screens (edge-to-edge bg,
-          // wider content) — the rest of the funnel stays a focused column.
-          const bleed = key === 'hero' && config.hero.layout === 'split';
+          const bg = (config as unknown as Record<string, SectionBgFields>)[key];
+          // Every section with a background spans the full viewport width on
+          // wide screens (edge-to-edge band, teachek-style); the split hero
+          // bleeds even without one. Content re-centres in the max-w-6xl column.
+          const hasBg = !!bg && !!bg.bg_type && bg.bg_type !== 'none';
+          const bleed = hasBg || (key === 'hero' && config.hero.layout === 'split');
           return (
             <Reveal key={key} enabled={config.animate !== false}>
-              <SectionBg bg={(config as unknown as Record<string, SectionBgFields>)[key]} bleed={bleed}>{node}</SectionBg>
+              <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
             </Reveal>
           );
         })}
@@ -384,7 +387,7 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
   return (
     <section>
       {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
-      <ul className="mx-auto max-w-xl space-y-2.5">
+      <ul className="mx-auto grid max-w-4xl gap-2.5 sm:grid-cols-2">
         {config.items.map((b, i) => (
           <li key={i} className="flex gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
             <Check className="h-5 w-5 shrink-0 text-emerald-600" />
@@ -398,7 +401,7 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
 
 function Gallery({ images, name }: { images: string[]; name: string }) {
   return (
-    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+    <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {images.slice(0, 8).map((src, i) => (
         <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
           <img src={src} alt={`${name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
@@ -447,7 +450,7 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
   return (
     <section>
       {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {config.items.map((w, i) => (
           <div key={i} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <RT as="p" className="font-semibold text-slate-900" html={w.title} />
@@ -465,7 +468,7 @@ function Reviews({ config, product }: { config: FunnelBlockConfig['reviews']; pr
     <section>
       {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
       {shots.length > 0 && <ReviewScreenshots images={shots} />}
-      <div className={`space-y-4 ${shots.length > 0 ? 'mt-4' : ''}`}>
+      <div className={`grid items-start gap-4 sm:grid-cols-2 ${shots.length > 0 ? 'mt-4' : ''}`}>
         {product.reviews.items.slice(0, 10).map((r) => (
           <article key={r.id} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <div className="mb-1 flex items-center gap-2">
@@ -489,7 +492,7 @@ function Faq({ config }: { config: FunnelBlockConfig['faq'] }) {
   return (
     <section>
       <h2 className="mb-4 text-center text-xl font-bold text-slate-900">FAQ</h2>
-      <div className="mx-auto max-w-xl space-y-3">
+      <div className="mx-auto grid max-w-4xl items-start gap-3 sm:grid-cols-2">
         {config.items.map((f, i) => (
           <details key={i} className="rounded-xl bg-white p-4 ring-1 ring-slate-200">
             <summary className="cursor-pointer font-semibold text-slate-900"><RT html={f.q} /></summary>
@@ -564,7 +567,7 @@ function OrderForm({ config, product, meta }: { config: FunnelBlockConfig['order
   }
 
   return (
-    <section id="funnel-order" className="scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
+    <section id="funnel-order" className="mx-auto max-w-2xl scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
       <RT as="h2" className="text-center text-lg font-bold text-slate-900" html={config.heading || 'Order now — Cash on Delivery'} />
 
       <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">
