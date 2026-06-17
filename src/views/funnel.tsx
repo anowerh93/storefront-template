@@ -8,6 +8,8 @@ import {
   ShieldCheck, RefreshCw, Headphones, Package, CreditCard, Gift,
   Award, Phone, Heart, Sparkles, BadgeCheck, ThumbsUp,
   ChevronLeft, ChevronRight,
+  Leaf, Zap, Brain, Flame, Droplet, Smile, Activity,
+  Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
 import { submitOrder } from '../lib/api';
@@ -31,6 +33,8 @@ const ICON_MAP: Record<string, any> = {
   'truck': Truck, 'shield-check': ShieldCheck, 'refresh-cw': RefreshCw, 'headphones': Headphones,
   'package': Package, 'credit-card': CreditCard, 'gift': Gift, 'award': Award, 'clock': Clock,
   'phone': Phone, 'heart': Heart, 'sparkles': Sparkles, 'badge-check': BadgeCheck, 'thumbs-up': ThumbsUp,
+  'leaf': Leaf, 'zap': Zap, 'brain': Brain, 'flame': Flame, 'droplet': Droplet, 'smile': Smile, 'activity': Activity,
+  'globe': Globe, 'message-circle': MessageCircle, 'help-circle': HelpCircle,
 };
 function BadgeIcon({ name, className }: { name: string; className?: string }) {
   const C = ICON_MAP[name] || Check;
@@ -534,18 +538,58 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   );
 }
 
+// Benefit tile palette — soft tinted card + a darker icon-tile, keyed by `tone`.
+const BENEFIT_TONES: Record<string, { bg: string; tile: string }> = {
+  amber:   { bg: 'bg-amber-50',  tile: 'bg-amber-100 text-amber-700' },
+  emerald: { bg: 'bg-brand-50',  tile: 'bg-brand-100 text-brand-700' },
+  rose:    { bg: 'bg-rose-50',   tile: 'bg-rose-100 text-rose-600' },
+  sky:     { bg: 'bg-sky-50',    tile: 'bg-sky-100 text-sky-700' },
+  purple:  { bg: 'bg-purple-50', tile: 'bg-purple-100 text-purple-700' },
+  slate:   { bg: 'bg-slate-50',  tile: 'bg-slate-100 text-slate-700' },
+};
+type BenefitItem = { icon?: string; tone?: string; title?: string; body?: string };
+// Back-compat: legacy benefits were plain strings → render as a title-only card.
+function normBenefit(b: string | BenefitItem): BenefitItem {
+  return typeof b === 'string' ? { icon: 'sparkles', tone: 'emerald', title: b, body: '' } : (b || {});
+}
 function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
+  const items = (config.items as (string | BenefitItem)[])
+    .map(normBenefit)
+    .filter((b) => (b.title || '').trim() !== '' || (b.body || '').trim() !== '');
+  if (!items.length) return null;
+  const lastIdx = items.length - 1;
   return (
     <section>
-      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
-      <ul className="mx-auto grid max-w-4xl gap-2.5 sm:grid-cols-2">
-        {config.items.map((b, i) => (
-          <li key={i} className="flex gap-3 rounded-xl bg-slate-50 px-4 py-3 ring-1 ring-slate-100">
-            <Check className="h-5 w-5 shrink-0 text-emerald-600" />
-            <RT className="text-slate-700" html={b} />
-          </li>
-        ))}
-      </ul>
+      {config.title && <RT as="h2" className="mb-6 text-center text-2xl font-extrabold text-slate-900 sm:text-3xl" html={config.title} />}
+      <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {items.map((b, i) => {
+          const featured = i === lastIdx && items.length > 1;
+          const tone = BENEFIT_TONES[b.tone || 'emerald'] ?? BENEFIT_TONES.emerald;
+          // Featured = wide dark card, icon on the left (mirrors the reference).
+          if (featured) {
+            return (
+              <div key={i} className="flex items-center gap-5 rounded-2xl bg-brand-700 p-6 text-white shadow-sm sm:col-span-2 lg:col-span-2">
+                <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                  <BadgeIcon name={b.icon || 'sparkles'} className="h-7 w-7 text-white" />
+                </div>
+                <div>
+                  {b.title && <RT as="h3" className="text-lg font-bold leading-snug" html={b.title} />}
+                  {b.body && <RT as="p" className="mt-1 text-sm text-white/85" html={b.body} />}
+                </div>
+              </div>
+            );
+          }
+          return (
+            <div key={i} className={`rounded-2xl ${tone.bg} p-6 ring-1 ring-black/5`}>
+              <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${tone.tile}`}>
+                <BadgeIcon name={b.icon || 'sparkles'} className="h-6 w-6" />
+              </div>
+              {b.title && <RT as="h3" className="font-bold leading-snug text-slate-900" html={b.title} />}
+              {b.body && <RT as="p" className="mt-1 text-sm text-slate-600" html={b.body} />}
+            </div>
+          );
+        })}
+      </div>
     </section>
   );
 }

@@ -488,7 +488,7 @@ export type FunnelBlockConfig = {
     bg_gradient_angle?: number;
     bg_image_url?: string | null;
   };
-  benefits: { visible: boolean; title: string; items: string[] };
+  benefits: { visible: boolean; title: string; items: (string | { icon?: string; tone?: string; title?: string; body?: string })[] };
   gallery: { visible: boolean; image_urls: string[] };
   price: { visible: boolean; note: string };
   urgency: { visible: boolean; headline: string; stock_text: string; countdown_minutes: number };
