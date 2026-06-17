@@ -476,7 +476,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   if (images.length === 1) {
     return (
       <div className="mx-auto max-w-xs">
-        <div className="relative aspect-[3/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
           <img src={images[0]} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
           <img src={images[0]} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
         </div>
@@ -494,7 +494,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
                   AND gives Embla a stable size before images load. The full
                   screenshot shows via object-contain over a blurred self-fill,
                   so nothing is cropped regardless of the upload's dimensions. */}
-              <div className="cf-card relative aspect-[3/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200 will-change-transform"
+              <div className="cf-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
                 <img src={src} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
                 <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
@@ -605,7 +605,13 @@ function Reviews({ config }: { config: FunnelBlockConfig['reviews'] }) {
   if (shots.length === 0) return null;
   return (
     <section>
-      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
+      {config.title && (
+        <div className="mb-6 text-center">
+          <RT as="h2" className="text-2xl font-extrabold text-slate-900 sm:text-3xl" html={config.title} />
+          {/* teachek-style accent underline under the section title */}
+          <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-brand-500" />
+        </div>
+      )}
       <ReviewScreenshots images={shots} />
     </section>
   );
