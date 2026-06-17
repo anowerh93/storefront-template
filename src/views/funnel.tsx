@@ -434,7 +434,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         // flattens). translateZ pushes them back; perspective does the shrinking,
         // so the scale nudge stays small. Cards stay bright; a dark shade gives the
         // Swiper-style "slideShadows" depth cue.
-        node.style.transform = `rotateY(${c * 45}deg) translateZ(${-Math.abs(c) * 90}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.05})`;
+        node.style.transform = `rotateY(${c * -45}deg) translateZ(${-Math.abs(c) * 90}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.05})`;
         node.style.opacity = '1';
         node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
         const shade = node.querySelector('.cf-shade') as HTMLElement | null;
