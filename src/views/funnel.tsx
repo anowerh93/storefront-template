@@ -351,7 +351,7 @@ function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; pro
   // (stacks on mobile). The white p-2 frame mimics the teachek-style card.
   if (split) {
     return (
-      <section className="grid items-center gap-8 lg:grid-cols-2">
+      <section className="grid items-center gap-8 lg:min-h-[560px] lg:grid-cols-2">
         <div className="text-center lg:text-left">
           {eyebrow}
           {headline}
@@ -500,8 +500,12 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
           <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
             {images.map((src, i) => (
-              <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-1/3"
+              <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-[30%]"
                    style={{ transformStyle: 'preserve-3d' }}>
+              {/* lg cards are <1/3 width so the 3 cards sit centred WITH side
+                  margin — the rotated side cards then stay fully inside the
+                  overflow-hidden window instead of being sliced flat at the
+                  edges (the earlier "cropping"). */}
               {/* aspect-ratio (not a fixed px height) keeps cards a uniform shape
                   AND gives Embla a stable size before images load. The full
                   screenshot shows via object-contain over a blurred self-fill,
