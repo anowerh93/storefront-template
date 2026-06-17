@@ -490,14 +490,13 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   }
 
   return (
-    // Full-bleed band, but the cards live in a centred max-width container so
-    // the coverflow shows exactly 3 large cards (like teachek) with margins —
-    // no edge slivers. On wide screens the carousel is capped (teachek caps the
-    // slider itself at 1224px even though its band is full width) so the 3 cards
-    // stay framed instead of spreading out; the funnel's other sections stay a
-    // narrower column.
+    // Full-bleed band, but the cards live in a centred container capped to the
+    // SAME width as every other funnel section (max-w-6xl) so the 3 cards line
+    // up flush with the hero / order form / etc. on wide screens instead of
+    // spreading wider. Full-bleed only lets the rotated side cards breathe past
+    // the column on narrower screens without clipping.
     <div className="fnl-full-bleed">
-      <div className="relative mx-auto max-w-[1224px] px-4 sm:px-6">
+      <div className="relative mx-auto max-w-6xl px-4 sm:px-6">
         <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
           <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
             {images.map((src, i) => (
