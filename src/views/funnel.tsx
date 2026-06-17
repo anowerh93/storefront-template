@@ -428,14 +428,17 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         const node = cards.current[slideIndex];
         if (!node) return;
         const d = diff * factor.current;                 // ~0 centre, ±1 neighbour
-        const c = Math.max(-2, Math.min(2, d));
-        // Match the teachek target (tuned live against it): 3 large cards, the
-        // sides kept big + bright, moderately angled — not edge-on / collapsed.
-        node.style.transform = `rotateY(${c * 33}deg) translateZ(${-Math.abs(c) * 70}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.12})`;
-        node.style.opacity = (1 - Math.min(Math.abs(d), 2) * 0.06).toFixed(3);
+        const c = Math.max(-1.6, Math.min(1.6, d));
+        // teachek look: centre card flat + upright, neighbours rotate back ~45°
+        // in REAL perspective (the slide wrapper is preserve-3d, so this no longer
+        // flattens). translateZ pushes them back; perspective does the shrinking,
+        // so the scale nudge stays small. Cards stay bright; a dark shade gives the
+        // Swiper-style "slideShadows" depth cue.
+        node.style.transform = `rotateY(${c * 45}deg) translateZ(${-Math.abs(c) * 90}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.05})`;
+        node.style.opacity = '1';
         node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
         const shade = node.querySelector('.cf-shade') as HTMLElement | null;
-        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.12).toFixed(3);
+        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.32).toFixed(3);
       });
     });
   }, []);
@@ -495,7 +498,8 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
           <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
             {images.map((src, i) => (
-              <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-1/3">
+              <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-1/3"
+                   style={{ transformStyle: 'preserve-3d' }}>
               {/* aspect-ratio (not a fixed px height) keeps cards a uniform shape
                   AND gives Embla a stable size before images load. The full
                   screenshot shows via object-contain over a blurred self-fill,
