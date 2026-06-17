@@ -429,13 +429,12 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         if (!node) return;
         const d = diff * factor.current;                 // ~0 centre, ±1 neighbour
         const c = Math.max(-2, Math.min(2, d));
-        // Match the teachek target (tuned live against it): 3 large cards, the
-        // sides kept big + bright, moderately angled — not edge-on / collapsed.
-        node.style.transform = `rotateY(${c * 33}deg) translateZ(${-Math.abs(c) * 70}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.12})`;
-        node.style.opacity = (1 - Math.min(Math.abs(d), 2) * 0.06).toFixed(3);
+        // Swiper coverflow parity: rotate=50, depth=100, scale=1, slideShadows.
+        node.style.transform = `rotateY(${c * 50}deg) translateZ(${-Math.abs(c) * 100}px)`;
+        node.style.opacity = '1';
         node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
         const shade = node.querySelector('.cf-shade') as HTMLElement | null;
-        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.12).toFixed(3);
+        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.45).toFixed(3);
       });
     });
   }, []);
@@ -492,7 +491,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
     // no edge slivers. The funnel's other sections stay a narrower column.
     <div className="fnl-full-bleed">
       <div className="relative mx-auto max-w-[1500px] px-4 sm:px-6">
-        <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
+        <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1200px' }}>
           <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
             {images.map((src, i) => (
               <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-1/3">
