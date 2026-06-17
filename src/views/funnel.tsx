@@ -428,12 +428,14 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         const node = cards.current[slideIndex];
         if (!node) return;
         const d = diff * factor.current;                 // ~0 centre, ±1 neighbour
-        const c = Math.max(-1.6, Math.min(1.6, d));
-        node.style.transform = `rotateY(${c * 45}deg) translateZ(${-Math.abs(c) * 90}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.16})`;
-        node.style.opacity = (1 - Math.min(Math.abs(d), 1.7) * 0.32).toFixed(3);
+        const c = Math.max(-2, Math.min(2, d));
+        // Keep the side cards LARGE + bright, just strongly angled (teachek's
+        // Swiper coverflow: rotate 50 / depth 100, no scale/opacity collapse).
+        node.style.transform = `rotateY(${c * 50}deg) translateZ(${-Math.abs(c) * 100}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.06})`;
+        node.style.opacity = (1 - Math.min(Math.abs(d), 2) * 0.12).toFixed(3);
         node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
         const shade = node.querySelector('.cf-shade') as HTMLElement | null;
-        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.3).toFixed(3);
+        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.18).toFixed(3);
       });
     });
   }, []);
@@ -485,16 +487,18 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   }
 
   return (
-    <div className="relative">
-      <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1600px' }}>
+    // Full-bleed so the coverflow showcases 3 large cards across, like teachek
+    // (the rest of the funnel stays a centred column).
+    <div className="fnl-full-bleed relative px-4 sm:px-6">
+      <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
         <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
           {images.map((src, i) => (
-            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[72%] cursor-grab px-2 active:cursor-grabbing sm:basis-[44%] lg:basis-[30%]">
+            <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[80%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-[48%] lg:basis-[32%] xl:basis-[27%]">
               {/* aspect-ratio (not a fixed px height) keeps cards a uniform shape
                   AND gives Embla a stable size before images load. The full
                   screenshot shows via object-contain over a blurred self-fill,
                   so nothing is cropped regardless of the upload's dimensions. */}
-              <div className="cf-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200 will-change-transform"
+              <div className="cf-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-2xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
                 <img src={src} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
                 <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
@@ -506,11 +510,11 @@ function ReviewScreenshots({ images }: { images: string[] }) {
       </div>
 
       <button type="button" aria-label="Previous reviews" onClick={() => emblaApi?.scrollPrev()}
-              className="absolute left-1 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+              className="absolute left-3 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2.5 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:bg-white sm:flex">
         <ChevronLeft className="h-5 w-5" />
       </button>
       <button type="button" aria-label="Next reviews" onClick={() => emblaApi?.scrollNext()}
-              className="absolute right-1 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2 text-slate-700 shadow ring-1 ring-slate-200 transition hover:bg-white sm:flex">
+              className="absolute right-3 top-1/2 z-[200] hidden -translate-y-1/2 items-center justify-center rounded-full bg-white/95 p-2.5 text-slate-700 shadow-lg ring-1 ring-slate-200 transition hover:bg-white sm:flex">
         <ChevronRight className="h-5 w-5" />
       </button>
     </div>
