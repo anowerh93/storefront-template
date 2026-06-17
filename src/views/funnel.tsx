@@ -603,6 +603,68 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
   );
 }
 
+/* Static 3-card perspective showcase — always displays up to 3 images
+   simultaneously in a 3D fan (the "second design" option). No carousel;
+   the side cards are permanently rotated back in perspective, framing
+   the centre. Cards clip cleanly at viewport edges — this is intentional
+   (matches the teachek-style full-bleed fan look on mobile). */
+function ReviewShowcase({ images }: { images: string[] }) {
+  const shown = images.slice(0, 3);
+  if (!shown.length) return null;
+
+  if (shown.length === 1) {
+    return (
+      <div className="mx-auto max-w-xs">
+        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
+          <img src={shown[0]} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+          <img src={shown[0]} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
+        </div>
+      </div>
+    );
+  }
+
+  type Slot = { src: string; w: string; t: string; rot: number; scale: number; op: number; z: number };
+  const slots: Slot[] = shown.length === 2
+    ? [
+        { src: shown[0], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(calc(-1 * clamp(110px, 16vw, 175px)))', rot:  28, scale: 0.84, op: 0.88, z: 1 },
+        { src: shown[1], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(clamp(110px, 16vw, 175px))',             rot: -28, scale: 0.84, op: 0.88, z: 1 },
+      ]
+    : [
+        { src: shown[0], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(calc(-1 * clamp(140px, 20vw, 235px)))', rot:  38, scale: 0.80, op: 0.85, z: 1 },
+        { src: shown[1], w: 'clamp(165px, 38vw, 275px)', t: 'translateX(0)',                                     rot:   0, scale: 1.00, op: 1.00, z: 3 },
+        { src: shown[2], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(clamp(140px, 20vw, 235px))',             rot: -38, scale: 0.80, op: 0.85, z: 1 },
+      ];
+
+  return (
+    <div className="fnl-full-bleed overflow-hidden">
+      <div
+        className="relative flex items-center justify-center py-8"
+        style={{ perspective: '1100px', height: 'min(72vw, 420px)' }}
+      >
+        {slots.map((sl, idx) => (
+          <div
+            key={idx}
+            style={{
+              position: 'absolute',
+              width: sl.w,
+              transform: `${sl.t} rotateY(${sl.rot}deg) scale(${sl.scale})`,
+              zIndex: sl.z,
+              opacity: sl.op,
+            }}
+          >
+            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-2xl ring-1 ring-slate-200">
+              <img src={sl.src} aria-hidden="true" draggable={false}
+                   className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+              <img src={sl.src} alt={`Review ${idx + 1}`} loading="lazy" draggable={false}
+                   className="relative z-[1] h-full w-full object-contain" />
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 // Funnel reviews = the curated screenshot carousel ONLY. The product's catalog
 // text reviews are deliberately NOT shown here — a funnel is a single-product ad
 // lander, and pulling in generic store reviews (often unrelated to this product)
@@ -619,7 +681,9 @@ function Reviews({ config }: { config: FunnelBlockConfig['reviews'] }) {
           <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-brand-500" />
         </div>
       )}
-      <ReviewScreenshots images={shots} />
+      {config.layout === 'showcase'
+        ? <ReviewShowcase images={shots} />
+        : <ReviewScreenshots images={shots} />}
     </section>
   );
 }
