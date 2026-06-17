@@ -494,7 +494,7 @@ export type FunnelBlockConfig = {
   urgency: { visible: boolean; headline: string; stock_text: string; countdown_minutes: number };
   order_form: { visible: boolean; heading: string; button_label: string };
   why_us: { visible: boolean; title: string; items: { title: string; body: string }[] };
-  reviews: { visible: boolean; title: string; screenshot_urls?: string[]; layout?: string };
+  reviews: { visible: boolean; title: string; screenshot_urls?: string[] };
   faq: { visible: boolean; items: { q: string; a: string }[] };
   trust_badges: { visible: boolean; items: { icon: string; title: string }[] };
 };

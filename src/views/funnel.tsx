@@ -429,12 +429,13 @@ function ReviewScreenshots({ images }: { images: string[] }) {
         if (!node) return;
         const d = diff * factor.current;                 // ~0 centre, ±1 neighbour
         const c = Math.max(-2, Math.min(2, d));
-        // Swiper coverflow parity: rotate=50, depth=100, scale=1, slideShadows.
-        node.style.transform = `rotateY(${c * 50}deg) translateZ(${-Math.abs(c) * 100}px)`;
-        node.style.opacity = '1';
+        // Match the teachek target (tuned live against it): 3 large cards, the
+        // sides kept big + bright, moderately angled — not edge-on / collapsed.
+        node.style.transform = `rotateY(${c * 33}deg) translateZ(${-Math.abs(c) * 70}px) scale(${1 - Math.min(Math.abs(d), 1) * 0.12})`;
+        node.style.opacity = (1 - Math.min(Math.abs(d), 2) * 0.06).toFixed(3);
         node.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
         const shade = node.querySelector('.cf-shade') as HTMLElement | null;
-        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.45).toFixed(3);
+        if (shade) shade.style.opacity = (Math.min(Math.abs(d), 1) * 0.12).toFixed(3);
       });
     });
   }, []);
@@ -491,7 +492,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
     // no edge slivers. The funnel's other sections stay a narrower column.
     <div className="fnl-full-bleed">
       <div className="relative mx-auto max-w-[1500px] px-4 sm:px-6">
-        <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1200px' }}>
+        <div className="overflow-hidden" ref={emblaRef} style={{ perspective: '1300px' }}>
           <div className="flex" style={{ transformStyle: 'preserve-3d' }}>
             {images.map((src, i) => (
               <div key={i} className="relative min-w-0 shrink-0 grow-0 basis-[82%] cursor-grab px-2.5 active:cursor-grabbing sm:basis-1/2 lg:basis-1/3">
@@ -602,68 +603,6 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
   );
 }
 
-/* Static 3-card perspective showcase — always displays up to 3 images
-   simultaneously in a 3D fan (the "second design" option). No carousel;
-   the side cards are permanently rotated back in perspective, framing
-   the centre. Cards clip cleanly at viewport edges — this is intentional
-   (matches the teachek-style full-bleed fan look on mobile). */
-function ReviewShowcase({ images }: { images: string[] }) {
-  const shown = images.slice(0, 3);
-  if (!shown.length) return null;
-
-  if (shown.length === 1) {
-    return (
-      <div className="mx-auto max-w-xs">
-        <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
-          <img src={shown[0]} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
-          <img src={shown[0]} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
-        </div>
-      </div>
-    );
-  }
-
-  type Slot = { src: string; w: string; t: string; rot: number; scale: number; op: number; z: number };
-  const slots: Slot[] = shown.length === 2
-    ? [
-        { src: shown[0], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(calc(-1 * clamp(110px, 16vw, 175px)))', rot:  28, scale: 0.84, op: 0.88, z: 1 },
-        { src: shown[1], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(clamp(110px, 16vw, 175px))',             rot: -28, scale: 0.84, op: 0.88, z: 1 },
-      ]
-    : [
-        { src: shown[0], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(calc(-1 * clamp(140px, 20vw, 235px)))', rot:  38, scale: 0.80, op: 0.85, z: 1 },
-        { src: shown[1], w: 'clamp(165px, 38vw, 275px)', t: 'translateX(0)',                                     rot:   0, scale: 1.00, op: 1.00, z: 3 },
-        { src: shown[2], w: 'clamp(130px, 30vw, 215px)', t: 'translateX(clamp(140px, 20vw, 235px))',             rot: -38, scale: 0.80, op: 0.85, z: 1 },
-      ];
-
-  return (
-    <div className="fnl-full-bleed overflow-hidden">
-      <div
-        className="relative flex items-center justify-center py-8"
-        style={{ perspective: '1100px', height: 'min(72vw, 420px)' }}
-      >
-        {slots.map((sl, idx) => (
-          <div
-            key={idx}
-            style={{
-              position: 'absolute',
-              width: sl.w,
-              transform: `${sl.t} rotateY(${sl.rot}deg) scale(${sl.scale})`,
-              zIndex: sl.z,
-              opacity: sl.op,
-            }}
-          >
-            <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-2xl ring-1 ring-slate-200">
-              <img src={sl.src} aria-hidden="true" draggable={false}
-                   className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
-              <img src={sl.src} alt={`Review ${idx + 1}`} loading="lazy" draggable={false}
-                   className="relative z-[1] h-full w-full object-contain" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
 // Funnel reviews = the curated screenshot carousel ONLY. The product's catalog
 // text reviews are deliberately NOT shown here — a funnel is a single-product ad
 // lander, and pulling in generic store reviews (often unrelated to this product)
@@ -680,9 +619,7 @@ function Reviews({ config }: { config: FunnelBlockConfig['reviews'] }) {
           <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-brand-500" />
         </div>
       )}
-      {config.layout === 'showcase'
-        ? <ReviewShowcase images={shots} />
-        : <ReviewScreenshots images={shots} />}
+      <ReviewScreenshots images={shots} />
     </section>
   );
 }
