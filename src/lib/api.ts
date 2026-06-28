@@ -34,15 +34,20 @@
  */
 
 import type {
+  AccountOrderSummary,
   BlogPostCard,
   BlogPostDetail,
   Category,
   CreateOrderInput,
+  Customer,
+  CustomerAuthResponse,
   FunnelData,
+  LoginCustomerInput,
   OrderResponse,
   Paginated,
   ProductCard,
   ProductDetail,
+  RegisterCustomerInput,
   ServiceCard,
   ServiceDetail,
   StorefrontMeta,
@@ -376,4 +381,201 @@ export async function submitLead(input: CreateLeadInput): Promise<{ ok: boolean 
     throw new Error(msg);
   }
   return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
+// Customer accounts (Phase 1) — bearer-token auth, browser-only
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Token is scoped to THIS tenant's slug so the same browser visiting two
+ * Reply.BD storefronts (rare, but possible on a shared device) never leaks one
+ * tenant's token to another. localStorage is per-origin already, but the slug
+ * key is belt-and-suspenders and keeps the contract explicit.
+ */
+const TOKEN_KEY = `sf_token_${STOREFRONT_SLUG}`;
+
+/** SSR-safe: there's no `window`/`localStorage` during Astro build or on the edge. */
+function hasStorage(): boolean {
+  return typeof window !== 'undefined' && typeof window.localStorage !== 'undefined';
+}
+
+export function getToken(): string | null {
+  if (!hasStorage()) return null;
+  try {
+    return window.localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token: string): void {
+  if (!hasStorage()) return;
+  try {
+    window.localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // private-mode / quota — nothing we can do; the session just won't persist.
+  }
+}
+
+export function clearToken(): void {
+  if (!hasStorage()) return;
+  try {
+    window.localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
+/** Thrown when an authed request comes back 401 — the caller redirects to /login. */
+export class UnauthenticatedError extends Error {
+  constructor(message = 'Your session has expired. Please log in again.') {
+    super(message);
+    this.name = 'UnauthenticatedError';
+  }
+}
+
+/**
+ * Authenticated browser fetch. Adds the bearer token, skips all caching (every
+ * call is per-customer, live data), and parses defensively the same way as
+ * submitOrder. On 401 it clears the stored token and throws
+ * UnauthenticatedError so the caller can bounce to /login.
+ */
+async function authFetch<T>(
+  path: string,
+  options: { method?: string; body?: unknown; params?: Record<string, string | number | undefined> } = {},
+): Promise<T> {
+  const token = getToken();
+  if (!token) throw new UnauthenticatedError('You are not logged in.');
+
+  const url = buildUrl(path, options.params);
+  const res = await fetch(url, {
+    method: options.method ?? 'GET',
+    headers: {
+      Accept: 'application/json',
+      Authorization: `Bearer ${token}`,
+      ...(options.body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+    },
+    body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    cache: 'no-store',
+  });
+
+  if (res.status === 401) {
+    clearToken();
+    throw new UnauthenticatedError();
+  }
+
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg = json?.error?.message ?? json?.message ?? 'Something went wrong. Please try again.';
+    throw new Error(msg);
+  }
+  // `unwrap: false` style handled by the caller — return the whole envelope so
+  // list endpoints can read `meta` too.
+  return json as T;
+}
+
+/**
+ * Unwraps Laravel's `{ data, error }` envelope for the customer auth endpoints,
+ * surfacing `error.code` on the thrown Error (so callers can branch on
+ * 'account_exists' / 'invalid_credentials' / 'password_required') and applying
+ * the same defensive JSON parse as submitOrder.
+ */
+export class ApiError extends Error {
+  code?: string;
+  status: number;
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+  }
+}
+
+async function postAuth<T>(
+  path: string,
+  body: Record<string, unknown>,
+  turnstileToken?: string,
+): Promise<T> {
+  const url = buildUrl(path);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(turnstileToken ? { 'cf-turnstile-response': turnstileToken } : {}),
+    },
+    body: JSON.stringify(body),
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const code: string | undefined = json?.error?.code;
+    const msg =
+      json?.error?.message ??
+      json?.message ??
+      // Laravel validation errors → first field message.
+      (json?.errors ? Object.values(json.errors).flat()[0] : undefined) ??
+      'Something went wrong. Please try again.';
+    throw new ApiError(String(msg), res.status, code);
+  }
+  return (json?.data ?? json) as T;
+}
+
+export function registerCustomer(input: RegisterCustomerInput): Promise<CustomerAuthResponse> {
+  return postAuth<CustomerAuthResponse>(
+    '/customer/register',
+    {
+      name: input.name,
+      phone: input.phone,
+      email: input.email || undefined,
+      password: input.password,
+    },
+    input.cf_turnstile_response,
+  );
+}
+
+export function loginCustomer(input: LoginCustomerInput): Promise<CustomerAuthResponse> {
+  return postAuth<CustomerAuthResponse>(
+    '/customer/login',
+    { identifier: input.identifier, password: input.password },
+    input.cf_turnstile_response,
+  );
+}
+
+/**
+ * Log out: best-effort token revocation server-side, then always clear the
+ * local token (so a network failure still logs the customer out of this
+ * device). Never throws — logout should always "work" from the user's view.
+ */
+export async function logoutCustomer(): Promise<void> {
+  const token = getToken();
+  if (token) {
+    try {
+      await authFetch('/customer/logout', { method: 'POST', body: {} });
+    } catch {
+      // ignore — clearing the local token below is what matters.
+    }
+  }
+  clearToken();
+}
+
+export async function getAccount(): Promise<Customer> {
+  const json = await authFetch<{ data: Customer }>('/customer/me');
+  return json.data;
+}
+
+export async function getMyOrders(page?: number): Promise<Paginated<AccountOrderSummary>> {
+  const json = await authFetch<Paginated<AccountOrderSummary>>('/customer/orders', {
+    params: { page },
+  });
+  // The list envelope already carries { data, meta } — return as-is.
+  return json;
+}
+
+export async function getMyOrder(orderNumber: string): Promise<OrderResponse> {
+  const json = await authFetch<{ data: OrderResponse }>(
+    `/customer/orders/${encodeURIComponent(orderNumber)}`,
+  );
+  return json.data;
 }

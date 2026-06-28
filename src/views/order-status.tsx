@@ -1,25 +1,14 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, Package, Truck, MessageCircle, Loader2 } from 'lucide-react';
-import { lookupOrder } from '../lib/api';
-import { formatBDT, relativeTime } from '../lib/format';
+import { CheckCircle2, MessageCircle, Loader2 } from 'lucide-react';
+import { lookupOrder, getToken, getMyOrder, UnauthenticatedError } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
-import { Badge } from '../components/ui/badge';
 import { Button } from '../components/ui/button';
-import { Separator } from '../components/ui/separator';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
+import { OrderDetail } from '../components/order/order-detail';
 import { NotFoundPage } from './not-found';
 import type { OrderResponse, StorefrontMeta } from '../lib/types';
-
-const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'brand' }> = {
-  pending:   { label: 'Order received',  variant: 'brand' },
-  on_hold:   { label: 'Awaiting confirmation', variant: 'warning' },
-  confirmed: { label: 'Confirmed',       variant: 'brand' },
-  shipped:   { label: 'On the way',      variant: 'brand' },
-  delivered: { label: 'Delivered',       variant: 'success' },
-  cancelled: { label: 'Cancelled',       variant: 'default' },
-};
 
 /**
  * Astro+CF port: previously did its own `await getStorefront()` +
@@ -29,37 +18,68 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'succe
  * it to the client also lets us show a loading state while the request
  * runs, and avoids the "order placed but page 404s because lookup race"
  * window right after submit.
+ *
+ * The order card itself is rendered by the shared <OrderDetail> component so
+ * the logged-in account view (which fetches via the bearer-token endpoint)
+ * shows the exact same UI.
  */
 export function OrderStatusPage({
   orderNumber,
   phone,
   placed,
+  accountExists,
   meta,
 }: {
   orderNumber: string;
   phone?: string;
   placed?: boolean;
+  /** Set when the customer ticked "Create an account?" but the phone already
+   *  had one — show a subtle "log in to track all your orders" nudge. */
+  accountExists?: boolean;
   meta: StorefrontMeta | null;
 }) {
   const [order, setOrder] = useState<OrderResponse | null>(null);
-  const [loading, setLoading] = useState<boolean>(Boolean(phone));
+  // A logged-in customer can view the order WITHOUT a phone (the account
+  // session is the identity proof) — resolved on the client below.
+  const [authed, setAuthed] = useState<boolean>(typeof window !== 'undefined' && Boolean(getToken()));
+  const [loading, setLoading] = useState<boolean>(Boolean(phone) || authed);
   const [notFound, setNotFound] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!phone) return;
     let cancelled = false;
-    setLoading(true);
-    lookupOrder(orderNumber, phone)
-      .then((res) => { if (!cancelled) setOrder(res); })
-      .catch(() => { if (!cancelled) setNotFound(true); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+
+    // Guest path: look up by phone last-4. Account path: a logged-in customer
+    // with no phone param fetches their own order via the bearer-token
+    // endpoint. (A phone param always takes precedence — it's the guest
+    // success-redirect shape and works even for logged-in customers.)
+    if (phone) {
+      setLoading(true);
+      lookupOrder(orderNumber, phone)
+        .then((res) => { if (!cancelled) setOrder(res); })
+        .catch(() => { if (!cancelled) setNotFound(true); })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    } else if (authed) {
+      setLoading(true);
+      getMyOrder(orderNumber)
+        .then((res) => { if (!cancelled) setOrder(res); })
+        .catch((err) => {
+          if (cancelled) return;
+          // Token died mid-session → drop the authed flag so we fall through
+          // to the guest lookup form instead of a hard 404.
+          if (err instanceof UnauthenticatedError) { setAuthed(false); setLoading(false); return; }
+          setNotFound(true);
+        })
+        .finally(() => { if (!cancelled) setLoading(false); });
+    }
+
     return () => { cancelled = true; };
-  }, [orderNumber, phone]);
+  }, [orderNumber, phone, authed]);
 
   if (!meta) return <NotFoundPage />;
 
-  // No phone → render the lookup form (the customer needs to verify identity).
-  if (!phone) {
+  // Guest with no phone → render the lookup form (identity verification).
+  // A logged-in customer skips this (handled by the authed fetch above).
+  if (!phone && !authed) {
     return (
       <>
         <Header meta={meta} />
@@ -90,18 +110,12 @@ export function OrderStatusPage({
     return <NotFoundPage />;
   }
 
-  // Below this point: original render path with `order` available.
-  const searchParams = { placed: placed ? '1' : undefined };
-
-  const justPlaced = searchParams.placed === '1';
-  const statusInfo = STATUS_LABELS[order.status] ?? { label: order.status, variant: 'default' as const };
-
   return (
     <>
       <Header meta={meta} />
 
       <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10">
-        {justPlaced && (
+        {placed && (
           <div className="rounded-2xl bg-brand-50 border border-brand-200 p-5 mb-6 flex items-start gap-3">
             <CheckCircle2 className="h-6 w-6 text-brand-600 shrink-0" />
             <div>
@@ -113,50 +127,15 @@ export function OrderStatusPage({
           </div>
         )}
 
-        <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6">
-          <div className="flex items-center justify-between mb-1">
-            <h1 className="text-2xl font-bold text-slate-900">Order #{order.order_number}</h1>
-            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
+        {accountExists && (
+          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-600">
+            You already have an account —{' '}
+            <a href="/login" className="font-semibold text-brand-600 hover:underline">log in</a>{' '}
+            to track all your orders in one place.
           </div>
-          <p className="text-xs text-slate-500 mb-5">Placed {order.placed_at ? relativeTime(order.placed_at) : ''}</p>
+        )}
 
-          {/* Status timeline (simple) */}
-          <div className="grid grid-cols-3 gap-2 mb-6 text-xs">
-            <TimelineStep icon={CheckCircle2} label="Confirmed" active={['confirmed','shipped','delivered'].includes(order.status)} />
-            <TimelineStep icon={Package} label="Shipped" active={['shipped','delivered'].includes(order.status)} />
-            <TimelineStep icon={Truck} label="Delivered" active={order.status === 'delivered'} />
-          </div>
-
-          <Separator className="my-5" />
-
-          <h3 className="font-semibold text-slate-900 mb-3 text-sm">Items</h3>
-          <ul className="space-y-3 mb-5">
-            {(order.items ?? []).map((it, i) => (
-              <li key={i} className="flex gap-3 text-sm">
-                <div className="flex-1">
-                  <p className="font-medium text-slate-900">{it.product_name}</p>
-                  {it.variant && <p className="text-xs text-slate-500">{it.variant}</p>}
-                  <p className="text-xs text-slate-500">Qty: {it.quantity} × {formatBDT(it.unit_price, { currency: order.currency })}</p>
-                </div>
-                <span className="font-semibold text-slate-900 shrink-0">{formatBDT(it.subtotal, { currency: order.currency })}</span>
-              </li>
-            ))}
-          </ul>
-
-          <Separator />
-
-          <div className="space-y-1.5 text-sm pt-4">
-            <div className="flex justify-between text-slate-600">
-              <span>Subtotal</span><span>{formatBDT(order.subtotal, { currency: order.currency })}</span>
-            </div>
-            <div className="flex justify-between text-slate-600">
-              <span>Shipping</span><span>{order.shipping_fee === 0 ? 'Free' : formatBDT(order.shipping_fee, { currency: order.currency })}</span>
-            </div>
-            <div className="flex justify-between text-base font-bold text-slate-900 pt-1">
-              <span>Total</span><span>{formatBDT(order.total, { currency: order.currency })}</span>
-            </div>
-          </div>
-        </div>
+        <OrderDetail order={order} />
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
           {meta.messenger?.url && (
@@ -176,14 +155,5 @@ export function OrderStatusPage({
       <Footer meta={meta} />
       <MessengerCTA href={meta.messenger?.url ?? null} />
     </>
-  );
-}
-
-function TimelineStep({ icon: Icon, label, active }: { icon: React.ComponentType<{ className?: string }>; label: string; active: boolean }) {
-  return (
-    <div className={`flex flex-col items-center gap-1.5 p-3 rounded-xl ${active ? 'bg-brand-50 text-brand-700' : 'bg-slate-50 text-slate-400'}`}>
-      <Icon className="h-5 w-5" />
-      <span className="font-medium">{label}</span>
-    </div>
   );
 }

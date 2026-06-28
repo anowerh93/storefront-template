@@ -1,9 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { ChevronDown, MapPin, Menu, Search, User, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ChevronDown, MapPin, Menu, Search, User, UserCircle, X } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
-import { Button } from '../ui/button';
+import { getToken } from '../../lib/api';
 
 /**
  * Two-row header inspired by the Omerce design:
@@ -22,6 +22,13 @@ export function Header({
 }) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [catsOpen, setCatsOpen] = useState(false);
+  // Token lives in localStorage (client-only) — read it AFTER mount so the
+  // SSR'd/static HTML and the first client render agree (no hydration
+  // mismatch). Defaults to logged-out; flips to logged-in once we've checked.
+  const [loggedIn, setLoggedIn] = useState(false);
+  useEffect(() => { setLoggedIn(Boolean(getToken())); }, []);
+  const accountHref = loggedIn ? '/account' : '/login';
+  const accountLabel = loggedIn ? 'My Account' : 'Login';
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
@@ -116,6 +123,19 @@ export function Header({
                 </div>
               </a>
 
+              {/* Account: "Login" for guests, "My Account" once a token is
+                  present. Token-aware affordance — see the mount effect above. */}
+              <a
+                href={accountHref}
+                className="hidden md:flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-slate-50 text-sm"
+              >
+                <UserCircle className="h-5 w-5 text-slate-600" />
+                <div className="text-left hidden xl:block">
+                  <div className="text-[10px] text-slate-500 leading-none">{loggedIn ? 'Account' : 'Sign in'}</div>
+                  <div className="text-xs font-semibold text-slate-900">{accountLabel}</div>
+                </div>
+              </a>
+
               <button
                 onClick={() => setMobileOpen((v) => !v)}
                 className="md:hidden p-2 rounded-lg hover:bg-slate-100"
@@ -200,6 +220,7 @@ export function Header({
           <a onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</a>
           {meta.has_blog && <a onClick={() => setMobileOpen(false)} href="/blog" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Blog</a>}
           <a onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</a>
+          <a onClick={() => setMobileOpen(false)} href={accountHref} className="block px-3 py-2 rounded-lg hover:bg-slate-100 font-semibold text-brand-700">{accountLabel}</a>
         </div>
       )}
     </header>

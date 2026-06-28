@@ -554,6 +554,12 @@ export type CreateOrderInput = {
   funnel_url?: string;
   // Cloudflare Turnstile token from the widget
   cf_turnstile_response?: string;
+  // Phase 1 customer accounts (opt-in at checkout): when create_account is set
+  // the API also provisions an account from the order and returns a token in
+  // `OrderResponse.customer`. Requires `password` (min 6) — a 422 with
+  // error.code === 'password_required' comes back if it's missing.
+  create_account?: boolean;
+  password?: string;
 };
 
 export type OrderResponse = {
@@ -567,6 +573,11 @@ export type OrderResponse = {
   // From POST /orders:
   message?: string;
   duplicate?: boolean;
+  // Phase 1: present when the order was placed with `create_account: true`.
+  // `customer.token` → auto-login the new account. `account_exists: true` means
+  // the phone already has an account (no token issued) — invite them to log in.
+  customer?: { token: string; id: number; name: string; phone: string; email: string | null };
+  account_exists?: boolean;
   // From GET /orders/{number}:
   placed_at?: string;
   customer_name?: string;
@@ -579,4 +590,55 @@ export type OrderResponse = {
     unit_price: number;
     subtotal: number;
   }[];
+};
+
+// ──────────────────────────────────────────────────────────────
+// Customer accounts (Phase 1) — POST /customer/* + GET /customer/*
+// ──────────────────────────────────────────────────────────────
+
+/** The authenticated customer (GET /customer/me, login/register payloads). */
+export type Customer = {
+  id: number;
+  name: string;
+  phone: string;
+  email: string | null;
+  /** Only present on GET /customer/me. */
+  email_verified?: boolean;
+  created_at?: string;
+};
+
+export type RegisterCustomerInput = {
+  name: string;
+  phone: string;
+  email?: string | null;
+  password: string;
+  /** Cloudflare Turnstile token — sent via the cf-turnstile-response header. */
+  cf_turnstile_response?: string;
+};
+
+export type LoginCustomerInput = {
+  /** Phone OR email. */
+  identifier: string;
+  password: string;
+  /** Cloudflare Turnstile token — sent via the cf-turnstile-response header. */
+  cf_turnstile_response?: string;
+};
+
+/** Result of register/login — token to persist + the customer. */
+export type CustomerAuthResponse = {
+  token: string;
+  customer: Customer;
+  /** register only: orders auto-linked to the new account by matching phone. */
+  claimed_orders?: number;
+};
+
+/** A row in the account order history (GET /customer/orders). */
+export type AccountOrderSummary = {
+  order_number: string;
+  status: string;
+  status_label: string;
+  placed_at: string | null;
+  total: number;
+  currency: string;
+  item_count: number;
 };

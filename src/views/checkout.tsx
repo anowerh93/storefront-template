@@ -2,9 +2,9 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ShoppingCart, Truck, Minus, Plus } from 'lucide-react';
+import { ShoppingCart, Truck, Minus, Plus, UserPlus } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
-import { submitOrder } from '../lib/api';
+import { submitOrder, setToken } from '../lib/api';
 import { formatBDT } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
@@ -29,6 +29,18 @@ const schema = z.object({
   customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
   shipping_zone:    z.string().min(1, 'Choose a delivery area'),
   notes:            z.string().max(500).optional(),
+  // Phase 1 opt-in account creation. Password is only required (min 6) when
+  // the "Create an account?" box is ticked — guest checkout is unaffected.
+  create_account:   z.boolean().optional(),
+  password:         z.string().optional(),
+}).superRefine((val, ctx) => {
+  if (val.create_account && (val.password ?? '').length < 6) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['password'],
+      message: 'Minimum 6 characters',
+    });
+  }
 });
 type FormData = z.infer<typeof schema>;
 
@@ -46,11 +58,13 @@ export function CheckoutPage({
   const [qty, setQty] = useState(Math.max(1, initialQty || 1));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Phase 1: opt-in account creation at checkout.
+  const [createAccount, setCreateAccount] = useState(false);
 
   const zones = meta?.shipping?.zones ?? [];
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
-    defaultValues: { shipping_zone: zones[0]?.code ?? '' },
+    defaultValues: { shipping_zone: zones[0]?.code ?? '', create_account: false },
   });
 
   // Empty / not-found state.
@@ -102,6 +116,9 @@ export function CheckoutPage({
         variant_index:  variant ? variant.index : null,
         quantity:       qty,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+        // Only sent when the box is ticked → guest checkout is byte-for-byte
+        // unchanged when it isn't.
+        ...(values.create_account ? { create_account: true, password: values.password } : {}),
       });
       pixel.purchase({
         orderNumber: order.order_number,
@@ -109,9 +126,25 @@ export function CheckoutPage({
         numItems: qty,
         contentIds: [product.id.toString()],
       });
-      window.location.href = `/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
+      // Account provisioned alongside the order → auto-login by storing the
+      // token, so the customer can reach /account straight away. If the phone
+      // already had an account (account_exists), no token comes back — we pass
+      // a flag to the success page so it can nudge them to log in.
+      if (order.customer?.token) {
+        setToken(order.customer.token);
+      }
+      const acctFlag = order.account_exists && !order.customer?.token ? '&account_exists=1' : '';
+      window.location.href = `/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}${acctFlag}`;
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      // 422 password_required (create_account set without a password) — the
+      // client-side zod check normally prevents this, but surface it on the
+      // password field as a belt-and-suspenders if the server rejects.
+      if (values.create_account && /password/i.test(msg)) {
+        form.setError('password', { type: 'server', message: 'Minimum 6 characters' });
+      } else {
+        setError(msg);
+      }
       setSubmitting(false);
     }
   }
@@ -155,6 +188,46 @@ export function CheckoutPage({
                 <div>
                   <Label htmlFor="co-notes">Order Notes <span className="font-normal text-slate-400">(optional)</span></Label>
                   <Textarea id="co-notes" placeholder="Special notes for delivery, etc." {...form.register('notes')} className="mt-1.5" />
+                </div>
+
+                {/* ── Opt-in account creation ── */}
+                <div className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <label htmlFor="co-create-account" className="flex cursor-pointer items-start gap-3">
+                    <input
+                      id="co-create-account"
+                      type="checkbox"
+                      className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+                      {...form.register('create_account', {
+                        onChange: (e) => {
+                          setCreateAccount(e.target.checked);
+                          if (!e.target.checked) form.clearErrors('password');
+                        },
+                      })}
+                    />
+                    <span>
+                      <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-900">
+                        <UserPlus className="h-4 w-4 text-brand-600" /> Create an account?
+                      </span>
+                      <span className="mt-0.5 block text-xs text-slate-500">
+                        Track all your orders in one place — no need to enter your phone next time.
+                      </span>
+                    </span>
+                  </label>
+
+                  {createAccount && (
+                    <div className="mt-3">
+                      <Label htmlFor="co-password">Password <span className="text-rose-500">*</span></Label>
+                      <Input
+                        id="co-password"
+                        type="password"
+                        placeholder="Minimum 6 characters"
+                        autoComplete="new-password"
+                        {...form.register('password')}
+                        className="mt-1.5"
+                      />
+                      {form.formState.errors.password && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.password.message}</p>}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
