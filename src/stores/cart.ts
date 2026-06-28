@@ -47,15 +47,22 @@ interface CartState {
   clear: () => void;
 }
 
+/** The API caps a single product line at 20 units (StorefrontOrderController).
+ *  Mirror it client-side so a stepper never builds a line the server rejects. */
+export const MAX_LINE_QTY = 20;
+
+/** Effective per-line ceiling: the lesser of tracked stock and MAX_LINE_QTY
+ *  (null/0 stock = unlimited, so just the cap). Shared by every qty stepper. */
+export const lineCeiling = (maxStock: number | null): number =>
+  maxStock != null && maxStock > 0 ? Math.min(maxStock, MAX_LINE_QTY) : MAX_LINE_QTY;
+
 /** A cart line is identified by the (product_id, variant_index) pair. */
 const sameLine = (l: CartLine, productId: number, variantIndex: number | null): boolean =>
   l.product_id === productId && (l.variant_index ?? null) === (variantIndex ?? null);
 
-/** Clamp to >= 1 and (when tracked) <= max_stock. */
-const clampQty = (qty: number, max: number | null): number => {
-  const q = Math.max(1, Math.floor(qty));
-  return max != null && max > 0 ? Math.min(q, max) : q;
-};
+/** Clamp to >= 1 and <= the per-line ceiling (stock and the 20-unit cap). */
+const clampQty = (qty: number, max: number | null): number =>
+  Math.min(Math.max(1, Math.floor(qty)), lineCeiling(max));
 
 // SSR-safe storage: no window/localStorage during build or on the edge.
 const noopStorage: StateStorage = {

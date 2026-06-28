@@ -7,7 +7,7 @@ import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { FitImage } from '../components/ui/fit-image';
 import { NotFoundPage } from './not-found';
-import { useCart } from '../stores/cart';
+import { useCart, lineCeiling } from '../stores/cart';
 import { pixel } from '../lib/pixel';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
@@ -245,8 +245,8 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
               <span className="w-10 text-center text-sm font-semibold tabular-nums">{qty}</span>
               <button
                 type="button"
-                onClick={() => setQty((q) => (maxStock != null && maxStock > 0 ? Math.min(maxStock, q + 1) : q + 1))}
-                disabled={maxStock != null && maxStock > 0 && qty >= maxStock}
+                onClick={() => setQty((q) => Math.min(lineCeiling(maxStock), q + 1))}
+                disabled={qty >= lineCeiling(maxStock)}
                 aria-label="Increase quantity"
                 className="px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
               >

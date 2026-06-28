@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 import { submitOrder, setToken } from '../lib/api';
-import { useCart, useCartHydrated, type CartLine } from '../stores/cart';
+import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
@@ -59,11 +59,16 @@ export function CheckoutPage({
   meta,
   variantIndex,
   qty: initialQty,
+  expressAttempt = false,
 }: {
   product: ProductDetail | null;
   meta: StorefrontMeta | null;
   variantIndex: number | null;
   qty: number;
+  /** True when the URL carried ?p= (a "buy now"), even if the product fetch
+   *  failed — lets us show "Nothing to check out" instead of silently showing
+   *  the persisted cart for an express click. */
+  expressAttempt?: boolean;
 }) {
   const isExpress = !!product;
 
@@ -87,7 +92,12 @@ export function CheckoutPage({
   // Express mode → one in-memory line derived from the product/variant/qty.
   const expressLine = useMemo<CartLine | null>(() => {
     if (!product) return null;
-    const variant = (variantIndex != null ? product.variants[variantIndex] : null) ?? product.variants[0] ?? null;
+    // Resolve by the variant's stable `.index` (what the PDP puts in ?v=), NOT
+    // by array position — they differ for a non-sequential variants array.
+    const variant =
+      (variantIndex != null ? product.variants.find((v) => v.index === variantIndex) : null) ??
+      product.variants[0] ??
+      null;
     return {
       product_id:    product.id,
       slug:          product.slug,
@@ -105,7 +115,10 @@ export function CheckoutPage({
   const lines: CartLine[] = isExpress ? (expressLine ? [expressLine] : []) : cartItems;
 
   // ── Empty / loading states ──
-  if (!meta || (isExpress && !product)) {
+  // An express attempt whose product failed to load shows "Nothing to check
+  // out" — NOT cart mode (which would surface the shopper's persisted cart for
+  // a buy-now click).
+  if (!meta || (expressAttempt && !product)) {
     return (
       <>
         {meta && <Header meta={meta} />}
@@ -166,7 +179,7 @@ export function CheckoutPage({
 
   // Express mode edits a local qty; cart mode writes through to the store.
   function changeQty(line: CartLine, next: number) {
-    const clamped = Math.max(1, line.max_stock != null && line.max_stock > 0 ? Math.min(line.max_stock, next) : next);
+    const clamped = Math.min(Math.max(1, next), lineCeiling(line.max_stock));
     if (isExpress) setExpressQty(clamped);
     else setCartQty(line.product_id, line.variant_index, clamped);
   }
@@ -335,7 +348,7 @@ export function CheckoutPage({
                       <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
                         <button type="button" onClick={() => changeQty(l, l.quantity - 1)} disabled={l.quantity <= 1} aria-label="Decrease quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
                         <span className="w-8 text-center text-sm font-semibold tabular-nums">{l.quantity}</span>
-                        <button type="button" onClick={() => changeQty(l, l.quantity + 1)} disabled={l.max_stock != null && l.max_stock > 0 && l.quantity >= l.max_stock} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => changeQty(l, l.quantity + 1)} disabled={l.quantity >= lineCeiling(l.max_stock)} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </li>
                   ))}

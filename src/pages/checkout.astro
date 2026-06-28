@@ -17,6 +17,11 @@ import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
 const params = Astro.url.searchParams;
 const slug = params.get('p') ?? '';
+// `?p=` present = an express "buy now" attempt. We pass this intent through so
+// the checkout island can show "Nothing to check out" if the express product
+// fetch failed, instead of silently dropping the shopper into cart mode (which
+// would show / place THEIR persisted cart for a buy-now click).
+const expressAttempt = slug !== '';
 const vRaw = parseInt(params.get('v') ?? '', 10);
 const variantIndex = Number.isNaN(vRaw) ? null : vRaw;
 const qty = Math.max(1, parseInt(params.get('q') ?? '1', 10) || 1);
@@ -37,5 +42,5 @@ const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Pro
 ---
 
 <Base title="Checkout" description="Secure checkout" meta={meta}>
-  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} />
+  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} />
 </Base>

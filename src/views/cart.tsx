@@ -1,5 +1,5 @@
 import { Loader2, Minus, Plus, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
-import { useCart, cartSubtotal, useCartHydrated } from '../stores/cart';
+import { useCart, cartSubtotal, useCartHydrated, lineCeiling } from '../stores/cart';
 import { formatBDT } from '../lib/format';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -83,7 +83,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
                         <button
                           type="button"
                           onClick={() => setQty(l.product_id, l.variant_index, l.quantity + 1)}
-                          disabled={l.max_stock != null && l.max_stock > 0 && l.quantity >= l.max_stock}
+                          disabled={l.quantity >= lineCeiling(l.max_stock)}
                           aria-label="Increase quantity"
                           className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
                         >
