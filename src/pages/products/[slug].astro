@@ -1,10 +1,10 @@
 ---
 /**
- * Product detail page — the order funnel entry point.
+ * Product detail page — the catalog entry point.
  *
- * Customers land here after clicking a product card. The OrderNowForm
- * inside submits straight to /api/v1/storefronts/{slug}/orders. No
- * separate cart page.
+ * Customers land here after clicking a product card. The buy box's
+ * "Add to Cart" stacks lines for a combined /cart → /checkout flow, while
+ * "Order Now" is an express single-item buy-now to /checkout?p=…&v=…&q=….
  *
  * Render mode: SSR on CF Workers (prerender:false). Pre-rendering each
  * PDP at build time would mean rebuilding the whole storefront every

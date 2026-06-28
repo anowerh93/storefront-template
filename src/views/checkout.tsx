@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ShoppingCart, Truck, Minus, Plus, UserPlus } from 'lucide-react';
+import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 import { submitOrder, setToken } from '../lib/api';
+import { useCart, useCartHydrated, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
@@ -17,11 +18,20 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { FitImage } from '../components/ui/fit-image';
 
 /**
- * Dedicated checkout page reached from the PDP "Order Now" button
- * (/checkout?p=slug&v=variantIndex&q=qty). Two-column "Secure Checkout"
- * layout — Billing Details on the left, Order Summary + COD + Place Order
- * on the right. Reuses the SAME zod schema + submitOrder + shipping-zone
- * logic as the inline OrderNowForm so order placement behaves identically.
+ * Checkout page with TWO entry modes, sharing one Billing form + Order Summary:
+ *
+ *  - Express "buy now": reached from the PDP "Order Now" button
+ *    (/checkout?p=slug&v=variantIndex&q=qty). checkout.astro fetches that one
+ *    product server-side and passes it as `product`; the summary is a single,
+ *    in-memory line (qty editable locally, not persisted to the cart).
+ *  - Cart mode: reached from /cart's "Proceed to Checkout" (/checkout, no
+ *    params). `product` is null; the summary is the persisted cart (qty edits
+ *    and removals write through to the store). The cart is cleared on success.
+ *
+ * Both submit ONE order with an items[] body — the server prices + re-checks
+ * stock per line and applies one order-level shipping fee on the combined
+ * subtotal. Guest checkout and the opt-in "Create an account?" both work in
+ * either mode.
  */
 const schema = z.object({
   customer_name:    z.string().min(2, 'Please enter your full name'),
@@ -55,10 +65,17 @@ export function CheckoutPage({
   variantIndex: number | null;
   qty: number;
 }) {
-  const [qty, setQty] = useState(Math.max(1, initialQty || 1));
+  const isExpress = !!product;
+
+  const hydrated = useCartHydrated();
+  const cartItems = useCart((s) => s.items);
+  const setCartQty = useCart((s) => s.setQty);
+  const removeCartLine = useCart((s) => s.removeFromCart);
+  const clearCart = useCart((s) => s.clear);
+
+  const [expressQty, setExpressQty] = useState(Math.max(1, initialQty || 1));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  // Phase 1: opt-in account creation at checkout.
   const [createAccount, setCreateAccount] = useState(false);
 
   const zones = meta?.shipping?.zones ?? [];
@@ -67,8 +84,28 @@ export function CheckoutPage({
     defaultValues: { shipping_zone: zones[0]?.code ?? '', create_account: false },
   });
 
-  // Empty / not-found state.
-  if (!meta || !product) {
+  // Express mode → one in-memory line derived from the product/variant/qty.
+  const expressLine = useMemo<CartLine | null>(() => {
+    if (!product) return null;
+    const variant = (variantIndex != null ? product.variants[variantIndex] : null) ?? product.variants[0] ?? null;
+    return {
+      product_id:    product.id,
+      slug:          product.slug,
+      name:          product.name,
+      image_url:     product.gallery_urls?.[0] ?? product.image_url ?? null,
+      variant_index: variant ? variant.index : null,
+      variant_label: variant ? variant.label : null,
+      unit_price:    variant?.price ?? product.price,
+      quantity:      expressQty,
+      max_stock:     variant ? variant.stock : null,
+      currency:      product.currency,
+    };
+  }, [product, variantIndex, expressQty]);
+
+  const lines: CartLine[] = isExpress ? (expressLine ? [expressLine] : []) : cartItems;
+
+  // ── Empty / loading states ──
+  if (!meta || (isExpress && !product)) {
     return (
       <>
         {meta && <Header meta={meta} />}
@@ -84,13 +121,40 @@ export function CheckoutPage({
     );
   }
 
-  const variant = (variantIndex != null ? product.variants[variantIndex] : null) ?? product.variants[0] ?? null;
-  const unitPrice = variant?.price ?? product.price;
-  const inStock = variant ? variant.in_stock : product.in_stock;
+  if (!isExpress && !hydrated) {
+    return (
+      <>
+        <Header meta={meta} />
+        <main className="mx-auto max-w-5xl px-4 py-24 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-slate-400" />
+          <p className="mt-4 text-sm text-slate-500">Loading your cart…</p>
+        </main>
+        <Footer meta={meta} />
+      </>
+    );
+  }
 
+  if (!isExpress && lines.length === 0) {
+    return (
+      <>
+        <Header meta={meta} />
+        <main className="mx-auto max-w-xl px-4 py-24 text-center">
+          <ShoppingBag className="mx-auto h-10 w-10 text-slate-300" />
+          <h1 className="mt-3 text-2xl font-bold text-slate-900">Your cart is empty</h1>
+          <p className="mt-2 text-slate-600">Add a product before checking out.</p>
+          <a href="/products" className="mt-6 inline-flex items-center gap-2 rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white hover:bg-brand-700">
+            Browse products
+          </a>
+        </main>
+        <Footer meta={meta} />
+      </>
+    );
+  }
+
+  const currency = meta.currency;
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
-  const subtotal = unitPrice * qty;
+  const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
     ? 0
@@ -98,41 +162,50 @@ export function CheckoutPage({
     ? 0
     : zone?.fee ?? 0;
   const total = subtotal + shippingFee;
-  const image = product.gallery_urls?.[0] ?? product.image_url;
+  const numItems = lines.reduce((n, l) => n + l.quantity, 0);
+
+  // Express mode edits a local qty; cart mode writes through to the store.
+  function changeQty(line: CartLine, next: number) {
+    const clamped = Math.max(1, line.max_stock != null && line.max_stock > 0 ? Math.min(line.max_stock, next) : next);
+    if (isExpress) setExpressQty(clamped);
+    else setCartQty(line.product_id, line.variant_index, clamped);
+  }
 
   async function onSubmit(values: FormData) {
-    if (!product) return;
+    if (lines.length === 0) return;
     setSubmitting(true);
     setError(null);
     try {
-      pixel.initiateCheckout({ value: subtotal, numItems: qty });
+      pixel.initiateCheckout({ value: subtotal, numItems });
       const order = await submitOrder({
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
         address:        values.customer_address,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
-        product_id:     product.id,
-        variant_index:  variant ? variant.index : null,
-        quantity:       qty,
+        items: lines.map((l) => ({
+          product_id:    l.product_id,
+          variant_index: l.variant_index,
+          quantity:      l.quantity,
+        })),
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
-        // Only sent when the box is ticked → guest checkout is byte-for-byte
-        // unchanged when it isn't.
+        // Only sent when the box is ticked → guest checkout is unchanged otherwise.
         ...(values.create_account ? { create_account: true, password: values.password } : {}),
       });
       pixel.purchase({
         orderNumber: order.order_number,
         value: order.total,
-        numItems: qty,
-        contentIds: [product.id.toString()],
+        numItems,
+        contentIds: lines.map((l) => l.product_id.toString()),
       });
       // Account provisioned alongside the order → auto-login by storing the
-      // token, so the customer can reach /account straight away. If the phone
-      // already had an account (account_exists), no token comes back — we pass
-      // a flag to the success page so it can nudge them to log in.
+      // token. If the phone already had an account (account_exists), no token
+      // comes back — pass a flag so the success page nudges them to log in.
       if (order.customer?.token) {
         setToken(order.customer.token);
       }
+      // Cart-mode order succeeded → empty the cart so the badge clears.
+      if (!isExpress) clearCart();
       const acctFlag = order.account_exists && !order.customer?.token ? '&account_exists=1' : '';
       window.location.href = `/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}${acctFlag}`;
     } catch (e) {
@@ -237,23 +310,36 @@ export function CheckoutPage({
               <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6">
                 <h2 className="border-b border-slate-100 pb-3 text-lg font-bold text-slate-900">Order Summary</h2>
 
-                {/* Product line */}
-                <div className="flex items-start gap-3 py-4">
-                  <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                    {image && <FitImage src={image} alt={product.name} />}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-slate-900 line-clamp-2">{product.name}</p>
-                    {variant && <p className="text-xs text-slate-500">{variant.label}</p>}
-                    <p className="mt-0.5 text-sm font-semibold text-rose-600">{formatBDT(unitPrice, { currency: meta.currency })}</p>
-                  </div>
-                  {/* qty stepper */}
-                  <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
-                    <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1} aria-label="Decrease quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
-                    <span className="w-8 text-center text-sm font-semibold tabular-nums">{qty}</span>
-                    <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /></button>
-                  </div>
-                </div>
+                {/* Product lines */}
+                <ul className="divide-y divide-slate-100">
+                  {lines.map((l) => (
+                    <li key={`${l.product_id}:${l.variant_index ?? '-'}`} className="flex items-start gap-3 py-4">
+                      <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+                        {l.image_url && <FitImage src={l.image_url} alt={l.name} />}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-slate-900 line-clamp-2">{l.name}</p>
+                        {l.variant_label && <p className="text-xs text-slate-500">{l.variant_label}</p>}
+                        <p className="mt-0.5 text-sm font-semibold text-rose-600">{formatBDT(l.unit_price, { currency })}</p>
+                        {!isExpress && (
+                          <button
+                            type="button"
+                            onClick={() => removeCartLine(l.product_id, l.variant_index)}
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-rose-600"
+                          >
+                            <Trash2 className="h-3 w-3" /> Remove
+                          </button>
+                        )}
+                      </div>
+                      {/* qty stepper */}
+                      <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
+                        <button type="button" onClick={() => changeQty(l, l.quantity - 1)} disabled={l.quantity <= 1} aria-label="Decrease quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                        <span className="w-8 text-center text-sm font-semibold tabular-nums">{l.quantity}</span>
+                        <button type="button" onClick={() => changeQty(l, l.quantity + 1)} disabled={l.max_stock != null && l.max_stock > 0 && l.quantity >= l.max_stock} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
 
                 {/* Shipping method */}
                 {meta.shipping?.enabled && zones.length > 0 && (
@@ -276,18 +362,18 @@ export function CheckoutPage({
                 {/* Totals */}
                 <div className="mt-4 space-y-1.5 border-t border-slate-100 pt-4 text-sm">
                   <div className="flex justify-between text-slate-600">
-                    <span>Subtotal</span>
-                    <span>{formatBDT(subtotal, { currency: meta.currency })}</span>
+                    <span>Subtotal <span className="text-slate-400">({numItems} item{numItems === 1 ? '' : 's'})</span></span>
+                    <span>{formatBDT(subtotal, { currency })}</span>
                   </div>
                   {meta.shipping?.enabled && (
                     <div className="flex justify-between text-slate-600">
                       <span>Shipping</span>
-                      <span>{shippingFee === 0 ? <span className="font-semibold text-brand-600">Free</span> : formatBDT(shippingFee, { currency: meta.currency })}</span>
+                      <span>{shippingFee === 0 ? <span className="font-semibold text-brand-600">Free</span> : formatBDT(shippingFee, { currency })}</span>
                     </div>
                   )}
                   <div className="flex items-baseline justify-between border-t border-slate-100 pt-2">
                     <span className="font-bold text-slate-900">Total</span>
-                    <span className="text-xl font-bold text-rose-600">{formatBDT(total, { currency: meta.currency })}</span>
+                    <span className="text-xl font-bold text-rose-600">{formatBDT(total, { currency })}</span>
                   </div>
                 </div>
               </div>
@@ -306,9 +392,9 @@ export function CheckoutPage({
                   Your details are used only to process and deliver this order.
                 </p>
 
-                <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={!inStock || submitting}>
+                <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
                   <ShoppingCart className="h-4 w-4" />
-                  {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : `Place Order — ${formatBDT(total, { currency: meta.currency })}`}
+                  {submitting ? 'Placing order…' : `Place Order — ${formatBDT(total, { currency })}`}
                 </Button>
               </div>
             </div>

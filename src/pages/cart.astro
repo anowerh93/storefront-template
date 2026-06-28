@@ -1,0 +1,27 @@
+---
+/**
+ * Cart page (Phase 2 multi-product cart). The cart itself lives in the
+ * browser's localStorage — this route only fetches the storefront meta for the
+ * chrome (header/footer/branding); CartPage reads the lines client-side.
+ *
+ * SSR on CF Workers (prerender:false) + noindex — it's a per-visitor page with
+ * nothing to crawl.
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getStorefront } from '../lib/api';
+import { CartPage } from '../views/cart';
+import type { StorefrontMeta } from '../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[cart.astro] getStorefront() failed:', err);
+}
+---
+
+<Base title="Your Cart" description="Review your cart" meta={meta} noindex={true}>
+  <CartPage client:load meta={meta} />
+</Base>

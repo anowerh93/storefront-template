@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ChevronDown, MapPin, Menu, Search, User, UserCircle, X } from 'lucide-react';
+import { ChevronDown, MapPin, Menu, Search, ShoppingCart, User, UserCircle, X } from 'lucide-react';
 import type { StorefrontMeta, Category } from '../../lib/types';
 import { getToken } from '../../lib/api';
+import { useCart, cartCount, useCartHydrated } from '../../stores/cart';
 
 /**
  * Two-row header inspired by the Omerce design:
- *   Row 1 — logo · location · big search · account/wishlist
+ *   Row 1 — logo · location · big search · cart · account
  *   Row 2 — "Browse all categories" mega dropdown · primary nav · phone/messenger CTA
  *
- * The cart icon was intentionally removed — this storefront uses a direct
- * order-on-PDP funnel rather than a multi-product cart.
+ * The cart icon shows a live item count (Phase 2 multi-product cart). The count
+ * is read after mount (the cart lives in localStorage) so the static HTML and
+ * the first client render agree — same deferral as the auth token below.
  */
 export function Header({
   meta,
@@ -29,6 +31,12 @@ export function Header({
   useEffect(() => { setLoggedIn(Boolean(getToken())); }, []);
   const accountHref = loggedIn ? '/account' : '/login';
   const accountLabel = loggedIn ? 'My Account' : 'Login';
+
+  // Live cart count — read after mount (cart is in localStorage); the badge
+  // stays hidden until hydration so SSR HTML and the first client render match.
+  const hydrated = useCartHydrated();
+  const cartUnits = useCart((s) => cartCount(s.items));
+  const cartBadge = hydrated && cartUnits > 0 ? cartUnits : null;
 
   return (
     <header className="sticky top-0 z-30 bg-white border-b border-slate-200">
@@ -136,6 +144,25 @@ export function Header({
                 </div>
               </a>
 
+              {/* Cart — live item-count badge (Phase 2). Always visible (mobile
+                  + desktop); the badge appears once the cart hydrates. */}
+              <a
+                href="/cart"
+                className="relative flex items-center gap-2 p-2 md:px-3 rounded-lg hover:bg-slate-50 text-sm"
+                aria-label={cartBadge ? `Cart, ${cartBadge} item${cartBadge === 1 ? '' : 's'}` : 'Cart'}
+              >
+                <ShoppingCart className="h-5 w-5 text-slate-600" />
+                <span className="text-left hidden xl:block">
+                  <span className="block text-[10px] text-slate-500 leading-none">Cart</span>
+                  <span className="block text-xs font-semibold text-slate-900">My Cart</span>
+                </span>
+                {cartBadge && (
+                  <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full bg-brand-600 text-[10px] font-bold leading-none text-white tabular-nums">
+                    {cartBadge}
+                  </span>
+                )}
+              </a>
+
               <button
                 onClick={() => setMobileOpen((v) => !v)}
                 className="md:hidden p-2 rounded-lg hover:bg-slate-100"
@@ -220,6 +247,10 @@ export function Header({
           <a onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</a>
           {meta.has_blog && <a onClick={() => setMobileOpen(false)} href="/blog" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Blog</a>}
           <a onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</a>
+          <a onClick={() => setMobileOpen(false)} href="/cart" className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-100">
+            <span>My Cart</span>
+            {cartBadge && <span className="min-w-[20px] inline-flex items-center justify-center rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">{cartBadge}</span>}
+          </a>
           <a onClick={() => setMobileOpen(false)} href={accountHref} className="block px-3 py-2 rounded-lg hover:bg-slate-100 font-semibold text-brand-700">{accountLabel}</a>
         </div>
       )}

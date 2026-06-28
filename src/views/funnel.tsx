@@ -740,9 +740,8 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         address:        values.customer_address,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
-        product_id:     product.id,
-        variant_index:  variant ? variant.index : null,
-        quantity:       qty,
+        // Funnels are single-product by design — a 1-element items[] cart.
+        items: [{ product_id: product.id, variant_index: variant ? variant.index : null, quantity: qty }],
         utm_source:     sp?.get('utm_source') || undefined,
         utm_medium:     sp?.get('utm_medium') || undefined,
         utm_campaign:   sp?.get('utm_campaign') || undefined,

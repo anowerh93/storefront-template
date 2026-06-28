@@ -537,6 +537,14 @@ export type Category = {
 // Orders (POST /orders, GET /orders/{number})
 // ──────────────────────────────────────────────────────────────
 
+/** One product line of an order (Phase 2 cart). variant_index is the API's
+ *  positional variant identity; null/omitted for variant-less products. */
+export type OrderItemInput = {
+  product_id: number;
+  variant_index?: number | null;
+  quantity: number;
+};
+
 export type CreateOrderInput = {
   customer_name: string;
   customer_phone: string;
@@ -545,9 +553,10 @@ export type CreateOrderInput = {
   customer_city?: string | null;
   shipping_zone?: string;       // 'inside_city' | 'outside_city'
   notes?: string;
-  product_id: number;
-  variant_index?: number | null;
-  quantity: number;
+  // Multi-product cart. The API also still accepts the legacy flat
+  // product_id/variant_index/quantity shape (funnel "buy now"), but the
+  // storefront standardizes on items[] — a single "buy now" is a 1-element cart.
+  items: OrderItemInput[];
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;

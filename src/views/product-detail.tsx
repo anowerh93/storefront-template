@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag } from 'lucide-react';
+import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus } from 'lucide-react';
 import { formatBDT, discountPct } from '../lib/format';
 import { getIcon } from '../lib/icons';
 import { Header } from '../components/layout/header';
@@ -7,6 +7,8 @@ import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { FitImage } from '../components/ui/fit-image';
 import { NotFoundPage } from './not-found';
+import { useCart } from '../stores/cart';
+import { pixel } from '../lib/pixel';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
 /**
@@ -111,14 +113,41 @@ function ProductGallery({ product }: { product: ProductDetail }) {
 /* ── Buy box ──────────────────────────────────────────────────────────── */
 function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
   const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
+  const [qty, setQty] = useState(1);
+  const [added, setAdded] = useState(false);
+  const addToCart = useCart((s) => s.addToCart);
   const selected = product.variants.find((v) => v.index === variantIdx) ?? null;
   const unitPrice = selected?.price ?? product.price;
   const inStock = selected ? selected.in_stock : product.in_stock;
+  const maxStock = selected ? selected.stock : null;
   const discount = discountPct(unitPrice, product.compare_at_price);
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
 
-  const checkoutHref = `/checkout?p=${encodeURIComponent(product.slug)}${variantIdx != null ? `&v=${variantIdx}` : ''}`;
+  // "Order Now" is an express single-item buy-now; "Add to Cart" stacks lines
+  // for a combined checkout. Both carry the chosen variant + quantity.
+  const checkoutHref = `/checkout?p=${encodeURIComponent(product.slug)}${variantIdx != null ? `&v=${variantIdx}` : ''}&q=${qty}`;
+
+  function handleAddToCart() {
+    if (!inStock) return;
+    addToCart(
+      {
+        product_id: product.id,
+        slug: product.slug,
+        name: product.name,
+        image_url: product.image_url ?? product.gallery_urls?.[0] ?? null,
+        variant_index: selected ? selected.index : null,
+        variant_label: selected ? selected.label : null,
+        unit_price: unitPrice,
+        max_stock: maxStock,
+        currency: product.currency,
+      },
+      qty,
+    );
+    pixel.addToCart({ id: product.id, name: product.name, price: unitPrice, quantity: qty, currency: product.currency });
+    setAdded(true);
+    setTimeout(() => setAdded(false), 1800);
+  }
 
   return (
     <div className="space-y-5">
@@ -198,14 +227,54 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
         </div>
       )}
 
-      {/* Order Now → checkout */}
+      {/* Quantity + Add to Cart + Order Now */}
       {inStock ? (
-        <a
-          href={checkoutHref}
-          className="flex w-full items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800"
-        >
-          <ShoppingBag className="h-5 w-5" /> Order Now
-        </a>
+        <div className="space-y-3">
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-medium text-slate-700">Quantity</span>
+            <div className="flex items-center overflow-hidden rounded-xl border border-slate-300">
+              <button
+                type="button"
+                onClick={() => setQty((q) => Math.max(1, q - 1))}
+                disabled={qty <= 1}
+                aria-label="Decrease quantity"
+                className="px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+              <span className="w-10 text-center text-sm font-semibold tabular-nums">{qty}</span>
+              <button
+                type="button"
+                onClick={() => setQty((q) => (maxStock != null && maxStock > 0 ? Math.min(maxStock, q + 1) : q + 1))}
+                disabled={maxStock != null && maxStock > 0 && qty >= maxStock}
+                aria-label="Increase quantity"
+                className="px-3 py-2 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+              >
+                <Plus className="h-4 w-4" />
+              </button>
+            </div>
+            {maxStock != null && maxStock > 0 && maxStock <= 10 && (
+              <span className="text-xs text-slate-500">Only {maxStock} left</span>
+            )}
+          </div>
+
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white px-6 py-3.5 text-base font-bold text-slate-900 transition hover:bg-slate-50"
+            >
+              {added ? <Check className="h-5 w-5 text-emerald-600" /> : <ShoppingCart className="h-5 w-5" />}
+              {added ? 'Added to cart' : 'Add to Cart'}
+            </button>
+            <a
+              href={checkoutHref}
+              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800"
+            >
+              <ShoppingBag className="h-5 w-5" /> Order Now
+            </a>
+          </div>
+        </div>
       ) : (
         <span className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 px-6 py-3.5 text-base font-bold text-slate-500">
           Out of Stock
