@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode, type CSSProperties } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import {
@@ -766,11 +766,31 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     }
   }
 
+  // Safety net: if validation blocks submit on a field that isn't on screen
+  // (e.g. a hidden shipping_zone when shipping is off), the inline message never
+  // renders and the order button looks dead. Name the offending field(s) at the
+  // top of the form so the shopper always gets feedback. Same as checkout.tsx.
+  function onInvalid(errors: FieldErrors<FormData>) {
+    const labels: Record<string, string> = {
+      customer_name:    'full name',
+      customer_address: 'delivery address',
+      customer_phone:   'phone number',
+      shipping_zone:    'delivery area',
+      notes:            'order notes',
+    };
+    const names = Object.keys(errors).map((k) => labels[k] ?? k);
+    setError(
+      names.length
+        ? `Please check your ${names.join(', ')} before placing the order.`
+        : 'Please check your details before placing the order.',
+    );
+  }
+
   return (
     <section id="funnel-order" className="mx-auto max-w-2xl scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
       <RT as="h2" className="text-center text-lg font-bold text-slate-900" html={config.heading || 'Order now — Cash on Delivery'} />
 
-      <form onSubmit={form.handleSubmit(onSubmit)} className="mt-4 space-y-4">
+      <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="mt-4 space-y-4">
         {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
 
         {product.variants.length > 0 && (

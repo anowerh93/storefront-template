@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag } from 'lucide-react';
@@ -254,6 +254,29 @@ export function CheckoutPage({
     }
   }
 
+  // Safety net: react-hook-form silently no-ops the submit when validation
+  // fails. If the failing field isn't on screen (e.g. a hidden shipping_zone),
+  // its inline message never renders and "Place Order" looks dead with no
+  // feedback. Surface a top-level message naming the offending field(s) so the
+  // shopper is never stuck guessing — guards the whole hidden-required-field
+  // bug class, not just shipping_zone.
+  function onInvalid(errors: FieldErrors<FormData>) {
+    const labels: Record<string, string> = {
+      customer_name:    'full name',
+      customer_address: 'delivery address',
+      customer_phone:   'phone number',
+      shipping_zone:    'delivery area',
+      password:         'password',
+      notes:            'order notes',
+    };
+    const names = Object.keys(errors).map((k) => labels[k] ?? k);
+    setError(
+      names.length
+        ? `Please check your ${names.join(', ')} before placing the order.`
+        : 'Please check your details before placing the order.',
+    );
+  }
+
   return (
     <>
       <Header meta={meta} />
@@ -265,7 +288,7 @@ export function CheckoutPage({
             <span className="text-lg font-bold">Secure Checkout</span>
           </div>
 
-          <form onSubmit={form.handleSubmit(onSubmit)} className="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
+          <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="grid lg:grid-cols-[1fr_380px] gap-6 items-start">
             {/* ── LEFT: Billing details ── */}
             <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6">
               <h2 className="border-b border-slate-100 pb-3 text-lg font-bold text-slate-900">Billing Details</h2>
