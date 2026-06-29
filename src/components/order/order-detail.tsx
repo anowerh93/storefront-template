@@ -1,5 +1,6 @@
 import { Check, X } from 'lucide-react';
 import { formatBDT } from '../../lib/format';
+import { customerStatus } from '../../lib/order-status';
 import { Badge } from '../ui/badge';
 import type { OrderResponse, StorefrontMeta } from '../../lib/types';
 
@@ -14,19 +15,6 @@ import type { OrderResponse, StorefrontMeta } from '../../lib/types';
  * an "Order Details" + "Customer Details" pair, then an "Ordered Products" table
  * with a totals footer.
  */
-
-// Keys MUST match the backend status strings exactly (App\Models\Order::STATUS_*);
-// note 'canceled' is spelled with one L. status_label from the server wins for
-// the text — these labels are fallbacks; the variant is what each key drives.
-const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'brand' }> = {
-  awaiting_verification: { label: 'Awaiting verification', variant: 'warning' },
-  pending:   { label: 'Order received',        variant: 'brand' },
-  on_hold:   { label: 'Awaiting confirmation', variant: 'warning' },
-  confirmed: { label: 'Confirmed',             variant: 'brand' },
-  shipped:   { label: 'On the way',            variant: 'brand' },
-  delivered: { label: 'Delivered',             variant: 'success' },
-  canceled:  { label: 'Canceled',              variant: 'default' },
-};
 
 // Customer-facing copy for each timeline milestone. The API only ever sends
 // these post-placement statuses (it filters internal verification states out),
@@ -65,11 +53,9 @@ export function OrderDetail({
   /** Last 4 digits of the phone (from the success/lookup URL) → masked display. */
   phoneLast4?: string;
 }) {
-  // Prefer the server's status_label when present; fall back to our local map.
-  const mapped = STATUS_LABELS[order.status];
-  const statusInfo = mapped
-    ? { label: order.status_label ?? mapped.label, variant: mapped.variant }
-    : { label: order.status_label ?? order.status, variant: 'default' as const };
+  // Customer-facing label + variant — deliberately NOT the API's status_label,
+  // which is internal merchant jargon ("Pending (needs call)").
+  const statusInfo = customerStatus(order.status);
 
   const currency = order.currency;
   const items = order.items ?? [];

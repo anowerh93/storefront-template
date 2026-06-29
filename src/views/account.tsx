@@ -12,17 +12,9 @@ import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
+import { customerStatus } from '../lib/order-status';
 import { NotFoundPage } from './not-found';
 import type { AccountOrderSummary, Customer, StorefrontMeta } from '../lib/types';
-
-const STATUS_VARIANT: Record<string, 'default' | 'success' | 'warning' | 'brand'> = {
-  pending: 'brand',
-  on_hold: 'warning',
-  confirmed: 'brand',
-  shipped: 'brand',
-  delivered: 'success',
-  cancelled: 'default',
-};
 
 /**
  * The customer account page — order history + "track without typing". On mount
@@ -118,7 +110,9 @@ export function AccountPage({ meta }: { meta: StorefrontMeta | null }) {
                 </div>
               ) : (
                 <ul className="space-y-3">
-                  {orders.map((o) => (
+                  {orders.map((o) => {
+                    const status = customerStatus(o.status);
+                    return (
                     <li key={o.order_number}>
                       <a
                         href={`/order/${encodeURIComponent(o.order_number)}`}
@@ -127,7 +121,7 @@ export function AccountPage({ meta }: { meta: StorefrontMeta | null }) {
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center gap-2">
                             <span className="font-semibold text-slate-900">#{o.order_number}</span>
-                            <Badge variant={STATUS_VARIANT[o.status] ?? 'default'}>{o.status_label}</Badge>
+                            <Badge variant={status.variant}>{status.label}</Badge>
                           </div>
                           <p className="mt-0.5 text-xs text-slate-500">
                             {o.placed_at ? relativeTime(o.placed_at) : ''} · {o.item_count} item{o.item_count === 1 ? '' : 's'}
@@ -137,7 +131,8 @@ export function AccountPage({ meta }: { meta: StorefrontMeta | null }) {
                         <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />
                       </a>
                     </li>
-                  ))}
+                    );
+                  })}
                 </ul>
               )}
             </div>
