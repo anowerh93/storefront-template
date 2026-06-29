@@ -33,26 +33,41 @@ import { FitImage } from '../components/ui/fit-image';
  * subtotal. Guest checkout and the opt-in "Create an account?" both work in
  * either mode.
  */
-const schema = z.object({
-  customer_name:    z.string().min(2, 'Please enter your full name'),
-  customer_address: z.string().min(10, 'Please enter your full delivery address'),
-  customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
-  shipping_zone:    z.string().min(1, 'Choose a delivery area'),
-  notes:            z.string().max(500).optional(),
-  // Phase 1 opt-in account creation. Password is only required (min 6) when
-  // the "Create an account?" box is ticked — guest checkout is unaffected.
-  create_account:   z.boolean().optional(),
-  password:         z.string().optional(),
-}).superRefine((val, ctx) => {
-  if (val.create_account && (val.password ?? '').length < 6) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      path: ['password'],
-      message: 'Minimum 6 characters',
-    });
-  }
-});
-type FormData = z.infer<typeof schema>;
+// shipping_zone is required ONLY when the tenant has shipping enabled with
+// zones (i.e. the delivery-area selector is actually on screen). When shipping
+// is OFF the selector — and its error message — are hidden, so a hard
+// requirement would make the form fail validation on a field the shopper can't
+// see or fix, and Place Order would silently do nothing. `requireZone` is
+// passed from the component so the rule always matches what's rendered.
+function makeCheckoutSchema(requireZone: boolean) {
+  return z.object({
+    customer_name:    z.string().min(2, 'Please enter your full name'),
+    customer_address: z.string().min(10, 'Please enter your full delivery address'),
+    customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
+    shipping_zone:    z.string().optional(),
+    notes:            z.string().max(500).optional(),
+    // Phase 1 opt-in account creation. Password is only required (min 6) when
+    // the "Create an account?" box is ticked — guest checkout is unaffected.
+    create_account:   z.boolean().optional(),
+    password:         z.string().optional(),
+  }).superRefine((val, ctx) => {
+    if (requireZone && !(val.shipping_zone && val.shipping_zone.length > 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['shipping_zone'],
+        message: 'Choose a delivery area',
+      });
+    }
+    if (val.create_account && (val.password ?? '').length < 6) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['password'],
+        message: 'Minimum 6 characters',
+      });
+    }
+  });
+}
+type FormData = z.infer<ReturnType<typeof makeCheckoutSchema>>;
 
 export function CheckoutPage({
   product,
@@ -84,6 +99,10 @@ export function CheckoutPage({
   const [createAccount, setCreateAccount] = useState(false);
 
   const zones = meta?.shipping?.zones ?? [];
+  // Only require a delivery zone when the selector is actually shown (shipping
+  // enabled + zones exist) — otherwise an empty hidden field blocks submit.
+  const requireZone = !!(meta?.shipping?.enabled && zones.length > 0);
+  const schema = useMemo(() => makeCheckoutSchema(requireZone), [requireZone]);
   const form = useForm<FormData>({
     resolver: zodResolver(schema),
     defaultValues: { shipping_zone: zones[0]?.code ?? '', create_account: false },

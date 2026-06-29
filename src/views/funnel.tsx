@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, type ReactNode, type CSSProperties } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo, type ReactNode, type CSSProperties } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -48,14 +48,23 @@ function RT({ html, as: Tag = 'span', className }: { html: string; as?: any; cla
   return <Tag className={className} dangerouslySetInnerHTML={{ __html: html }} />;
 }
 
-const schema = z.object({
-  customer_name:    z.string().min(2, 'Please enter your full name'),
-  customer_address: z.string().min(10, 'Please enter your full delivery address'),
-  customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
-  shipping_zone:    z.string().min(1, 'Choose a delivery area'),
-  notes:            z.string().max(500).optional(),
-});
-type FormData = z.infer<typeof schema>;
+// shipping_zone is required only when the delivery-area selector is shown
+// (shipping enabled + zones). Otherwise the hidden empty field would block the
+// order button with no visible error — same guard as checkout.tsx.
+function makeOrderSchema(requireZone: boolean) {
+  return z.object({
+    customer_name:    z.string().min(2, 'Please enter your full name'),
+    customer_address: z.string().min(10, 'Please enter your full delivery address'),
+    customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
+    shipping_zone:    z.string().optional(),
+    notes:            z.string().max(500).optional(),
+  }).superRefine((val, ctx) => {
+    if (requireZone && !(val.shipping_zone && val.shipping_zone.length > 0)) {
+      ctx.addIssue({ code: z.ZodIssueCode.custom, path: ['shipping_zone'], message: 'Choose a delivery area' });
+    }
+  });
+}
+type FormData = z.infer<ReturnType<typeof makeOrderSchema>>;
 
 /* Fade/slide a block in as it scrolls into view (funnels are noindex + JS-only
    FB-ad traffic, so a JS-driven reveal is safe). Disabled → renders immediately. */
@@ -715,6 +724,8 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const [error, setError] = useState<string | null>(null);
 
   const zones = meta.shipping?.zones ?? [];
+  const requireZone = !!(meta.shipping?.enabled && zones.length > 0);
+  const schema = useMemo(() => makeOrderSchema(requireZone), [requireZone]);
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { shipping_zone: zones[0]?.code ?? '' } });
 
   const variant = (variantIdx != null ? product.variants.find((v) => v.index === variantIdx) : null) ?? null;
