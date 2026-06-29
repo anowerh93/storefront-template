@@ -139,7 +139,7 @@ export function OrderStatusPage({
             </div>
           )}
 
-          <OrderDetail order={order} meta={meta} phoneLast4={phone} showTimeline={!placed} />
+          <OrderDetail order={order} meta={meta} phoneLast4={phone} />
 
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
             <a href="/products">

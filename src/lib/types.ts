@@ -592,6 +592,10 @@ export type OrderResponse = {
   customer_name?: string;
   address?: string;
   shipping_zone?: string | null;
+  // Post-placement, customer-facing status milestones (oldest-first). Placement
+  // itself is rendered from `placed_at`; internal verification states are
+  // filtered out server-side. Each: a status + ISO timestamp.
+  timeline?: { status: string; at: string }[];
   items?: {
     product_name: string;
     variant: string | null;

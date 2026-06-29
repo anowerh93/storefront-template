@@ -1,4 +1,4 @@
-import { CheckCircle2, Package, Truck, XCircle } from 'lucide-react';
+import { Check, X } from 'lucide-react';
 import { formatBDT } from '../../lib/format';
 import { Badge } from '../ui/badge';
 import type { OrderResponse, StorefrontMeta } from '../../lib/types';
@@ -10,10 +10,9 @@ import type { OrderResponse, StorefrontMeta } from '../../lib/types';
  * receives an already-fetched OrderResponse so the two surfaces can fetch it
  * however they need (guest lookup vs. authed).
  *
- * Layout mirrors a classic order-confirmation receipt: an "Order Details" +
- * "Customer Details" pair, then an "Ordered Products" table with a totals
- * footer. An optional status timeline shows on the tracking surface (not on
- * the fresh success screen, which is already topped by a success banner).
+ * Layout: a vertical status Timeline (Order placed → recorded milestones), then
+ * an "Order Details" + "Customer Details" pair, then an "Ordered Products" table
+ * with a totals footer.
  */
 
 // Keys MUST match the backend status strings exactly (App\Models\Order::STATUS_*);
@@ -29,7 +28,17 @@ const STATUS_LABELS: Record<string, { label: string; variant: 'default' | 'succe
   canceled:  { label: 'Canceled',              variant: 'default' },
 };
 
-/** ISO → "29 Jun 2026" (absolute, locale-stable). Empty string when unusable. */
+// Customer-facing copy for each timeline milestone. The API only ever sends
+// these post-placement statuses (it filters internal verification states out),
+// but we still guard by looking each one up so an unknown status is skipped.
+const STEP_COPY: Record<string, { title: string; description: string; canceled?: boolean }> = {
+  confirmed: { title: 'Confirmed', description: 'We’ve confirmed your order.' },
+  shipped:   { title: 'Shipped',   description: 'Your order is on the way.' },
+  delivered: { title: 'Delivered', description: 'You have received your order.' },
+  canceled:  { title: 'Canceled',  description: 'Your order has been canceled.', canceled: true },
+};
+
+/** ISO → "19 Jun 2026" (absolute, locale-stable). Empty string when unusable. */
 function formatDate(iso?: string): string {
   if (!iso) return '';
   const d = new Date(iso);
@@ -37,26 +46,30 @@ function formatDate(iso?: string): string {
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
+/** ISO → "9:18 AM" (time only). Empty string when unusable. */
+function formatTime(iso?: string): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+
 export function OrderDetail({
   order,
   meta,
   phoneLast4,
-  showTimeline = false,
 }: {
   order: OrderResponse;
   /** Storefront meta — used to resolve the shipping-zone code to its label. */
   meta?: StorefrontMeta | null;
   /** Last 4 digits of the phone (from the success/lookup URL) → masked display. */
   phoneLast4?: string;
-  /** Show the Confirmed → Shipped → Delivered strip (tracking surface only). */
-  showTimeline?: boolean;
 }) {
   // Prefer the server's status_label when present; fall back to our local map.
   const mapped = STATUS_LABELS[order.status];
   const statusInfo = mapped
     ? { label: order.status_label ?? mapped.label, variant: mapped.variant }
     : { label: order.status_label ?? order.status, variant: 'default' as const };
-  const isCanceled = order.status === 'canceled';
 
   const currency = order.currency;
   const items = order.items ?? [];
@@ -74,32 +87,46 @@ export function OrderDetail({
 
   const placedDate = formatDate(order.placed_at);
 
+  // Timeline rows: placement (always, from placed_at) + recorded milestones.
+  const timelineRows: { at?: string; title: string; description: string; canceled?: boolean }[] = [
+    { at: order.placed_at, title: 'Order Placed', description: 'Your order has been placed successfully.' },
+    ...(order.timeline ?? [])
+      .filter((t) => STEP_COPY[t.status])
+      .map((t) => ({ at: t.at, ...STEP_COPY[t.status] })),
+  ];
+
   return (
     <div className="space-y-6">
-      {/* Optional status timeline (tracking surface). */}
-      {showTimeline && (
-        <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Order status</h2>
-            <Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>
-          </div>
-          {/* The Confirmed → Shipped → Delivered strip only makes sense on the
-              fulfillment path; a canceled order shows an explicit notice instead
-              of three greyed steps that read as a stalled progress bar. */}
-          {isCanceled ? (
-            <div className="flex items-center gap-2 rounded-xl bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
-              <XCircle className="h-5 w-5 shrink-0" />
-              This order has been canceled.
-            </div>
-          ) : (
-            <div className="grid grid-cols-3 gap-2 text-xs">
-              <TimelineStep icon={CheckCircle2} label="Confirmed" active={['confirmed', 'shipped', 'delivered'].includes(order.status)} />
-              <TimelineStep icon={Package} label="Shipped" active={['shipped', 'delivered'].includes(order.status)} />
-              <TimelineStep icon={Truck} label="Delivered" active={order.status === 'delivered'} />
-            </div>
-          )}
-        </div>
-      )}
+      {/* Status timeline */}
+      <Card title="Timeline">
+        <ol>
+          {timelineRows.map((row, i) => {
+            const last = i === timelineRows.length - 1;
+            const time = formatTime(row.at);
+            return (
+              <li key={i} className="flex gap-3 sm:gap-4">
+                {/* Date / time */}
+                <div className="w-20 shrink-0 text-right sm:w-24">
+                  <p className="text-xs font-medium text-slate-600">{formatDate(row.at) || '—'}</p>
+                  {time && <p className="text-xs text-slate-400">{time}</p>}
+                </div>
+                {/* Marker + connector */}
+                <div className="flex flex-col items-center">
+                  <span className={`z-10 flex h-6 w-6 items-center justify-center rounded-full text-white ${row.canceled ? 'bg-rose-500' : 'bg-emerald-500'}`}>
+                    {row.canceled ? <X className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" focusable="false" /> : <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" focusable="false" />}
+                  </span>
+                  {!last && <span className="w-px flex-1 bg-slate-200" />}
+                </div>
+                {/* Title + description */}
+                <div className={`flex-1 ${last ? 'pb-0.5' : 'pb-6'}`}>
+                  <p className="font-semibold text-slate-900">{row.title}</p>
+                  <p className="mt-0.5 text-sm text-slate-500">{row.description}</p>
+                </div>
+              </li>
+            );
+          })}
+        </ol>
+      </Card>
 
       {/* Order Details + Customer Details */}
       <div className="grid gap-6 md:grid-cols-2">
@@ -206,15 +233,6 @@ function Row({ label, value, multiline = false }: { label: string; value: React.
     <div className={`flex gap-4 text-sm ${multiline ? 'items-start' : 'items-center'} justify-between`}>
       <span className="shrink-0 text-slate-500">{label}</span>
       <span className={`text-right font-medium text-slate-900 ${multiline ? 'break-words' : 'truncate'}`}>{value}</span>
-    </div>
-  );
-}
-
-function TimelineStep({ icon: Icon, label, active }: { icon: React.ComponentType<{ className?: string }>; label: string; active: boolean }) {
-  return (
-    <div className={`flex flex-col items-center gap-1.5 rounded-xl p-3 ${active ? 'bg-brand-50 text-brand-700' : 'bg-slate-50 text-slate-400'}`}>
-      <Icon className="h-5 w-5" />
-      <span className="font-medium">{label}</span>
     </div>
   );
 }
