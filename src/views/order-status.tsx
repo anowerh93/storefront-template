@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle2, MessageCircle, Loader2 } from 'lucide-react';
+import { Check, Loader2 } from 'lucide-react';
 import { lookupOrder, getToken, getMyOrder, UnauthenticatedError } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -114,41 +114,47 @@ export function OrderStatusPage({
     <>
       <Header meta={meta} />
 
-      <main className="mx-auto max-w-2xl px-4 sm:px-6 py-6 sm:py-10">
-        {placed && (
-          <div className="rounded-2xl bg-brand-50 border border-brand-200 p-5 mb-6 flex items-start gap-3">
-            <CheckCircle2 className="h-6 w-6 text-brand-600 shrink-0" />
-            <div>
-              <h2 className="font-semibold text-brand-900">Order placed!</h2>
-              <p className="text-sm text-brand-700 mt-0.5">
-                We've received your order and will contact you shortly to confirm the details.
-              </p>
+      <main className="bg-slate-50">
+        <div className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12 space-y-6">
+          {/* Success banner (fresh order) vs. a neutral heading (tracking). */}
+          {placed ? (
+            <div className="flex items-center gap-4 rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6 shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
+                <Check className="h-7 w-7" strokeWidth={3} />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Order placed successfully</h1>
+                <p className="mt-0.5 text-sm text-slate-500">Thank you. Your order has been received.</p>
+              </div>
             </div>
-          </div>
-        )}
-
-        {accountExists && (
-          <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 mb-6 text-sm text-slate-600">
-            You already have an account —{' '}
-            <a href="/login" className="font-semibold text-brand-600 hover:underline">log in</a>{' '}
-            to track all your orders in one place.
-          </div>
-        )}
-
-        <OrderDetail order={order} />
-
-        <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
-          {meta.messenger?.url && (
-            <a href={meta.messenger.url} target="_blank" rel="noopener">
-              <Button variant="outline">
-                <MessageCircle className="h-4 w-4" />
-                Need help? Message us
-              </Button>
-            </a>
+          ) : (
+            <h1 className="text-2xl font-bold text-slate-900">Order #{order.order_number}</h1>
           )}
-          <a href="/products">
-            <Button variant="brand">Continue shopping</Button>
-          </a>
+
+          {accountExists && (
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
+              You already have an account —{' '}
+              <a href="/login" className="font-semibold text-brand-600 hover:underline">log in</a>{' '}
+              to track all your orders in one place.
+            </div>
+          )}
+
+          <OrderDetail order={order} meta={meta} phoneLast4={phone} showTimeline={!placed} />
+
+          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+            <a href="/products">
+              <Button variant="brand" className="w-full sm:w-auto">Continue Shopping</Button>
+            </a>
+            {authed ? (
+              <a href="/account">
+                <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
+              </a>
+            ) : (
+              <a href="/cart">
+                <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
+              </a>
+            )}
+          </div>
         </div>
       </main>
 
