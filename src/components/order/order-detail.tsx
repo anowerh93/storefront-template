@@ -26,6 +26,24 @@ const STEP_COPY: Record<string, { title: string; description: string; canceled?:
   canceled:  { title: 'Canceled',  description: 'Your order has been canceled.', canceled: true },
 };
 
+/**
+ * Variant → display string. The API sends `variant` as a string|null, but
+ * defend against a stray object (an old build / cached payload that still
+ * sends the raw {color,size,…} array) — rendering an object as a React child
+ * throws and blanks the whole page. Only color/size/weight are surfaced, never
+ * the internal stock count.
+ */
+function variantText(variant: unknown): string {
+  if (typeof variant === 'string') return variant.trim();
+  if (variant && typeof variant === 'object') {
+    return ['color', 'size', 'weight']
+      .map((k) => (variant as Record<string, unknown>)[k])
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      .join(' · ');
+  }
+  return '';
+}
+
 /** ISO → "19 Jun 2026" (absolute, locale-stable). Empty string when unusable. */
 function formatDate(iso?: string): string {
   if (!iso) return '';
@@ -154,7 +172,7 @@ export function OrderDetail({
                     <tr key={i} className="border-b border-slate-100 last:border-0">
                       <td className="py-3 pr-3">
                         <p className="font-medium text-slate-900">{it.product_name}</p>
-                        {it.variant && <p className="text-xs text-slate-500">{it.variant}</p>}
+                        {variantText(it.variant) && <p className="text-xs text-slate-500">{variantText(it.variant)}</p>}
                       </td>
                       <td className="py-3 px-3 text-center tabular-nums text-slate-700">{it.quantity}</td>
                       <td className="py-3 px-3 text-right tabular-nums text-slate-700">{formatBDT(it.unit_price, { currency })}</td>
@@ -170,7 +188,7 @@ export function OrderDetail({
               {items.map((it, i) => (
                 <li key={i} className="py-3">
                   <p className="font-medium text-slate-900">{it.product_name}</p>
-                  {it.variant && <p className="text-xs text-slate-500">{it.variant}</p>}
+                  {variantText(it.variant) && <p className="text-xs text-slate-500">{variantText(it.variant)}</p>}
                   <div className="mt-1 flex items-baseline justify-between">
                     <span className="text-xs text-slate-500 tabular-nums">
                       Qty {it.quantity} × {formatBDT(it.unit_price, { currency })}
