@@ -242,11 +242,18 @@ function hexA(hex: string, a: number): string {
 }
 
 // Tiled-pattern motifs (100×100 tile). Rendered as a faint, tenant-coloured SVG
-// that slowly drifts (.fnl-bg-pattern). leaves → organic; dots/grid → geometric.
+// that slowly drifts (.fnl-bg-pattern). leaves/dates/hearts/blossom → organic;
+// dots/grid/stars/sparkles → geometric. Keep byte-identical to the dashboard
+// preview MOTIFS in myapp resources/views/funnels/builder.blade.php.
 const PATTERN_MOTIFS: Record<string, string> = {
-  leaves: "<path d='M50 18c-9 7-9 23 0 30 9-7 9-23 0-30z'/><path d='M22 64c-6 5-6 16 0 21 6-5 6-16 0-21z'/><circle cx='78' cy='30' r='4'/><circle cx='30' cy='86' r='3'/>",
-  dots:   "<circle cx='25' cy='25' r='4'/><circle cx='75' cy='75' r='4'/><circle cx='75' cy='25' r='2.5'/><circle cx='25' cy='75' r='2.5'/>",
-  grid:   "<path d='M0 50h100M50 0v100'/>",
+  leaves:  "<path d='M50 18c-9 7-9 23 0 30 9-7 9-23 0-30z'/><path d='M22 64c-6 5-6 16 0 21 6-5 6-16 0-21z'/><circle cx='78' cy='30' r='4'/><circle cx='30' cy='86' r='3'/>",
+  dots:    "<circle cx='25' cy='25' r='4'/><circle cx='75' cy='75' r='4'/><circle cx='75' cy='25' r='2.5'/><circle cx='25' cy='75' r='2.5'/>",
+  grid:    "<path d='M0 50h100M50 0v100'/>",
+  dates:   "<ellipse cx='30' cy='34' rx='6.5' ry='12' transform='rotate(-20 30 34)'/><ellipse cx='43' cy='29' rx='6.5' ry='12' transform='rotate(16 43 29)'/><ellipse cx='71' cy='70' rx='6.5' ry='12' transform='rotate(-14 71 70)'/><ellipse cx='84' cy='65' rx='6.5' ry='12' transform='rotate(18 84 65)'/>",
+  hearts:  "<path d='M50 71 C31 58 22 46 30 36 C36 29 46 31 50 38 C54 31 64 29 70 36 C78 46 69 58 50 71 Z'/><path d='M84 28 C77 23 73 18 76 14 C78 11 82 12 84 15 C86 12 90 11 92 14 C95 18 91 23 84 28 Z'/>",
+  stars:   "<path transform='translate(9 12) scale(0.6)' d='M50 6 L60 38 L94 38 L67 58 L77 90 L50 71 L23 90 L33 58 L6 38 L40 38 Z'/><path transform='translate(60 -2) scale(0.3)' d='M50 6 L60 38 L94 38 L67 58 L77 90 L50 71 L23 90 L33 58 L6 38 L40 38 Z'/>",
+  blossom: "<circle cx='50' cy='30' r='8'/><circle cx='67' cy='42' r='8'/><circle cx='61' cy='63' r='8'/><circle cx='39' cy='63' r='8'/><circle cx='33' cy='42' r='8'/><circle cx='50' cy='47' r='6'/><circle cx='86' cy='84' r='4'/>",
+  sparkles:"<path d='M50 22 C51.5 41 53 46.5 72 48 C53 49.5 51.5 55 50 74 C48.5 55 47 49.5 28 48 C47 46.5 48.5 41 50 22 Z'/><path d='M82 60 C82.7 68 83.4 70.6 90 72 C83.4 73.4 82.7 76 82 84 C81.3 76 80.6 73.4 74 72 C80.6 70.6 81.3 68 82 60 Z'/>",
 };
 
 function patternUrl(motif: string, hex: string): string {
