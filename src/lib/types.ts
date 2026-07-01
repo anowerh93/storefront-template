@@ -495,6 +495,8 @@ export type FunnelBlockConfig = {
   order_form: { visible: boolean; heading: string; button_label: string };
   why_us: { visible: boolean; title: string; items: { title: string; body: string }[] };
   reviews: { visible: boolean; title: string; screenshot_urls?: string[] };
+  /** YouTube lite-embed section — the API exposes only the validated video id. */
+  video?: { visible: boolean; title: string; youtube_id?: string | null };
   faq: { visible: boolean; items: { q: string; a: string }[] };
   trust_badges: { visible: boolean; items: { icon: string; title: string }[] };
 };
