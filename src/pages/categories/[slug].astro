@@ -1,0 +1,72 @@
+---
+/**
+ * Category detail — products within one category, with sort + pagination.
+ *
+ * SSR on CF Workers (prerender:false): the slug is dynamic and ?sort /
+ * ?page come off the URL. A failed/missing category passes res=null and
+ * the view renders its 404 in-place. Hydrated as an island for SortDropdown.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getCategory, getStorefront, getCategories, resolvePath, type ProductSort } from '../../lib/api';
+import { breadcrumbSchema, collectionPageSchema } from '../../lib/schema';
+import { CategoryDetailPage } from '../../views/category-detail';
+import type { StorefrontMeta, Category, Paginated, ProductCard } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+const sp   = Astro.url.searchParams;
+const sort = (sp.get('sort') ?? 'newest') as ProductSort;
+const page = parseInt(sp.get('page') ?? '1', 10);
+
+// All three fetches in PARALLEL — sequential awaits here cost extra origin
+// round-trips per page view (meta/categories are independent of the category).
+const [res, meta, categories]: [
+  { category: Category; products: Paginated<ProductCard> } | null,
+  StorefrontMeta | null,
+  Category[],
+] = await Promise.all([
+  getCategory(slug, { sort, page }).catch((err) => {
+    console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
+    return null;
+  }),
+  getStorefront().catch((err) => {
+    console.warn('[categories/[slug].astro] getStorefront() failed:', err);
+    return null;
+  }),
+  getCategories().catch(() => []),
+]);
+
+// Slug renames leave a 301 behind — same contract as products/[slug].astro.
+if (!res) {
+  const redirect = await resolvePath(`/categories/${slug}`);
+  if (redirect?.to?.startsWith('/')) {
+    return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
+  }
+  // Real 404 status, not a soft 404 (see products/[slug].astro).
+  Astro.response.status = 404;
+}
+
+// JSON-LD: CollectionPage + breadcrumb trail on the canonical origin.
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = res
+  ? [
+      collectionPageSchema(res.category, `${origin}/categories/${encodeURIComponent(slug)}`),
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Categories', url: `${origin}/categories` },
+        { name: res.category.name },
+      ]),
+    ]
+  : [];
+---
+
+<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas} meta={meta}>
+  <CategoryDetailPage
+    client:load
+    searchParams={{ sort, page: String(page) }}
+    res={res}
+    meta={meta}
+    categories={categories}
+  />
+</Base>

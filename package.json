@@ -1,13 +1,14 @@
 {
   "name": "@replybd/storefront-template",
-  "version": "1.0.0",
-  "description": "Reply.BD headless storefront template — Next.js 15 + Tailwind v4 + shadcn/ui. Consumes the Reply.BD storefront API (https://reply.bd) and ships every tenant page (home, products, PDP, categories, order tracking) as a single npm dep.",
+  "version": "2.0.0-astro.1",
+  "description": "Reply.BD headless storefront template — Astro + React islands + Tailwind v4, deployed on Cloudflare Pages. Consumes the Reply.BD storefront API at https://reply.bd.",
   "keywords": [
-    "nextjs",
+    "astro",
     "storefront",
     "ecommerce",
     "tailwind",
-    "shadcn",
+    "react",
+    "cloudflare",
     "bangladesh",
     "cod",
     "headless",
@@ -25,52 +26,16 @@
   "license": "MIT",
   "private": false,
   "type": "module",
-  "files": [
-    "src",
-    "next.config.mjs",
-    "tailwind.preset.ts",
-    "README.md"
-  ],
-  "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts"
-    },
-    "./page": {
-      "types": "./src/page.tsx",
-      "import": "./src/page.tsx"
-    },
-    "./layout": {
-      "types": "./src/layout.tsx",
-      "import": "./src/layout.tsx"
-    },
-    "./revalidate": {
-      "types": "./src/revalidate.ts",
-      "import": "./src/revalidate.ts"
-    },
-    "./next.config": {
-      "import": "./next.config.mjs"
-    },
-    "./tailwind.preset": {
-      "types": "./tailwind.preset.ts",
-      "import": "./tailwind.preset.ts"
-    },
-    "./styles.css": "./src/styles.css"
-  },
   "scripts": {
-    "dev": "next dev --turbopack",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "typecheck": "tsc --noEmit",
-    "prepublishOnly": "npm run typecheck"
-  },
-  "peerDependencies": {
-    "next": "^15.0.0",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "typecheck": "astro check",
+    "deploy": "wrangler pages deploy ./dist"
   },
   "dependencies": {
+    "@astrojs/cloudflare": "^12.0.0",
+    "@astrojs/react": "^4.0.0",
     "@hookform/resolvers": "^3.9.1",
     "@radix-ui/react-accordion": "^1.2.2",
     "@radix-ui/react-checkbox": "^1.1.3",
@@ -83,34 +48,31 @@
     "@radix-ui/react-separator": "^1.1.1",
     "@radix-ui/react-slot": "^1.1.1",
     "@radix-ui/react-tabs": "^1.1.2",
+    "@tailwindcss/vite": "^4.0.0",
+    "astro": "^5.0.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "embla-carousel-react": "^8.5.1",
     "framer-motion": "^11.15.0",
     "lucide-react": "^0.469.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
     "react-hook-form": "^7.54.2",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
+    "tailwindcss": "^4.0.0",
+    "wrangler": "^3.90.0",
     "zod": "^3.24.1",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.0.0",
+    "@tailwindcss/typography": "^0.5.19",
     "@types/node": "^22.10.0",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "eslint": "^9.17.0",
-    "eslint-config-next": "^15.1.3",
-    "next": "^15.1.3",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "tailwindcss": "^4.0.0",
     "typescript": "^5.7.2"
   },
-  "publishConfig": {
-    "access": "public"
-  },
   "engines": {
-    "node": ">=18.18.0"
+    "node": ">=20.0.0"
   }
 }

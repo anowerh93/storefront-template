@@ -1,6 +1,5 @@
-import Link from 'next/link';
 import { Search, X, PackageX } from 'lucide-react';
-import { getProducts, getStorefront, getCategories, type ProductSort } from '../lib/api';
+import { type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -8,22 +7,34 @@ import { ProductGrid } from '../components/product/product-grid';
 import { SortDropdown } from '../components/product/sort-dropdown';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
+import type { Category, Paginated, ProductCard, StorefrontMeta } from '../lib/types';
 
-export async function ProductListPage({
+/**
+ * Astro+CF port: was an async server component that fetched meta +
+ * products + categories itself. The fetch now happens in the Astro page
+ * frontmatter (src/pages/products/index.astro) and results arrive as
+ * props, so this can render as a sync client island (SortDropdown needs
+ * hydration). All filter/pagination links are plain <a> + a native GET
+ * <form> — those work without JS; only SortDropdown's onChange needs it.
+ */
+export function ProductListPage({
   searchParams,
+  meta,
+  productsRes,
+  categories,
 }: {
   searchParams?: { search?: string; category?: string; page?: string; sort?: string };
+  meta: StorefrontMeta | null;
+  productsRes: Paginated<ProductCard>;
+  categories: Category[];
 }) {
+  if (!meta) return <NotFoundPage />;
+
   const page     = parseInt(searchParams?.page ?? '1', 10);
   const search   = searchParams?.search ?? '';
   const category = searchParams?.category ?? '';
   const sort     = (searchParams?.sort ?? 'newest') as ProductSort;
-
-  const [meta, productsRes, categories] = await Promise.all([
-    getStorefront(),
-    getProducts({ page, perPage: 24, search, category, sort }),
-    getCategories().catch(() => []),
-  ]);
 
   const total       = productsRes.meta.total;
   const lastPage    = productsRes.meta.last_page;
@@ -81,29 +92,29 @@ export async function ProductListPage({
           <div className="mb-5 flex items-center gap-2 flex-wrap text-sm">
             <span className="text-xs text-slate-500 font-medium">Filters:</span>
             {search && (
-              <Link
+              <a
                 href={buildHref({ search: '' })}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 text-slate-700 hover:bg-slate-200 transition text-xs font-medium"
               >
                 Search: &ldquo;{search}&rdquo;
                 <X className="h-3 w-3" />
-              </Link>
+              </a>
             )}
             {activeCat && (
-              <Link
+              <a
                 href={buildHref({ category: '' })}
                 className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-brand-100 text-brand-700 hover:bg-brand-200 transition text-xs font-medium"
               >
                 Category: {activeCat.name}
                 <X className="h-3 w-3" />
-              </Link>
+              </a>
             )}
-            <Link
+            <a
               href="/products"
               className="text-xs text-slate-500 hover:text-slate-900 underline underline-offset-2 ml-1"
             >
               Clear all
-            </Link>
+            </a>
           </div>
         )}
 
@@ -111,21 +122,21 @@ export async function ProductListPage({
           {/* Categories sidebar (desktop) */}
           <aside className="hidden lg:block space-y-1">
             <p className="text-xs uppercase tracking-wider font-semibold text-slate-500 mb-3">Categories</p>
-            <Link
+            <a
               href={buildHref({ category: '' })}
               className={`block px-3 py-2 rounded-lg text-sm transition ${!category ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700 hover:bg-slate-100'}`}
             >
               All products
-            </Link>
+            </a>
             {categories.map((c) => (
-              <Link
+              <a
                 key={c.slug}
                 href={buildHref({ category: c.slug })}
                 className={`flex items-center justify-between px-3 py-2 rounded-lg text-sm transition ${category === c.slug ? 'bg-brand-50 text-brand-700 font-medium' : 'text-slate-700 hover:bg-slate-100'}`}
               >
                 <span>{c.name}</span>
                 <span className="text-xs text-slate-400">{c.product_count}</span>
-              </Link>
+              </a>
             ))}
           </aside>
 
@@ -133,20 +144,20 @@ export async function ProductListPage({
           <div>
             {/* Mobile category chips */}
             <div className="lg:hidden mb-4 flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
-              <Link
+              <a
                 href={buildHref({ category: '' })}
                 className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${!category ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
               >
                 All
-              </Link>
+              </a>
               {categories.map((c) => (
-                <Link
+                <a
                   key={c.slug}
                   href={buildHref({ category: c.slug })}
                   className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium transition ${category === c.slug ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-700'}`}
                 >
                   {c.name}
-                </Link>
+                </a>
               ))}
             </div>
 
@@ -159,9 +170,9 @@ export async function ProductListPage({
                   We couldn&rsquo;t find anything for that combination.
                 </p>
                 <div className="mt-5">
-                  <Link href="/products">
+                  <a href="/products">
                     <Button variant="brand">View all products</Button>
-                  </Link>
+                  </a>
                 </div>
               </div>
             ) : (
@@ -172,27 +183,27 @@ export async function ProductListPage({
             {lastPage > 1 && (
               <nav className="mt-10 flex items-center justify-center gap-1.5">
                 {page > 1 && (
-                  <Link href={buildHref({ page: page - 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  <a href={buildHref({ page: page - 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
                     ← Prev
-                  </Link>
+                  </a>
                 )}
                 {Array.from({ length: lastPage }, (_, i) => i + 1)
                   .filter((p) => p === 1 || p === lastPage || Math.abs(p - page) <= 1)
                   .map((p, idx, arr) => (
                     <span key={p} className="contents">
                       {idx > 0 && arr[idx - 1] !== p - 1 && <span className="px-1 text-slate-400">…</span>}
-                      <Link
+                      <a
                         href={buildHref({ page: p })}
                         className={`px-3 py-2 rounded-lg text-sm font-medium ${p === page ? 'bg-brand-500 text-white' : 'text-slate-700 hover:bg-slate-100'}`}
                       >
                         {p}
-                      </Link>
+                      </a>
                     </span>
                   ))}
                 {page < lastPage && (
-                  <Link href={buildHref({ page: page + 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
+                  <a href={buildHref({ page: page + 1 })} className="px-3 py-2 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-100">
                     Next →
-                  </Link>
+                  </a>
                 )}
               </nav>
             )}

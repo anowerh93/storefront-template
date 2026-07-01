@@ -1,11 +1,10 @@
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { HomepageConfig } from '../../lib/types';
 
 const GRADIENTS = {
   purple:  'from-violet-700 via-purple-600 to-fuchsia-600',
   rose:    'from-rose-600 via-pink-600 to-fuchsia-600',
-  emerald: 'from-emerald-700 via-emerald-600 to-teal-600',
+  emerald: 'from-brand-700 via-brand-600 to-brand-500',
   amber:   'from-amber-600 via-orange-600 to-rose-600',
   sky:     'from-sky-700 via-blue-600 to-indigo-600',
   slate:   'from-slate-800 via-slate-700 to-slate-600',
@@ -21,7 +20,7 @@ export function PromoBanner({ config }: { config: HomepageConfig['promo_banner']
 
   return (
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-10">
-      <Link
+      <a
         href={config.button_url}
         className={`group flex items-center justify-between gap-6 p-5 sm:p-7 rounded-2xl bg-gradient-to-r ${grad} text-white overflow-hidden relative`}
       >
@@ -44,7 +43,7 @@ export function PromoBanner({ config }: { config: HomepageConfig['promo_banner']
             {config.button_text} <ArrowRight className="h-3 w-3" />
           </span>
         </div>
-      </Link>
+      </a>
     </section>
   );
 }

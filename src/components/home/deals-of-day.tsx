@@ -1,7 +1,5 @@
 'use client';
 
-import Link from 'next/link';
-import Image from 'next/image';
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import type { ProductCard } from '../../lib/types';
@@ -51,18 +49,17 @@ export function DealsOfDay({
         </div>
 
         {/* Featured */}
-        <Link
+        <a
           href={`/products/${featured.slug}`}
           className="group bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-lg rounded-2xl p-5 sm:p-6 transition flex flex-col"
         >
           <div className="relative aspect-[4/3] rounded-xl bg-slate-50 overflow-hidden mb-4">
             {featured.image_url && (
-              <Image
+              <img
                 src={featured.image_url}
                 alt={featured.name}
-                fill
-                sizes="(max-width: 1024px) 100vw, 600px"
-                className="object-contain p-4 group-hover:scale-105 transition-transform duration-500"
+                loading="lazy"
+                className="absolute inset-0 h-full w-full object-cover group-hover:scale-105 transition-transform duration-500"
               />
             )}
             {discount && (
@@ -86,14 +83,14 @@ export function DealsOfDay({
           <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-snug line-clamp-2">{featured.name}</h3>
 
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-bold text-slate-900">{formatBDT(featured.price)}</span>
+            <span className="text-2xl font-bold text-slate-900">{formatBDT(featured.price, { currency: featured.currency })}</span>
             {featured.compare_at_price && featured.compare_at_price > featured.price && (
-              <span className="text-sm text-slate-400 line-through">{formatBDT(featured.compare_at_price)}</span>
+              <span className="text-sm text-slate-400 line-through">{formatBDT(featured.compare_at_price, { currency: featured.currency })}</span>
             )}
           </div>
 
           <CountdownTimer />
-        </Link>
+        </a>
 
         {/* Right mini products */}
         <div className="grid grid-rows-3 gap-3">
@@ -106,20 +103,20 @@ export function DealsOfDay({
 
 function MiniDealCard({ product }: { product: ProductCard }) {
   return (
-    <Link
+    <a
       href={`/products/${product.slug}`}
       className="group flex gap-3 items-center p-3 rounded-xl bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-sm transition"
     >
       <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-50 overflow-hidden shrink-0">
         {product.image_url && (
-          <Image src={product.image_url} alt={product.name} fill sizes="80px" className="object-contain p-1" />
+          <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         )}
       </div>
       <div className="min-w-0 flex-1">
         <p className="text-xs sm:text-sm font-medium text-slate-900 line-clamp-2 group-hover:text-brand-600">{product.name}</p>
-        <p className="text-sm font-bold text-slate-900 mt-1">{formatBDT(product.price)}</p>
+        <p className="text-sm font-bold text-slate-900 mt-1">{formatBDT(product.price, { currency: product.currency })}</p>
       </div>
-    </Link>
+    </a>
   );
 }
 

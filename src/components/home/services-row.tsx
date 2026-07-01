@@ -1,10 +1,9 @@
-import { ArrowRight } from 'lucide-react';
 import { getIcon } from '../../lib/icons';
 import type { HomepageConfig } from '../../lib/types';
 
 const TONE_STYLES: Record<string, { bg: string; tagBg: string }> = {
   amber:   { bg: 'bg-amber-100',   tagBg: 'bg-amber-200 text-amber-800' },
-  emerald: { bg: 'bg-emerald-100', tagBg: 'bg-emerald-200 text-emerald-800' },
+  emerald: { bg: 'bg-brand-100', tagBg: 'bg-brand-200 text-brand-800' },
   rose:    { bg: 'bg-rose-100',    tagBg: 'bg-rose-200 text-rose-800' },
   sky:     { bg: 'bg-sky-100',     tagBg: 'bg-sky-200 text-sky-800' },
   purple:  { bg: 'bg-purple-100',  tagBg: 'bg-purple-200 text-purple-800' },
@@ -27,9 +26,6 @@ export function ServicesRow({ items }: { items: HomepageConfig['services_row']['
               </div>
               <h3 className="font-bold text-slate-900 text-base sm:text-lg leading-snug">{svc.title}</h3>
               <p className="text-xs sm:text-sm text-slate-600 mt-1">{svc.body}</p>
-              <span className="mt-4 inline-flex items-center gap-1 text-xs font-semibold text-slate-900">
-                Learn more <ArrowRight className="h-3 w-3" />
-              </span>
             </div>
           );
         })}

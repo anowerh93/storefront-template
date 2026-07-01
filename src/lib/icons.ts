@@ -12,6 +12,7 @@ import {
   ThumbsUp, Award, Clock, Phone,
   MessageCircle, Heart, Sparkles, BadgeCheck,
   HelpCircle,
+  Leaf, Zap, Brain, Flame, Droplet, Smile, Activity,
 } from 'lucide-react';
 
 const REGISTRY: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -32,6 +33,13 @@ const REGISTRY: Record<string, React.ComponentType<{ className?: string }>> = {
   'sparkles':      Sparkles,
   'badge-check':   BadgeCheck,
   'help-circle':   HelpCircle,
+  'leaf':          Leaf,
+  'zap':           Zap,
+  'brain':         Brain,
+  'flame':         Flame,
+  'droplet':       Droplet,
+  'smile':         Smile,
+  'activity':      Activity,
 };
 
 export function getIcon(name: string): React.ComponentType<{ className?: string }> {

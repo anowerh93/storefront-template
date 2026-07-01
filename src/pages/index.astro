@@ -1,0 +1,198 @@
+---
+/**
+ * Homepage — full Astro port of views/home.tsx.
+ *
+ * Architecture: Astro page does the API fetches in frontmatter (build-time),
+ * then renders the React component tree. The components themselves were
+ * cleaned of Next.js-specific imports in Phase 2a (next/link → <a>,
+ * next/image → <img>, etc.), so they render fine as Astro React islands.
+ *
+ * Interactive bits (Header's mobile menu, DealsOfDay's carousel, the
+ * eventual cart) are marked `client:load` so they hydrate. Everything
+ * else stays as pure server-rendered HTML — gigantic perf win over Vercel
+ * because Bangladesh's mobile clients only pay for the JS they actually
+ * use (the carousel + dropdown, not the entire Next.js runtime).
+ */
+import Base from '../layouts/Base.astro';
+import { getStorefront, getProducts, getCategories } from '../lib/api';
+import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
+import { resolveHomeData } from '../lib/home-data';
+import { Header } from '../components/layout/header';
+import { Footer } from '../components/layout/footer';
+import { MessengerCTA } from '../components/layout/messenger-cta';
+import { ServiceHome } from '../views/service-home';
+import { HeroGrid } from '../components/home/hero-grid';
+import { CategoryStrip } from '../components/home/category-strip';
+import { ProductRow } from '../components/home/product-row';
+import { PromoRow } from '../components/home/promo-row';
+import { BrandStrip } from '../components/home/brand-strip';
+import { PromoBanner } from '../components/home/promo-banner';
+import { CardPaymentPromo } from '../components/home/card-payment-promo';
+import { DealsOfDay } from '../components/home/deals-of-day';
+import { ServicesRow } from '../components/home/services-row';
+import { TrustBadges } from '../components/home/trust-badges';
+import type { HomepageSectionKey } from '../lib/types';
+
+// Build-time fetch — same shape as views/home.tsx's async function. Three
+// API calls in parallel since the homepage is the most-hit route; we want
+// the fastest possible build.
+const [meta, productsRes, categories] = await Promise.all([
+  getStorefront().catch(() => null),
+  getProducts({ perPage: 100 }).catch(() => ({ data: [], meta: null })),
+  getCategories().catch(() => []),
+]);
+
+// If the storefront API is completely unreachable, render a minimal
+// placeholder rather than crashing the build. This matches the original
+// Next.js code's behaviour (which logged a warning and rendered blank
+// pages) but logs more loudly so we notice.
+if (!meta) {
+  console.error('[index.astro] getStorefront() returned null — tenant API unreachable. Rendering placeholder.');
+}
+
+// Service tenants get a block-based service website (ServiceSiteConfig)
+// instead of the product storefront — own sticky anchor-nav header, lead
+// form instead of checkout. The product/category data fetched above is
+// simply unused (service tenants have none).
+const isServiceSite = meta?.business_type === 'service' && !!meta?.service_home;
+
+const all = productsRes.data ?? [];
+const home = meta?.homepage ?? null;
+
+// ID-resolution (config product_ids → full ProductCard objects) lives in the
+// shared helper so the dashboard live-preview island renders identically.
+const {
+  heroProducts,
+  featureProducts,
+  trendingProducts,
+  mostSellingProducts,
+  dealsProducts,
+  promoRowItems,
+  dealsSpotlight,
+  homepageCategories,
+  sectionOrder,
+} = resolveHomeData(home, all, categories);
+
+// JSON-LD. This page is PRERENDERED, so the request origin is meaningless
+// at build time — schemas only render once the tenant has a public_url
+// (i.e. after the first deploy), which is exactly when they matter.
+const origin = (meta?.public_url ?? '').replace(/\/+$/, '');
+const serviceFaq = meta?.service_home?.faq;
+const schemas: Record<string, unknown>[] =
+  meta && origin
+    ? isServiceSite
+      ? [
+          orgSchema(meta, origin),
+          ...(serviceFaq?.visible && serviceFaq.items?.length
+            ? [faqSchema(serviceFaq.items)].filter(
+                (s): s is Record<string, unknown> => s !== null,
+              )
+            : []),
+        ]
+      : [orgSchema(meta, origin), websiteSchema(meta, origin)]
+    : [];
+---
+
+{/* No title/description props: Base renders "Site title — Tagline" and the
+    seo.description fallback chain (passing meta.about here used to override
+    the tenant's Site description with the footer summary). */}
+<Base schema={schemas} meta={meta}>
+  {/* Service tenants: block-based service website with its own anchor-nav
+      header — the product Header/sections below never render for them. */}
+  {meta && isServiceSite && <ServiceHome client:load meta={meta} config={meta.service_home!} />}
+
+  {meta && !isServiceSite && <Header client:load meta={meta} categories={categories} />}
+
+  <main class="pb-12">
+    {meta && !isServiceSite && home && sectionOrder.map((key: HomepageSectionKey) => {
+      switch (key) {
+        case 'hero':
+          return home.hero.visible && (home.hero.image_url || heroProducts.length > 0)
+            ? <HeroGrid featured={heroProducts} hero={home.hero} />
+            : null;
+        case 'categories':
+          return home.categories.visible
+            ? <CategoryStrip categories={homepageCategories} title={home.categories.title} />
+            : null;
+        case 'feature_products':
+          return home.feature_products.visible && featureProducts.length > 0
+            ? <ProductRow
+                title={home.feature_products.title}
+                subtitle={home.feature_products.subtitle}
+                products={featureProducts}
+                cols={5}
+              />
+            : null;
+        case 'promo_row':
+          return home.promo_row.visible && promoRowItems.length === 3
+            ? <PromoRow
+                products={promoRowItems.map((x) => x.product)}
+                cards={promoRowItems.map((x) => x.card)}
+              />
+            : null;
+        case 'trending_products':
+          return home.trending_products.visible && trendingProducts.length > 0
+            ? <ProductRow
+                title={home.trending_products.title}
+                subtitle={home.trending_products.subtitle}
+                products={trendingProducts}
+                cols={5}
+              />
+            : null;
+        case 'brand_strip':
+          return home.brand_strip.visible
+            ? <BrandStrip items={home.brand_strip.items} />
+            : null;
+        case 'promo_banner':
+          return home.promo_banner.visible
+            ? <PromoBanner config={home.promo_banner} />
+            : null;
+        case 'most_selling':
+          return home.most_selling.visible && mostSellingProducts.length > 0
+            ? <ProductRow
+                title={home.most_selling.title}
+                subtitle={home.most_selling.subtitle}
+                products={mostSellingProducts}
+                cols={5}
+              />
+            : null;
+        case 'card_payment_promo':
+          return home.card_payment_promo.visible
+            ? <CardPaymentPromo config={home.card_payment_promo} />
+            : null;
+        case 'deals_of_day':
+          return home.deals_of_day.visible && (dealsSpotlight || dealsProducts.length > 0)
+            ? <DealsOfDay
+                client:visible
+                products={dealsProducts}
+                spotlight={dealsSpotlight}
+                title={home.deals_of_day.title}
+              />
+            : null;
+        case 'services_row':
+          return home.services_row.visible
+            ? <ServicesRow items={home.services_row.items} />
+            : null;
+        case 'trust_badges':
+          return home.trust_badges.visible
+            ? <TrustBadges items={home.trust_badges.items} />
+            : null;
+        default:
+          return null;
+      }
+    })}
+
+    {/* Fallback when the API is unreachable or returned no homepage config */}
+    {!meta && (
+      <div class="mx-auto max-w-2xl px-4 py-16 text-center">
+        <h1 class="text-2xl font-bold text-slate-900">This shop is temporarily unavailable</h1>
+        <p class="mt-2 text-sm text-slate-500">
+          Please try again in a minute, or contact the shop owner.
+        </p>
+      </div>
+    )}
+  </main>
+
+  {meta && <Footer meta={meta} categories={isServiceSite ? [] : categories} />}
+  {meta?.messenger?.url && <MessengerCTA client:visible href={meta.messenger.url} />}
+</Base>

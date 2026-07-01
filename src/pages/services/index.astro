@@ -1,0 +1,21 @@
+---
+/**
+ * Services catalog page (service tenants). SSR — services change without a
+ * rebuild, like the product list. Pure content, so no client island.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getServices, getStorefront } from '../../lib/api';
+import { ServicesPage } from '../../views/services-page';
+import type { ServiceCard, StorefrontMeta } from '../../lib/types';
+
+const [services, meta]: [ServiceCard[] | null, StorefrontMeta | null] = await Promise.all([
+  getServices().catch((err) => { console.warn('[services/index] getServices failed:', err); return null; }),
+  getStorefront().catch((err) => { console.warn('[services/index] getStorefront failed:', err); return null; }),
+]);
+---
+
+<Base title="Services" description={meta?.about ?? undefined} meta={meta}>
+  <ServicesPage meta={meta} services={services ?? []} />
+</Base>

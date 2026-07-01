@@ -1,28 +1,21 @@
-import Link from 'next/link';
-import Image from 'next/image';
 import { Star } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 import { Badge } from '../ui/badge';
+import { FitImage } from '../ui/fit-image';
 
 export function ProductCard({ product }: { product: ProductCardType }) {
   const discount = discountPct(product.price, product.compare_at_price);
 
   return (
-    <Link
+    <a
       href={`/products/${product.slug}`}
       className="group block rounded-2xl bg-white ring-1 ring-slate-200 hover:ring-brand-300 hover:shadow-md transition overflow-hidden"
     >
       {/* Image */}
       <div className="relative aspect-square bg-slate-100 overflow-hidden">
         {product.image_url ? (
-          <Image
-            src={product.image_url}
-            alt={product.name}
-            fill
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
-            className="object-cover group-hover:scale-105 transition-transform duration-500"
-          />
+          <FitImage src={product.image_url} alt={product.name} />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-3xl font-bold">
             {product.name.charAt(0).toUpperCase()}
@@ -55,12 +48,12 @@ export function ProductCard({ product }: { product: ProductCardType }) {
         )}
 
         <div className="flex items-baseline gap-2">
-          <span className="text-base font-bold text-slate-900">{formatBDT(product.price)}</span>
+          <span className="text-base font-bold text-slate-900">{formatBDT(product.price, { currency: product.currency })}</span>
           {product.compare_at_price && product.compare_at_price > product.price && (
-            <span className="text-xs text-slate-400 line-through">{formatBDT(product.compare_at_price)}</span>
+            <span className="text-xs text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
           )}
         </div>
       </div>
-    </Link>
+    </a>
   );
 }

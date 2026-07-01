@@ -1,14 +1,19 @@
-import Link from 'next/link';
 import { MessageCircle, ShieldCheck, Truck, HelpCircle } from 'lucide-react';
-import { getStorefront } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
+import { NotFoundPage } from './not-found';
+import type { StorefrontMeta } from '../lib/types';
 
-export async function OrderLookupPage() {
-  const meta = await getStorefront();
+/**
+ * Astro+CF port: previously async-fetched its own storefront meta.
+ * Now receives `meta` as a prop from the Astro page wrapper so the
+ * component itself can hydrate as a sync client island.
+ */
+export function OrderLookupPage({ meta }: { meta: StorefrontMeta | null }) {
+  if (!meta) return <NotFoundPage />;
 
   return (
     <>
@@ -57,9 +62,9 @@ export async function OrderLookupPage() {
                 </Button>
               </a>
             )}
-            <Link href="/products">
+            <a href="/products">
               <Button variant="outline" size="sm">Continue shopping</Button>
-            </Link>
+            </a>
           </div>
         </div>
       </main>
@@ -81,7 +86,7 @@ function Trust({
 }) {
   return (
     <div className="rounded-xl bg-white ring-1 ring-slate-200 px-3 py-3 flex flex-col items-center gap-1">
-      <Icon className="h-5 w-5 text-emerald-600" />
+      <Icon className="h-5 w-5 text-brand-600" />
       <p className="text-xs font-semibold text-slate-900">{title}</p>
       <p className="text-[10px] text-slate-500">{subtitle}</p>
     </div>

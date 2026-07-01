@@ -1,0 +1,47 @@
+---
+/**
+ * Service detail page (service tenants). SSR — fetched per request and
+ * CDN-cached, like product detail pages. Client island for the booking form.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getService, getStorefront } from '../../lib/api';
+import { breadcrumbSchema } from '../../lib/schema';
+import { ServiceDetailPage } from '../../views/service-detail-page';
+import type { ServiceDetail, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+const [service, meta]: [ServiceDetail | null, StorefrontMeta | null] = await Promise.all([
+  getService(slug).catch((err) => { console.warn(`[services/[slug]] getService(${slug}) failed:`, err); return null; }),
+  getStorefront().catch((err) => { console.warn('[services/[slug]] getStorefront failed:', err); return null; }),
+]);
+
+// Real 404 status when the service doesn't exist (avoid soft-404s).
+if (!service) {
+  Astro.response.status = 404;
+}
+
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = service
+  ? [
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Services', url: `${origin}/services` },
+        { name: service.name },
+      ]),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
+---
+
+<Base
+  title={service?.seo?.title}
+  description={service?.seo?.description ?? undefined}
+  ogImage={service?.image_url ?? undefined}
+  noindex={service?.seo?.noindex}
+  schema={schemas}
+  meta={meta}
+>
+  <ServiceDetailPage client:load service={service} meta={meta} />
+</Base>

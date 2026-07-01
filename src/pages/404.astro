@@ -1,0 +1,19 @@
+---
+/**
+ * Branded 404 — served for any unmatched path so visitors get a real
+ * "not found" page instead of the homepage. (Astro static build emits
+ * 404.html, which Cloudflare Pages serves on not-found.)
+ */
+import Base from '../layouts/Base.astro';
+---
+
+<Base title="Page not found" noindex={true}>
+  <main class="mx-auto max-w-md px-4 py-24 text-center">
+    <p class="text-5xl font-extrabold text-slate-300">404</p>
+    <h1 class="mt-3 text-xl font-bold text-slate-900">Page not found</h1>
+    <p class="mt-2 text-slate-600">This page doesn't exist or has been moved.</p>
+    <a href="/" class="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700">
+      Go to homepage
+    </a>
+  </main>
+</Base>

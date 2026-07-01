@@ -1,0 +1,25 @@
+---
+/**
+ * Customer login page. Account features are OPT-IN — guest checkout and guest
+ * order tracking stay fully usable. SSR (prerender:false) so the page never
+ * gets cached with a stale logged-in/out state, and noindex (account pages
+ * shouldn't appear in search).
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getStorefront } from '../lib/api';
+import { LoginPage } from '../views/login';
+import type { StorefrontMeta } from '../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[login.astro] getStorefront() failed:', err);
+}
+---
+
+<Base title="Log in" meta={meta} noindex={true}>
+  <LoginPage client:load meta={meta} />
+</Base>

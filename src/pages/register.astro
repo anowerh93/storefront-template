@@ -1,0 +1,23 @@
+---
+/**
+ * Customer registration page. OPT-IN — guest checkout/tracking unaffected.
+ * SSR + noindex (account pages shouldn't appear in search).
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getStorefront } from '../lib/api';
+import { RegisterPage } from '../views/register';
+import type { StorefrontMeta } from '../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[register.astro] getStorefront() failed:', err);
+}
+---
+
+<Base title="Create an account" meta={meta} noindex={true}>
+  <RegisterPage client:load meta={meta} />
+</Base>

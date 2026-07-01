@@ -1,0 +1,21 @@
+---
+/**
+ * Order lookup landing page — shown when the customer clicks "Track order"
+ * in the header/footer without already having an order number in hand.
+ */
+import Base from '../../layouts/Base.astro';
+import { getStorefront } from '../../lib/api';
+import { OrderLookupPage } from '../../views/order-lookup';
+import type { StorefrontMeta } from '../../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[order/lookup.astro] getStorefront() failed:', err);
+}
+---
+
+<Base title="Track your order" meta={meta}>
+  <OrderLookupPage client:load meta={meta} />
+</Base>

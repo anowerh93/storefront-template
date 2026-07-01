@@ -1,7 +1,11 @@
 node_modules
-.next
-out
 dist
+.astro
+.wrangler
+out
+# Legacy — old Next.js build cache. Kept in gitignore so a stray local
+# build from before the Astro migration doesn't accidentally get committed.
+.next
 .env
 .env.local
 .env*.local
@@ -9,5 +13,3 @@ dist
 .DS_Store
 # TypeScript incremental build cache — should never be committed
 *.tsbuildinfo
-# Next.js auto-generates this on every dev/build run
-next-env.d.ts

@@ -1,0 +1,35 @@
+---
+/**
+ * Blog listing (/blog). SSR — posts change without a rebuild, and ?page is
+ * read off the URL. Shared by both business types. Hydrated so the e-commerce
+ * Header (mobile menu / category dropdown) stays interactive.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getBlogPosts, getStorefront, getCategories } from '../../lib/api';
+import { blogSchema, breadcrumbSchema } from '../../lib/schema';
+import { BlogListPage } from '../../views/blog-list';
+import type { BlogPostCard, Category, Paginated, StorefrontMeta } from '../../lib/types';
+
+const page = parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
+const search = (Astro.url.searchParams.get('search') ?? '').trim();
+
+const [posts, meta, categories]: [Paginated<BlogPostCard> | null, StorefrontMeta | null, Category[]] = await Promise.all([
+  getBlogPosts({ page, perPage: 12, search: search || undefined }).catch((err) => { console.warn('[blog/index] getBlogPosts failed:', err); return null; }),
+  getStorefront().catch((err) => { console.warn('[blog/index] getStorefront failed:', err); return null; }),
+  getCategories().catch(() => []),
+]);
+
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = meta
+  ? [
+      blogSchema(meta, `${origin}/blog`),
+      breadcrumbSchema([{ name: 'Home', url: `${origin}/` }, { name: 'Blog' }]),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
+---
+
+<Base title="Blog" description={meta?.seo?.description ?? meta?.about ?? undefined} schema={schemas} meta={meta}>
+  <BlogListPage client:load meta={meta} posts={posts} categories={categories} search={search} />
+</Base>

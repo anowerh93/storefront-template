@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@plugin '@tailwindcss/typography';
 
 /*
  * Reply.BD storefront — Tailwind v4 theme.
@@ -8,18 +9,20 @@
  * runtime injection fails or during SSR before metadata loads.
  */
 @theme {
-  /* Brand defaults — overridden at runtime per tenant */
-  --color-brand-50:  rgb(238 242 255);
-  --color-brand-100: rgb(224 231 255);
-  --color-brand-200: rgb(199 210 254);
-  --color-brand-300: rgb(165 180 252);
-  --color-brand-400: rgb(129 140 248);
-  --color-brand-500: rgb(99  102 241);
-  --color-brand-600: rgb(79   70 229);
-  --color-brand-700: rgb(67   56 202);
-  --color-brand-800: rgb(55   48 163);
-  --color-brand-900: rgb(49   46 129);
-  --color-brand-950: rgb(30   27 75);
+  /* Brand defaults — #0b1a3a (deep navy) ramp, generated with the same
+     tint/shade math as brandCssVars(). Overridden at runtime per tenant; this
+     static set is the fallback when no theme_color is injected. */
+  --color-brand-50:  rgb(243 244 245);
+  --color-brand-100: rgb(218 221 225);
+  --color-brand-200: rgb(182 186 196);
+  --color-brand-300: rgb(133 141 157);
+  --color-brand-400: rgb( 72  83 107);
+  --color-brand-500: rgb( 11  26  58);
+  --color-brand-600: rgb( 10  23  52);
+  --color-brand-700: rgb(  8  20  44);
+  --color-brand-800: rgb(  7  16  35);
+  --color-brand-900: rgb(  5  12  26);
+  --color-brand-950: rgb(  3   8  17);
 
   /* Neutral surface tokens — the rest of the app reads `surface` etc. */
   --color-surface:        rgb(255 255 255);
@@ -47,6 +50,15 @@
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
   }
+
+  /* Inline highlight (<mark>) from funnel rich-text headlines — keep the
+     editor's amber look and inherit the surrounding text colour. */
+  mark {
+    background-color: rgb(253 230 138); /* amber-200 */
+    color: inherit;
+    border-radius: 2px;
+    padding: 0 0.1em;
+  }
 }
 
 @layer utilities {
@@ -54,3 +66,104 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
+/* ── Per-word/per-selection animations (funnel rich-text) ──────────────────
+   Words carry data-anim="TOKEN" (set in the dashboard inline editor, validated
+   server-side by App\Support\RichText). Tokens MUST mirror ANIM_TOKENS in
+   resources/js/inline-editor.js. They play only once their block scrolls into
+   view (Reveal adds .funnel-revealed). Resting state (no .funnel-revealed) is
+   fully visible, so text never hides if JS is disabled. */
+@keyframes fnl-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes fnl-slide-up { from { opacity: 0; transform: translateY(0.6em); } to { opacity: 1; transform: translateY(0); } }
+@keyframes fnl-pop { 0% { opacity: 0; transform: scale(0.6); } 60% { transform: scale(1.08); } 100% { opacity: 1; transform: scale(1); } }
+@keyframes fnl-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.09); } }
+@keyframes fnl-shake { 0%, 100% { transform: translateX(0); } 20% { transform: translateX(-3px); } 40% { transform: translateX(3px); } 60% { transform: translateX(-2px); } 80% { transform: translateX(2px); } }
+
+/* Per-section dark background → readable (white) text. Unlayered so it beats
+   Tailwind's text-* utilities, but plain enough that inline rich-text colours
+   (style="color:…") still win. */
+.funnel-dark :is(h1, h2, h3, h4, p, span, li, summary) { color: #fff; }
+
+/* WHITE CARDS inside a dark section (service-site contact form, service +
+   testimonial cards) keep dark text — .sv-card opts a card out of the
+   whitening above. Inline rich-text colours still win (style attr). */
+.funnel-dark .sv-card,
+.funnel-dark .sv-card :is(h1, h2, h3, h4, p, span, li, summary, label) { color: #0f172a; }
+
+/* Bengali funnel font — opt-in per funnel (config.font === 'bengali'). The
+   Hind Siliguri webfont is loaded by Base.astro (bengaliFont prop) only on
+   these pages; this just applies it to the funnel subtree. */
+.funnel-font-bn { font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif; }
+
+/* Section "pattern" background — a tiled SVG motif (set inline per section)
+   that slowly drifts diagonally. Subtle, brand-coloured ambience. */
+@keyframes fnl-bg-scroll { from { background-position: 0 0; } to { background-position: 800px 800px; } }
+.fnl-bg-pattern { animation: fnl-bg-scroll 60s linear infinite; }
+@media (prefers-reduced-motion: reduce) { .fnl-bg-pattern { animation: none; } }
+
+/* Full-bleed: break a section out of its max-width column to span the full
+   viewport width (the split hero). The body has overflow-x:hidden so the
+   100vw width never introduces a horizontal scrollbar. */
+.fnl-full-bleed { position: relative; left: 50%; right: 50%; width: 100vw; margin-left: -50vw; margin-right: -50vw; }
+
+/* Footer with a LIGHT custom background → dark text (the default footer text
+   is light for the dark brand backdrop). Unlayered low-specificity override
+   that beats Tailwind's text-brand-* utilities. The social-icon chips keep
+   their own dark bg-brand-800 background, so their light icons are excluded
+   (:not) — otherwise dark-on-dark would hide them. Image backgrounds carry a
+   dark scrim and never get this class, so they stay light. */
+.footer-on-light :is(h1, h2, h3, h4, p, span, li, label),
+.footer-on-light a:not(.bg-brand-800) { color: #1e293b; }
+.footer-on-light a:not(.bg-brand-800):hover { color: #0f172a; }
+
+/* transforms need inline-block; fade (opacity only) stays inline so it wraps */
+[data-anim="slide-up"],
+[data-anim="pop"],
+[data-anim="pulse"],
+[data-anim="shake"] { display: inline-block; }
+
+.funnel-revealed [data-anim="fade"]     { animation: fnl-fade .7s both; }
+.funnel-revealed [data-anim="slide-up"] { animation: fnl-slide-up .7s both; }
+.funnel-revealed [data-anim="pop"]      { animation: fnl-pop .6s both; }
+.funnel-revealed [data-anim="pulse"]    { animation: fnl-pulse 1.6s ease-in-out infinite; }
+.funnel-revealed [data-anim="shake"]    { animation: fnl-shake 1.8s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .funnel-revealed [data-anim] { animation: none !important; }
+}
+
+/* Enlarged (font-size) / animated (inline-block) words are taller than the
+   line. Give the LINE that holds one extra leading so its tall inline box —
+   Bengali matras sit well above/below the baseline — doesn't crowd the wrapped
+   line above, and keep the span's own box compact so lines don't jump. :has()
+   is progressive: a browser without it just keeps the prior spacing. Unlayered
+   so it beats Tailwind's leading-* utilities. Mirrored in the dashboard's
+   resources/js/inline-editor.css (.funnel-preview). */
+:is(h1, h2, h3, h4, p, li, summary):has([data-anim]),
+:is(h1, h2, h3, h4, p, li, summary):has(span[style*="font-size"]) { line-height: 1.5; }
+[data-anim],
+span[style*="font-size"] { line-height: 1.15; }
+
+/* ── Markdown tables (Specifications / Support / Description) ─────────────
+   Tailwind Typography only draws bottom borders under rows — markdown spec
+   tables had NO outer or column borders at all. Give them the full grid a
+   spec sheet needs: boxed outline, vertical separators, shaded header,
+   rounded corners (border-radius needs border-collapse: separate). */
+.prose table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  overflow: hidden;
+  width: 100%;
+}
+.prose th,
+.prose td {
+  border-bottom: 1px solid #e2e8f0;
+  border-right: 1px solid #e2e8f0;
+  padding: 0.5rem 0.75rem;
+}
+.prose th:last-child,
+.prose td:last-child { border-right: 0; }
+.prose tr:last-child td { border-bottom: 0; }
+.prose thead th { background: #f8fafc; }

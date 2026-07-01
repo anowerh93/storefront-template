@@ -1,0 +1,48 @@
+---
+/**
+ * Product list / search / filter page (footer "Shop" link).
+ *
+ * SSR on CF Workers (prerender:false) because it reads ?search / ?category
+ * / ?page / ?sort off the URL — those can't be baked at build time. The
+ * native GET <form> and <a> filter links re-request this route server-side;
+ * only the SortDropdown needs client JS, so the view hydrates as an island.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getStorefront, getProducts, getCategories, type ProductSort } from '../../lib/api';
+import { ProductListPage } from '../../views/product-list';
+import type { StorefrontMeta, Category } from '../../lib/types';
+
+const sp = Astro.url.searchParams;
+const search   = sp.get('search')   ?? '';
+const category = sp.get('category') ?? '';
+const page     = parseInt(sp.get('page') ?? '1', 10);
+const sort     = (sp.get('sort') ?? 'newest') as ProductSort;
+
+let meta: StorefrontMeta | null = null;
+let categories: Category[] = [];
+let productsRes = { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 24 } } as any;
+
+try {
+  [meta, productsRes, categories] = await Promise.all([
+    getStorefront(),
+    getProducts({ page, perPage: 24, search, category, sort }),
+    getCategories().catch(() => []),
+  ]);
+} catch (err) {
+  console.warn('[products/index.astro] fetch failed:', err);
+}
+
+const searchParams = { search, category, page: String(page), sort };
+---
+
+<Base title="All products" meta={meta}>
+  <ProductListPage
+    client:load
+    searchParams={searchParams}
+    meta={meta}
+    productsRes={productsRes}
+    categories={categories}
+  />
+</Base>

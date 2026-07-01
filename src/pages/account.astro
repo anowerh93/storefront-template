@@ -1,0 +1,24 @@
+---
+/**
+ * Customer account page — order history + "track without typing". The view
+ * redirects to /login client-side when there's no stored token. SSR + noindex
+ * (per-customer page; never cached or indexed).
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getStorefront } from '../lib/api';
+import { AccountPage } from '../views/account';
+import type { StorefrontMeta } from '../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[account.astro] getStorefront() failed:', err);
+}
+---
+
+<Base title="My account" meta={meta} noindex={true}>
+  <AccountPage client:load meta={meta} />
+</Base>

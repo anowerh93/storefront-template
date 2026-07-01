@@ -27,7 +27,8 @@ export async function HomePage() {
   ]);
 
   const all = productsRes.data;
-  const home = meta.homepage;
+  // Legacy view (superseded by index.astro) — e-commerce config only.
+  const home = meta.homepage!;
   const byId = new Map(all.map((p) => [p.id, p]));
 
   const resolve = (ids: number[]): ProductCard[] =>
@@ -59,7 +60,7 @@ export async function HomePage() {
     switch (key) {
       case 'hero':
         return home.hero.visible && heroProducts.length > 0
-          ? <HeroGrid key="hero" featured={heroProducts} eyebrow={home.hero.eyebrow} />
+          ? <HeroGrid key="hero" featured={heroProducts} hero={home.hero} />
           : null;
       case 'categories':
         return home.categories.visible

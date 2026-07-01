@@ -1,0 +1,84 @@
+---
+/**
+ * Product detail page — the catalog entry point.
+ *
+ * Customers land here after clicking a product card. The buy box's
+ * "Add to Cart" stacks lines for a combined /cart → /checkout flow, while
+ * "Order Now" is an express single-item buy-now to /checkout?p=…&v=…&q=….
+ *
+ * Render mode: SSR on CF Workers (prerender:false). Pre-rendering each
+ * PDP at build time would mean rebuilding the whole storefront every
+ * time a product is added — cheaper for v1 to let CF Workers fetch on
+ * first request and CDN-cache it. Trade-off: ~150ms slower first paint
+ * on each unique URL, basically free thereafter.
+ *
+ * Fetch is in Astro frontmatter (server-side) so we pass the product
+ * data to the React component as a prop. The view itself was refactored
+ * from async-fetching to prop-receiving so it could be client:load'd —
+ * client islands have to be sync.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getProduct, getStorefront, resolvePath } from '../../lib/api';
+import { breadcrumbSchema, faqSchema, productSchema } from '../../lib/schema';
+import { ProductDetailPage } from '../../views/product-detail';
+import type { ProductDetail, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+// Two independent fetches, run in PARALLEL — sequential awaits here cost a
+// full extra origin round-trip per page view. If the product 404s we still
+// want meta for the layout/branding on the rendered NotFoundPage.
+const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Promise.all([
+  getProduct(slug).catch((err) => {
+    console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
+    return null;
+  }),
+  getStorefront().catch((err) => {
+    console.warn('[products/[slug].astro] getStorefront() failed:', err);
+    return null;
+  }),
+]);
+
+// Slug renames leave a 301 behind — ask the redirect table before rendering
+// a 404 (the miss is logged server-side either way). Local paths only; a
+// poisoned to_path must never become an open redirect.
+if (!product) {
+  const redirect = await resolvePath(`/products/${slug}`);
+  if (redirect?.to?.startsWith('/')) {
+    return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
+  }
+  // Real 404 status — the in-place not-found view with a 200 is a "soft
+  // 404" that search engines flag and keep crawling.
+  Astro.response.status = 404;
+}
+
+// JSON-LD: Product (+ratings/reviews) + breadcrumb trail (+FAQ when the
+// funnel has one). URLs use the canonical origin so rich results point
+// at the real domain; SSR pages can fall back to the request origin.
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const productUrl = `${origin}/products/${encodeURIComponent(slug)}`;
+const schemas = product
+  ? [
+      productSchema(product, productUrl),
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: 'Products', url: `${origin}/products` },
+        { name: product.name },
+      ]),
+      ...(product.funnel?.faq?.length ? [faqSchema(product.funnel.faq)] : []),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
+---
+
+<Base
+  title={product?.name}
+  description={product?.short_description ?? product?.name}
+  ogImage={product?.image_url ?? undefined}
+  noindex={product?.seo?.noindex}
+  schema={schemas}
+  meta={meta}
+>
+  <ProductDetailPage client:load product={product} meta={meta} />
+</Base>

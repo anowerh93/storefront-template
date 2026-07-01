@@ -1,4 +1,3 @@
-import Link from 'next/link';
 import { ArrowRight } from 'lucide-react';
 import type { ProductCard as ProductCardType } from '../../lib/types';
 import { ProductCard } from '../product/product-card';
@@ -35,9 +34,9 @@ export function ProductRow({
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900">{title}</h2>
           {subtitle && <p className="text-xs sm:text-sm text-slate-500 mt-0.5">{subtitle}</p>}
         </div>
-        <Link href={viewAllHref} className="text-sm font-medium text-slate-600 hover:text-brand-600 inline-flex items-center gap-1">
+        <a href={viewAllHref} className="text-sm font-medium text-slate-600 hover:text-brand-600 inline-flex items-center gap-1">
           View All <ArrowRight className="h-3.5 w-3.5" />
-        </Link>
+        </a>
       </div>
 
       <div className={`grid ${gridCls} gap-3 sm:gap-4`}>

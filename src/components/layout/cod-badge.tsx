@@ -8,9 +8,9 @@ import { Badge } from '../ui/badge';
 export function CodBadge({ size = 'sm' }: { size?: 'sm' | 'lg' }) {
   if (size === 'lg') {
     return (
-      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-50 border border-emerald-200 w-fit">
-        <Truck className="h-4 w-4 text-emerald-700" />
-        <span className="text-sm font-semibold text-emerald-800">Cash on Delivery available</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-brand-50 border border-brand-200 w-fit">
+        <Truck className="h-4 w-4 text-brand-700" />
+        <span className="text-sm font-semibold text-brand-800">Cash on Delivery available</span>
       </div>
     );
   }

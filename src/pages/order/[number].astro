@@ -1,0 +1,49 @@
+---
+/**
+ * Order success / tracking page — the route that was MISSING (the live bug).
+ *
+ * Reached two ways:
+ *   1. Right after checkout, the order forms redirect to
+ *      /order/{number}?placed=1&phone={last4} → the "Order placed!" success
+ *      screen + status timeline.
+ *   2. Guest tracking from the lookup form: /order/{number}?phone={last4}.
+ *
+ * SSR on CF Workers (prerender:false) — the order number is a per-request
+ * route param, not a build-time path, and the lookup is per-customer live
+ * data. We fetch only the storefront meta here (for the chrome); the order
+ * itself is looked up CLIENT-SIDE inside OrderStatusPage so we can show a
+ * loading state and dodge the "placed but lookup races" window right after
+ * submit (same reasoning documented in order-status.tsx).
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getStorefront } from '../../lib/api';
+import { OrderStatusPage } from '../../views/order-status';
+import type { StorefrontMeta } from '../../lib/types';
+
+const orderNumber = Astro.params.number ?? '';
+const phone = Astro.url.searchParams.get('phone') ?? undefined;
+const placed = Astro.url.searchParams.get('placed') === '1';
+// Set when checkout's "Create an account?" hit a phone that already has one
+// (the order still succeeded) — the success screen nudges them to log in.
+const accountExists = Astro.url.searchParams.get('account_exists') === '1';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[order/[number].astro] getStorefront() failed:', err);
+}
+---
+
+<Base title={`Order #${orderNumber}`} meta={meta} noindex={true}>
+  <OrderStatusPage
+    client:load
+    orderNumber={orderNumber}
+    phone={phone}
+    placed={placed}
+    accountExists={accountExists}
+    meta={meta}
+  />
+</Base>

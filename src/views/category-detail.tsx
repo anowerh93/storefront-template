@@ -1,31 +1,35 @@
-import { notFound } from 'next/navigation';
-import Link from 'next/link';
 import { PackageX } from 'lucide-react';
-import { getCategory, getStorefront, getCategories, type ProductSort } from '../lib/api';
+import { type ProductSort } from '../lib/api';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { ProductGrid } from '../components/product/product-grid';
 import { SortDropdown } from '../components/product/sort-dropdown';
 import { Button } from '../components/ui/button';
+import { NotFoundPage } from './not-found';
+import type { Category, Paginated, ProductCard, StorefrontMeta } from '../lib/types';
 
-export async function CategoryDetailPage({
-  slug,
+/**
+ * Astro+CF port: was async (fetched category+products+meta). The Astro page
+ * (src/pages/categories/[slug].astro) does the fetch and passes `res` in;
+ * a null res (category 404 or fetch error) renders NotFoundPage in-place.
+ * Rendered as a client island because SortDropdown needs hydration.
+ */
+export function CategoryDetailPage({
   searchParams,
+  res,
+  meta,
+  categories,
 }: {
-  slug: string;
   searchParams?: { sort?: string; page?: string };
+  res: { category: Category; products: Paginated<ProductCard> } | null;
+  meta: StorefrontMeta | null;
+  categories: Category[];
 }) {
+  if (!res || !meta) return <NotFoundPage />;
+
   const sort = (searchParams?.sort ?? 'newest') as ProductSort;
   const page = parseInt(searchParams?.page ?? '1', 10);
-
-  let res;
-  try {
-    res = await getCategory(slug, { sort, page });
-  } catch {
-    notFound();
-  }
-  const [meta, categories] = await Promise.all([getStorefront(), getCategories().catch(() => [])]);
   const { category, products } = res;
 
   return (
@@ -33,9 +37,9 @@ export async function CategoryDetailPage({
       <Header meta={meta} categories={categories} />
       <main className="mx-auto max-w-[1200px] px-4 sm:px-6 py-6 sm:py-10">
         <nav className="text-xs text-slate-500 mb-4">
-          <Link href="/" className="hover:text-brand-600">Home</Link>
+          <a href="/" className="hover:text-brand-600">Home</a>
           <span className="mx-2">/</span>
-          <Link href="/categories" className="hover:text-brand-600">Categories</Link>
+          <a href="/categories" className="hover:text-brand-600">Categories</a>
           <span className="mx-2">/</span>
           <span className="text-slate-700">{category.name}</span>
         </nav>
@@ -48,7 +52,7 @@ export async function CategoryDetailPage({
             </p>
           </div>
           {products.data.length > 0 && (
-            <SortDropdown current={sort} basePath={`/categories/${slug}`} />
+            <SortDropdown current={sort} basePath={`/categories/${category.slug}`} />
           )}
         </div>
 
@@ -60,9 +64,9 @@ export async function CategoryDetailPage({
               We&rsquo;re still adding products to this category.
             </p>
             <div className="mt-5">
-              <Link href="/products">
+              <a href="/products">
                 <Button variant="brand">Browse all products</Button>
-              </Link>
+              </a>
             </div>
           </div>
         ) : (

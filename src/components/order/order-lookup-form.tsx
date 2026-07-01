@@ -1,14 +1,10 @@
-'use client';
-
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
 
 export function OrderLookupForm({ orderNumber: initialNumber = '' }: { orderNumber?: string }) {
-  const router = useRouter();
   const [orderNumber, setOrderNumber] = useState(initialNumber);
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +16,11 @@ export function OrderLookupForm({ orderNumber: initialNumber = '' }: { orderNumb
     if (!canSubmit) return;
     setSubmitting(true);
     const num = (initialNumber || orderNumber).trim();
-    router.push(`/order/${encodeURIComponent(num)}?phone=${encodeURIComponent(phone.slice(-4))}`);
+    // Astro+CF: client-side navigation via window.location.href since
+    // this is a React island, not a Next.js Server Component. The PRG
+    // semantics are identical — full page load on a new URL, which gives
+    // us the SSR'd /order/{number} page rendering on Cloudflare Workers.
+    window.location.href = `/order/${encodeURIComponent(num)}?phone=${encodeURIComponent(phone.slice(-4))}`;
   }
 
   return (
