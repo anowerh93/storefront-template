@@ -478,8 +478,8 @@ async function authFetch<T>(
 /**
  * Unwraps Laravel's `{ data, error }` envelope for the customer auth endpoints,
  * surfacing `error.code` on the thrown Error (so callers can branch on
- * 'account_exists' / 'invalid_credentials' / 'password_required') and applying
- * the same defensive JSON parse as submitOrder.
+ * 'registration_failed' / 'invalid_credentials' / 'password_required') and
+ * applying the same defensive JSON parse as submitOrder.
  */
 export class ApiError extends Error {
   code?: string;

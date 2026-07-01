@@ -14,8 +14,10 @@ import type { StorefrontMeta } from '../lib/types';
  * Customer registration. name + phone + optional email + password (min 6). On
  * success the bearer token is stored and we redirect to /account; any orders
  * that already match this phone get auto-claimed server-side (claimed_orders).
- * A 409 account_exists means the phone/email is already registered → we point
- * them at /login instead of showing a dead-end error.
+ * A 422 registration_failed can mean the phone/email is already registered
+ * (the API deliberately doesn't say — enumeration guard), so we show the
+ * generic message plus a login pointer instead of a dead-end error.
+ * account_exists is the pre-hardening code, kept for rollout overlap.
  */
 export function RegisterPage({ meta }: { meta: StorefrontMeta | null }) {
   const [name, setName] = useState('');
@@ -60,7 +62,7 @@ export function RegisterPage({ meta }: { meta: StorefrontMeta | null }) {
       setToken(res.token);
       window.location.href = '/account';
     } catch (err) {
-      if (err instanceof ApiError && err.code === 'account_exists') {
+      if (err instanceof ApiError && (err.code === 'registration_failed' || err.code === 'account_exists')) {
         setExists(true);
       } else {
         setError(err instanceof Error ? err.message : 'Could not create your account. Please try again.');
@@ -87,8 +89,8 @@ export function RegisterPage({ meta }: { meta: StorefrontMeta | null }) {
         <form onSubmit={onSubmit} className="space-y-4 rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6">
           {exists && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-              An account with this phone or email already exists.{' '}
-              <a href="/login" className="font-semibold underline">Log in instead</a>.
+              Unable to register with these details. If you already have an account,{' '}
+              <a href="/login" className="font-semibold underline">log in instead</a>.
             </div>
           )}
           {error && (
