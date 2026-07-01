@@ -242,16 +242,35 @@ function hexA(hex: string, a: number): string {
 }
 
 // Tiled-pattern motifs (100×100 tile). Rendered as a faint, tenant-coloured SVG
-// that slowly drifts (.fnl-bg-pattern). leaves → organic; dots/grid → geometric.
+// that slowly drifts (.fnl-bg-pattern). leaves/dates/hearts/blossom → organic;
+// dots/grid/stars/sparkles → geometric. Keep byte-identical to the dashboard
+// preview MOTIFS in myapp resources/views/funnels/builder.blade.php.
 const PATTERN_MOTIFS: Record<string, string> = {
-  leaves: "<path d='M50 18c-9 7-9 23 0 30 9-7 9-23 0-30z'/><path d='M22 64c-6 5-6 16 0 21 6-5 6-16 0-21z'/><circle cx='78' cy='30' r='4'/><circle cx='30' cy='86' r='3'/>",
-  dots:   "<circle cx='25' cy='25' r='4'/><circle cx='75' cy='75' r='4'/><circle cx='75' cy='25' r='2.5'/><circle cx='25' cy='75' r='2.5'/>",
-  grid:   "<path d='M0 50h100M50 0v100'/>",
+  leaves:  "<path d='M50 18c-9 7-9 23 0 30 9-7 9-23 0-30z'/><path d='M22 64c-6 5-6 16 0 21 6-5 6-16 0-21z'/><circle cx='78' cy='30' r='4'/><circle cx='30' cy='86' r='3'/>",
+  dots:    "<circle cx='25' cy='25' r='4'/><circle cx='75' cy='75' r='4'/><circle cx='75' cy='25' r='2.5'/><circle cx='25' cy='75' r='2.5'/>",
+  grid:    "<path d='M0 50h100M50 0v100'/>",
+  dates:   "<ellipse cx='30' cy='34' rx='6.5' ry='12' transform='rotate(-20 30 34)'/><ellipse cx='43' cy='29' rx='6.5' ry='12' transform='rotate(16 43 29)'/><ellipse cx='71' cy='70' rx='6.5' ry='12' transform='rotate(-14 71 70)'/><ellipse cx='84' cy='65' rx='6.5' ry='12' transform='rotate(18 84 65)'/>",
+  hearts:  "<path d='M50 71 C31 58 22 46 30 36 C36 29 46 31 50 38 C54 31 64 29 70 36 C78 46 69 58 50 71 Z'/><path d='M84 28 C77 23 73 18 76 14 C78 11 82 12 84 15 C86 12 90 11 92 14 C95 18 91 23 84 28 Z'/>",
+  stars:   "<path transform='translate(9 12) scale(0.6)' d='M50 6 L60 38 L94 38 L67 58 L77 90 L50 71 L23 90 L33 58 L6 38 L40 38 Z'/><path transform='translate(60 -2) scale(0.3)' d='M50 6 L60 38 L94 38 L67 58 L77 90 L50 71 L23 90 L33 58 L6 38 L40 38 Z'/>",
+  blossom: "<circle cx='50' cy='30' r='8'/><circle cx='67' cy='42' r='8'/><circle cx='61' cy='63' r='8'/><circle cx='39' cy='63' r='8'/><circle cx='33' cy='42' r='8'/><circle cx='50' cy='47' r='6'/><circle cx='86' cy='84' r='4'/>",
+  sparkles:"<path d='M50 22 C51.5 41 53 46.5 72 48 C53 49.5 51.5 55 50 74 C48.5 55 47 49.5 28 48 C47 46.5 48.5 41 50 22 Z'/><path d='M82 60 C82.7 68 83.4 70.6 90 72 C83.4 73.4 82.7 76 82 84 C81.3 76 80.6 73.4 74 72 C80.6 70.6 81.3 68 82 60 Z'/>",
+  crescent:"<path fill-rule='evenodd' d='M20 50 a30 30 0 1 0 60 0 a30 30 0 1 0 -60 0 M38 50 a26 26 0 1 0 52 0 a26 26 0 1 0 -52 0'/><path transform='translate(70 16) scale(0.17)' d='M50 6 L60 38 L94 38 L67 58 L77 90 L50 71 L23 90 L33 58 L6 38 L40 38 Z'/>",
+  honeycomb:"<path d='M50 10 L67.3 20.0 L67.3 40.0 L50 50 L32.7 40.0 L32.7 20.0 Z'/><path d='M30 44 L47.3 54.0 L47.3 74.0 L30 84 L12.7 74.0 L12.7 54.0 Z'/><path d='M70 44 L87.3 54.0 L87.3 74.0 L70 84 L52.7 74.0 L52.7 54.0 Z'/>",
+  bottle:  "<rect x='38' y='50' width='24' height='34' rx='7'/><rect x='45' y='40' width='10' height='11'/><rect x='43' y='30' width='14' height='10' rx='2'/><circle cx='50' cy='25' r='2.5'/>",
+  chili:   "<path d='M60 32 C64 42 60 58 46 70 C39 76 31 74 33 66 C37 54 50 46 55 36 C56 33 58 32 60 32 Z'/><path d='M60 32 C61 27 64 24 68 24 C67 29 64 32 60 34 Z'/>",
+  gift:    "<rect x='30' y='50' width='40' height='30' rx='2'/><rect x='26' y='42' width='48' height='10' rx='2'/><rect x='45' y='42' width='10' height='38'/><path d='M50 42 C43 33 32 34 35 42 C37 47 46 45 50 42 Z'/><path d='M50 42 C57 33 68 34 65 42 C63 47 54 45 50 42 Z'/>",
+  palm:    "<path d='M46 88 C46 72 47 60 48 52 L52 52 C53 60 54 72 54 88 Z'/><path d='M50 50 C36 42 22 46 12 62 C24 48 40 49 50 53 Z'/><path d='M50 50 C64 42 78 46 88 62 C76 48 60 49 50 53 Z'/><path d='M50 49 C40 38 30 34 22 34 C34 36 44 42 50 51 Z'/><path d='M50 49 C60 38 70 34 78 34 C66 36 56 42 50 51 Z'/><path d='M50 48 C46 36 44 28 40 22 C48 30 50 38 51 49 Z'/><path d='M50 48 C54 36 56 28 60 22 C52 30 50 38 50 49 Z'/><circle cx='43' cy='55' r='2'/><circle cx='45' cy='58' r='2'/><circle cx='42' cy='58' r='2'/><circle cx='44' cy='61' r='1.8'/><circle cx='57' cy='55' r='2'/><circle cx='55' cy='58' r='2'/><circle cx='59' cy='58' r='2'/><circle cx='57' cy='61' r='1.8'/><ellipse cx='28' cy='76' rx='2.4' ry='4' transform='rotate(20 28 76)'/><ellipse cx='72' cy='74' rx='2.4' ry='4' transform='rotate(-16 72 74)'/><ellipse cx='40' cy='84' rx='2.4' ry='4'/>",
+  camel:   "<path d='M20 78 L22 60 C22 54 28 52 32 57 C35 46 46 45 50 56 C54 52 60 53 62 58 L67 46 C66 40 73 37 76 42 C79 41 81 45 78 48 L74 56 C73 62 66 63 61 61 L59 78 L55 78 L55 63 L50 63 L50 78 L46 78 L46 62 L35 62 L35 78 L31 78 L31 60 L26 60 L24 78 Z'/>",
+  desert:  "<path d='M0 84 C22 76 40 86 62 80 C80 75 92 82 100 79 L100 100 L0 100 Z'/><circle cx='82' cy='22' r='8'/><g transform='translate(-2 34) scale(0.42)'><path d='M46 88 C46 72 47 60 48 52 L52 52 C53 60 54 72 54 88 Z'/><path d='M50 50 C36 42 22 46 12 62 C24 48 40 49 50 53 Z'/><path d='M50 50 C64 42 78 46 88 62 C76 48 60 49 50 53 Z'/><path d='M50 49 C40 38 30 34 22 34 C34 36 44 42 50 51 Z'/><path d='M50 49 C60 38 70 34 78 34 C66 36 56 42 50 51 Z'/><path d='M50 48 C46 36 44 28 40 22 C48 30 50 38 51 49 Z'/><path d='M50 48 C54 36 56 28 60 22 C52 30 50 38 50 49 Z'/><circle cx='43' cy='55' r='2'/><circle cx='45' cy='58' r='2'/><circle cx='42' cy='58' r='2'/><circle cx='44' cy='61' r='1.8'/><circle cx='57' cy='55' r='2'/><circle cx='55' cy='58' r='2'/><circle cx='59' cy='58' r='2'/><circle cx='57' cy='61' r='1.8'/></g><g transform='translate(50 40) scale(0.42)'><path d='M20 78 L22 60 C22 54 28 52 32 57 C35 46 46 45 50 56 C54 52 60 53 62 58 L67 46 C66 40 73 37 76 42 C79 41 81 45 78 48 L74 56 C73 62 66 63 61 61 L59 78 L55 78 L55 63 L50 63 L50 78 L46 78 L46 62 L35 62 L35 78 L31 78 L31 60 L26 60 L24 78 Z'/></g>",
 };
+
+// Outlined (stroked) motifs vs filled silhouettes — mirror of the dashboard
+// preview's STROKE set in builder.blade.php.
+const STROKE_MOTIFS = new Set(['grid', 'honeycomb']);
 
 function patternUrl(motif: string, hex: string): string {
   const m = PATTERN_MOTIFS[motif] ?? PATTERN_MOTIFS.leaves;
-  const g = motif === 'grid'
+  const g = STROKE_MOTIFS.has(motif)
     ? `<g stroke='${hex}' stroke-opacity='0.06' stroke-width='2' fill='none'>${m}</g>`
     : `<g fill='${hex}' fill-opacity='0.06'>${m}</g>`;
   const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='150' height='150' viewBox='0 0 100 100'>${g}</svg>`;
