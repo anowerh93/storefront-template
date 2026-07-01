@@ -127,6 +127,12 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         const hasShots = (config.reviews.screenshot_urls?.length ?? 0) > 0;
         return config.reviews.visible && hasShots ? <Reviews config={config.reviews} /> : null;
       }
+      case 'video': {
+        // Optional chain: cached API payloads from before this block existed
+        // simply don't have the key.
+        const v = config.video;
+        return v?.visible && v.youtube_id ? <VideoBlock config={v} /> : null;
+      }
       case 'faq':
         return config.faq.visible && config.faq.items.length ? <Faq config={config.faq} /> : null;
       case 'trust_badges':
@@ -680,6 +686,41 @@ function WhyUs({ config }: { config: FunnelBlockConfig['why_us'] }) {
             {w.body && <RT as="p" className="mt-1 text-sm text-slate-600" html={w.body} />}
           </div>
         ))}
+      </div>
+    </section>
+  );
+}
+
+/* ── Video (YouTube lite embed) ───────────────────────────────────────────
+   The heavy YouTube player only loads when the visitor taps play — until then
+   it's just the thumbnail (img.youtube.com always serves hqdefault) with a
+   play button, so the ad lander stays fast. The embed uses youtube-nocookie
+   and the API-validated video id, never a raw pasted URL. */
+function VideoBlock({ config }: { config: NonNullable<FunnelBlockConfig['video']> }) {
+  const [playing, setPlaying] = useState(false);
+  const id = config.youtube_id as string;
+  return (
+    <section className="mx-auto max-w-2xl">
+      {config.title && <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900" html={config.title} />}
+      <div className="relative aspect-video overflow-hidden rounded-2xl bg-slate-900 shadow-md ring-1 ring-slate-200">
+        {playing ? (
+          <iframe
+            src={`https://www.youtube-nocookie.com/embed/${id}?autoplay=1&rel=0`}
+            title={config.title || 'Video'}
+            className="absolute inset-0 h-full w-full"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+            allowFullScreen
+          />
+        ) : (
+          <button type="button" onClick={() => setPlaying(true)} aria-label="Play video" className="group absolute inset-0 h-full w-full cursor-pointer">
+            <img src={`https://img.youtube.com/vi/${id}/hqdefault.jpg`} alt="" loading="lazy"
+                 className="absolute inset-0 h-full w-full object-cover transition group-hover:scale-[1.02]" />
+            <span className="absolute inset-0 bg-black/10 transition group-hover:bg-black/20" aria-hidden="true" />
+            <span className="absolute left-1/2 top-1/2 grid h-14 w-20 -translate-x-1/2 -translate-y-1/2 place-items-center rounded-2xl bg-red-600 shadow-lg transition group-hover:scale-105" aria-hidden="true">
+              <span className="ml-1 inline-block border-y-[10px] border-l-[17px] border-y-transparent border-l-white" />
+            </span>
+          </button>
+        )}
       </div>
     </section>
   );
