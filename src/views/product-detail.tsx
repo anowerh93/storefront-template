@@ -351,7 +351,10 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
   if (tabs.length === 0) return <div />;
 
   return (
-    <div className="rounded-2xl bg-white ring-1 ring-slate-200">
+    // min-w-0: this is a grid/flex cell whose default min-width:auto would let a
+    // wide spec table (long unbreakable token) push the whole page sideways on
+    // mobile. min-w-0 lets it shrink to the column so the table wraps/scrolls.
+    <div className="min-w-0 rounded-2xl bg-white ring-1 ring-slate-200">
       <div className="flex flex-wrap gap-1 border-b border-slate-100 p-2">
         {tabs.map((t) => (
           <button

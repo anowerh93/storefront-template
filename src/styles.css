@@ -46,6 +46,20 @@
     background: var(--color-surface);
   }
 
+  /* Mobile horizontal-overflow guard. Clipping only <body> is unreliable: on
+     phones the VISUAL VIEWPORT pans <html>, so a sub-pixel-wide descendant
+     (or a data-driven one — a long spec-table token, a wide embed) lets the
+     whole page be swiped sideways. Clip BOTH axes' overflow-x. Use `clip`, not
+     `hidden`: `overflow-x:hidden` forces the other axis to compute `auto`,
+     turning html/body into a scroll container that can trap `position:sticky`
+     (the desktop product gallery) and spawn a second scrollbar. `clip` leaves
+     overflow-y `visible`, so sticky + normal page scroll keep working. */
+  html,
+  body {
+    overflow-x: clip;
+    max-width: 100%;
+  }
+
   /* Tap targets — BD market is mobile-first, default browser hit area is too small */
   button, a, [role="button"] {
     -webkit-tap-highlight-color: transparent;
@@ -102,8 +116,8 @@
 @media (prefers-reduced-motion: reduce) { .fnl-bg-pattern { animation: none; } }
 
 /* Full-bleed: break a section out of its max-width column to span the full
-   viewport width (the split hero). The body has overflow-x:hidden so the
-   100vw width never introduces a horizontal scrollbar. */
+   viewport width (the split hero). html/body clip overflow-x (see the base
+   layer) so the 100vw width never introduces a horizontal scrollbar. */
 .fnl-full-bleed { position: relative; left: 50%; right: 50%; width: 100vw; margin-left: -50vw; margin-right: -50vw; }
 
 /* Footer with a LIGHT custom background → dark text (the default footer text
@@ -162,6 +176,11 @@ span[style*="font-size"] { line-height: 1.15; }
   border-bottom: 1px solid #e2e8f0;
   border-right: 1px solid #e2e8f0;
   padding: 0.5rem 0.75rem;
+  /* Break a long unbreakable token (bare URL, SKU, model code) instead of
+     letting the cell's min-content force the table — and the mobile page —
+     wider than the viewport. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .prose th:last-child,
 .prose td:last-child { border-right: 0; }

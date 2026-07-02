@@ -432,7 +432,7 @@ function Faq({ block }: { block: ServiceHomeConfig['faq'] }) {
             <div key={i}>
               <button type="button" onClick={() => setOpen(open === i ? null : i)}
                       className="w-full flex items-center justify-between gap-4 py-4 text-left">
-                <RT html={f.q} className="font-semibold text-slate-900 text-sm sm:text-base" />
+                <RT html={f.q} className="min-w-0 break-words font-semibold text-slate-900 text-sm sm:text-base" />
                 <span className="text-slate-400 text-xl leading-none shrink-0">{open === i ? '−' : '+'}</span>
               </button>
               {open === i && <RT as="p" html={f.a} className="pb-4 text-sm text-slate-600 leading-relaxed block" />}
