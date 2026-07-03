@@ -200,17 +200,21 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
         </p>
       )}
 
-      {/* Price + status */}
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        <span className="text-sm font-medium text-slate-500">Price:</span>
-        <span className="text-2xl font-bold text-rose-600">{formatBDT(unitPrice, { currency: product.currency })}</span>
-        {product.compare_at_price && product.compare_at_price > unitPrice && (
-          <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
-        )}
-        {discount && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Save {discount}%</span>}
-        <span className="ml-auto text-sm">
+      {/* Price + status — Status sits on its OWN line under the price
+          (reference layout), not pushed to the right of the price row where
+          it competes for width on phones. */}
+      <div className="space-y-1.5">
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-sm font-medium text-slate-500">Price:</span>
+          <span className="text-2xl font-bold text-rose-600">{formatBDT(unitPrice, { currency: product.currency })}</span>
+          {product.compare_at_price && product.compare_at_price > unitPrice && (
+            <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
+          )}
+          {discount && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Save {discount}%</span>}
+        </div>
+        <p className="text-sm text-slate-700">
           Status: <span className={inStock ? 'font-semibold text-emerald-600' : 'font-semibold text-rose-600'}>{inStock ? 'In Stock' : 'Out of Stock'}</span>
-        </span>
+        </p>
       </div>
 
       {/* Variant picker (only if the product has variants) */}

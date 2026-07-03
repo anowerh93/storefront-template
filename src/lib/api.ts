@@ -51,6 +51,7 @@ import type {
   ServiceCard,
   ServiceDetail,
   StorefrontMeta,
+  SuggestProduct,
   TeamMember,
 } from './types';
 
@@ -303,6 +304,31 @@ export function lookupOrder(orderNumber: string, phoneLast4: string) {
     params: { phone: phoneLast4 },
     cache: false,
   });
+}
+
+// ──────────────────────────────────────────────────────────────
+// Live-search autosuggest (browser-side)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Header search suggestions. Browser-only, fired per (debounced) keystroke —
+ * pass an AbortSignal so a stale in-flight request never overwrites a newer
+ * response. HTTP/parse errors REJECT (throw) — the SearchBox caller catches,
+ * keeps the previous rows, and stays quiet. Only a genuine 200 with a data
+ * array may settle a query, so a 429/500 can never masquerade as an
+ * authoritative "No products found" to a shopper. The plain form submit to
+ * /products always still works.
+ */
+export async function suggestProducts(q: string, signal?: AbortSignal): Promise<SuggestProduct[]> {
+  const res = await fetch(buildUrl('/products/suggest', { q }), {
+    headers: { Accept: 'application/json' },
+    cache: 'no-store',
+    signal,
+  });
+  if (!res.ok) throw new Error(`suggest failed: ${res.status}`);
+  const json = await res.json().catch(() => null);
+  if (!Array.isArray(json?.data)) throw new Error('suggest: bad payload');
+  return json.data as SuggestProduct[];
 }
 
 // ──────────────────────────────────────────────────────────────
