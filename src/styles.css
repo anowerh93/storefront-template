@@ -158,6 +158,17 @@
 [data-anim],
 span[style*="font-size"] { line-height: 1.15; }
 
+/* ── iOS input auto-zoom guard ─────────────────────────────────────────────
+   iOS Safari zooms the whole page when a focused input's font-size is under
+   16px — and once zoomed, the page pans left/right regardless of any
+   overflow clipping (visual-viewport panning ignores overflow-x). The header
+   search (text-sm = 14px) and its category select (text-xs = 12px) triggered
+   this on every search tap. Force ≥16px on phones only; desktop keeps the
+   designed sizes. Unlayered so it beats Tailwind's text-* utilities. */
+@media (max-width: 767px) {
+  input, select, textarea { font-size: 16px; }
+}
+
 /* ── Markdown tables (Specifications / Support / Description) ─────────────
    Tailwind Typography only draws bottom borders under rows — markdown spec
    tables had NO outer or column borders at all. Give them the full grid a
