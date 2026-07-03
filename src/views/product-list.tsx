@@ -140,8 +140,12 @@ export function ProductListPage({
             ))}
           </aside>
 
-          {/* Grid */}
-          <div>
+          {/* Grid. min-w-0: this grid cell defaults to min-width:auto, so the
+              chip rail's min-content (every shrink-0 chip summed — 700px+ with
+              many categories) would size the implicit mobile column past the
+              viewport, pushing the 2nd card column off-screen. min-w-0 lets the
+              track stay at viewport width so the rail actually scrolls. */}
+          <div className="min-w-0">
             {/* Mobile category chips */}
             <div className="lg:hidden mb-4 flex gap-2 overflow-x-auto no-scrollbar -mx-4 px-4 pb-1">
               <a

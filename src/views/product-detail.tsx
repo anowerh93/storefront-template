@@ -50,9 +50,14 @@ export function ProductDetailPage({
           <span className="text-slate-700">{product.name}</span>
         </nav>
 
-        {/* Top: gallery + buy box */}
+        {/* Top: gallery + buy box. min-w-0 on both cells: a grid item defaults
+            to min-width:auto, so the thumbnail rail's min-content (6 thumbs ×
+            64px + gaps = 424px) would size the single mobile column past the
+            375px viewport — stretching the buy box with it and clipping the
+            "Status" chip + 6th thumb off-screen. min-w-0 keeps the track at
+            viewport width so the rail scrolls internally instead. */}
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          <div className="lg:sticky lg:top-6 lg:self-start">
+          <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
             <ProductGallery product={product} />
           </div>
           <BuyBox product={product} meta={meta} />
@@ -150,7 +155,8 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
   }
 
   return (
-    <div className="space-y-5">
+    // min-w-0: sibling grid cell of the gallery — see the grid comment above.
+    <div className="min-w-0 space-y-5">
       <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{product.name}</h1>
 
       {(product.rating_count ?? 0) > 0 && product.rating_avg != null && (
