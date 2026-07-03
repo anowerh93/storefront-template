@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, MapPin, Menu, Search, ShoppingCart, User, UserCircle, X } from 'lucide-react';
-import type { StorefrontMeta, Category } from '../../lib/types';
-import { getToken } from '../../lib/api';
+import type { StorefrontMeta, Category, SuggestProduct } from '../../lib/types';
+import { getToken, suggestProducts } from '../../lib/api';
+import { formatBDT } from '../../lib/format';
 import { useCart, cartCount, useCartHydrated } from '../../stores/cart';
 
 /**
@@ -90,27 +91,7 @@ export function Header({
                 looked centred when both sides happened to be balanced — it
                 drifted left once the wishlist button and location pill were
                 removed.) */}
-            <form action="/products" method="get" className="order-last w-full md:order-none md:mx-auto md:max-w-2xl">
-              <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
-                {/* name="category" + option values so the dropdown actually
-                    filters — it submits ?category=<slug> to /products, which
-                    the product-list page reads. Was decorative before (no
-                    name attr, no option values → selecting did nothing). */}
-                <select name="category" className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
-                  <option value="">All Categories</option>
-                  {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
-                </select>
-                <input
-                  type="search"
-                  name="search"
-                  placeholder="Type and search products..."
-                  className="flex-1 px-3 text-sm border-0 focus:outline-none placeholder:text-slate-400"
-                />
-                <button type="submit" className="px-4 bg-slate-900 hover:bg-slate-800 text-white" aria-label="Search">
-                  <Search className="h-4 w-4" />
-                </button>
-              </div>
-            </form>
+            <SearchBox categories={categories} currency={meta.currency} />
 
             {/* Right cluster: track order, mobile menu.
                 NOTE: these used to be dead <button>s copied from the
@@ -263,5 +244,181 @@ function NavLink({ href, children }: { href: string; children: React.ReactNode }
     <a href={href} className="px-3 py-1.5 rounded-lg text-slate-700 hover:bg-slate-100 hover:text-slate-900 font-medium transition">
       {children}
     </a>
+  );
+}
+
+/**
+ * Header search bar with live autosuggest (thumb + name + price per row).
+ *
+ * Progressive enhancement over the plain GET form: typing ≥2 chars fires a
+ * debounced /products/suggest fetch (aborting any stale in-flight request);
+ * Enter with no row highlighted — or JS failing entirely — still submits the
+ * normal form to /products?search=…, so search never breaks.
+ *
+ * Overflow discipline (see the mobile-overflow saga): the panel is absolutely
+ * positioned inset-x-0 INSIDE the relative <form>, so its width can never
+ * exceed the search bar's; row names get min-w-0 + truncate.
+ */
+function SearchBox({ categories, currency }: { categories: Category[]; currency?: string }) {
+  const [q, setQ] = useState('');
+  const [items, setItems] = useState<SuggestProduct[]>([]);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  // Last query the current `items` belong to — distinguishes "no results for
+  // this query" (show empty state) from "still waiting" (keep quiet).
+  const [settledFor, setSettledFor] = useState('');
+  const boxRef = useRef<HTMLFormElement>(null);
+  // User dismissed the panel (Escape / tap outside) — a suggest response that
+  // resolves AFTER the dismissal must not force it back open. Reset by any
+  // new keystroke or re-focus (renewed intent).
+  const dismissedRef = useRef(false);
+
+  const query = q.trim();
+
+  useEffect(() => {
+    dismissedRef.current = false; // new keystroke = renewed intent
+    if (query.length < 2) {
+      setItems([]);
+      setSettledFor('');
+      setActive(-1);
+      return;
+    }
+    const ctl = new AbortController();
+    const t = setTimeout(() => {
+      suggestProducts(query, ctl.signal)
+        .then((rows) => {
+          setItems(rows);
+          setSettledFor(query);
+          setActive(-1);
+          if (!dismissedRef.current) setOpen(true);
+        })
+        // Aborted (newer keystroke), throttled (429), or offline — keep the
+        // prior rows and stay quiet. Errors must NEVER settle the query: a
+        // settled empty state reads as an authoritative "No products found".
+        .catch(() => {});
+    }, 250);
+    return () => { clearTimeout(t); ctl.abort(); };
+  }, [query]);
+
+  // Close when clicking/tapping anywhere outside the search bar + panel.
+  useEffect(() => {
+    const onDown = (e: PointerEvent) => {
+      if (boxRef.current && !boxRef.current.contains(e.target as Node)) {
+        dismissedRef.current = true;
+        setOpen(false);
+      }
+    };
+    document.addEventListener('pointerdown', onDown);
+    return () => document.removeEventListener('pointerdown', onDown);
+  }, []);
+
+  const showPanel = open && query.length >= 2 && (items.length > 0 || settledFor === query);
+
+  function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (!showPanel || items.length === 0) {
+      if (e.key === 'Escape') {
+        dismissedRef.current = true;
+        setOpen(false);
+      }
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      setActive((i) => (i + 1) % items.length);
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      setActive((i) => (i <= 0 ? items.length - 1 : i - 1));
+    } else if (e.key === 'Enter' && active >= 0) {
+      e.preventDefault();
+      window.location.href = `/products/${encodeURIComponent(items[active].slug)}`;
+    } else if (e.key === 'Escape') {
+      dismissedRef.current = true;
+      setOpen(false);
+    }
+  }
+
+  return (
+    <form
+      ref={boxRef}
+      action="/products"
+      method="get"
+      role="search"
+      className="relative order-last w-full md:order-none md:mx-auto md:max-w-2xl"
+    >
+      <div className="flex items-stretch h-11 rounded-lg border border-slate-300 overflow-hidden focus-within:border-brand-500 focus-within:ring-2 focus-within:ring-brand-500/30 bg-white">
+        {/* name="category" + option values so the dropdown actually
+            filters — it submits ?category=<slug> to /products, which
+            the product-list page reads. */}
+        <select name="category" className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
+          <option value="">All Categories</option>
+          {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
+        </select>
+        <input
+          type="search"
+          name="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => { dismissedRef.current = false; if (query.length >= 2) setOpen(true); }}
+          onKeyDown={onKeyDown}
+          placeholder="Type and search products..."
+          autoComplete="off"
+          role="combobox"
+          aria-expanded={showPanel}
+          aria-autocomplete="list"
+          aria-controls="header-search-suggest"
+          className="flex-1 min-w-0 px-3 text-sm border-0 focus:outline-none placeholder:text-slate-400"
+        />
+        <button type="submit" className="px-4 bg-slate-900 hover:bg-slate-800 text-white" aria-label="Search">
+          <Search className="h-4 w-4" />
+        </button>
+      </div>
+
+      {showPanel && (
+        <div
+          id="header-search-suggest"
+          role="listbox"
+          className="absolute inset-x-0 top-full z-50 mt-1.5 max-h-[70vh] overflow-y-auto overflow-x-hidden rounded-xl bg-white shadow-xl ring-1 ring-slate-200"
+        >
+          {items.map((p, i) => (
+            <a
+              key={p.slug}
+              href={`/products/${encodeURIComponent(p.slug)}`}
+              role="option"
+              aria-selected={i === active}
+              onMouseEnter={() => setActive(i)}
+              className={`flex items-center gap-3 px-3 py-2.5 transition ${i === active ? 'bg-slate-50' : ''}`}
+            >
+              <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
+                {p.image_url && (
+                  <img src={p.image_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-0.5" />
+                )}
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium text-slate-900">{p.name}</span>
+                <span className="text-sm font-bold text-brand-600">
+                  {formatBDT(p.price, { currency })}
+                  {p.compare_at_price != null && p.compare_at_price > p.price && (
+                    <s className="ml-1.5 text-xs font-normal text-slate-400">
+                      {formatBDT(p.compare_at_price, { currency })}
+                    </s>
+                  )}
+                </span>
+              </span>
+            </a>
+          ))}
+
+          {items.length === 0 ? (
+            <p className="px-3 py-3.5 text-sm text-slate-500">No products found for &ldquo;{query}&rdquo;</p>
+          ) : (
+            <button
+              type="submit"
+              className="block w-full border-t border-slate-100 px-3 py-2.5 text-center text-sm font-semibold text-brand-600 hover:bg-slate-50"
+            >
+              View all results for &ldquo;{query}&rdquo;
+            </button>
+          )}
+        </div>
+      )}
+    </form>
   );
 }

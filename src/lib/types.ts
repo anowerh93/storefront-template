@@ -332,6 +332,15 @@ export type ShippingZone = {
 // Products (GET /products, /products/{slug})
 // ──────────────────────────────────────────────────────────────
 
+/** Header live-search autosuggest row — deliberately tiny (never a full card). */
+export type SuggestProduct = {
+  name: string;
+  slug: string;
+  price: number;
+  compare_at_price: number | null;
+  image_url: string | null;
+};
+
 export type ProductCard = {
   id: number;
   slug: string;
