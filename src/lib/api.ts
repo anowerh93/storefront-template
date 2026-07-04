@@ -119,7 +119,10 @@ async function apiFetch<T>(
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
-    throw new Error(`API ${path} failed: ${res.status} ${res.statusText}`);
+    // ApiError carries the HTTP status so callers can tell "doesn't exist"
+    // (404) apart from "temporarily refused" (429 throttle, 5xx) — the payment
+    // order-status page must never render a throttled lookup as "not found".
+    throw new ApiError(`API ${path} failed: ${res.status} ${res.statusText}`, res.status);
   }
   // Read as text so the same body can be parsed AND stored: the Laravel API
   // sends `Cache-Control: no-cache, private` (correct for direct browser
@@ -357,8 +360,15 @@ export async function submitOrder(input: CreateOrderInput): Promise<OrderRespons
   // error box. Shoppers get plain language; status codes stay internal.
   const json = await res.json().catch(() => null);
   if (!res.ok) {
+    // The API's error envelope is { error: { code, message } } — json.error is
+    // an OBJECT, so it must never be fed to new Error() directly (the shopper
+    // would see "[object Object]" instead of e.g. the online_unavailable /
+    // payment_init_failed guidance to fall back to Cash on Delivery).
     const msg =
-      json?.message ?? json?.error ?? 'Sorry, your order could not be placed. Please try again in a minute.';
+      json?.message ??
+      json?.error?.message ??
+      (typeof json?.error === 'string' ? json.error : undefined) ??
+      'Sorry, your order could not be placed. Please try again in a minute.';
     throw new Error(msg);
   }
   if (!json) {
@@ -402,8 +412,12 @@ export async function submitLead(input: CreateLeadInput): Promise<{ ok: boolean 
   });
   const json = await res.json().catch(() => null);
   if (!res.ok) {
+    // Same envelope note as submitOrder: json.error is an object, never a string.
     const msg =
-      json?.message ?? json?.error ?? 'Sorry, your inquiry could not be sent. Please try again in a minute.';
+      json?.message ??
+      json?.error?.message ??
+      (typeof json?.error === 'string' ? json.error : undefined) ??
+      'Sorry, your inquiry could not be sent. Please try again in a minute.';
     throw new Error(msg);
   }
   return { ok: true };

@@ -59,6 +59,13 @@ export type StorefrontMeta = {
   social_links: Record<string, string> | object;
   messenger: { url: string | null; handle: string | null } | null;
   turnstile: { site_key: string | null };
+  /**
+   * Which payment methods checkout may offer: always ['cod'], plus 'online'
+   * when the tenant has a connected gateway (their own SSLCommerz / EPS /
+   * aamarPay account — the shopper never picks a gateway, just "pay online").
+   * Optional for cached payloads that predate the field.
+   */
+  payment_methods?: string[];
   shipping: {
     enabled: boolean;
     free_shipping_threshold: number | null;
@@ -580,6 +587,12 @@ export type CreateOrderInput = {
   // error.code === 'password_required' comes back if it's missing.
   create_account?: boolean;
   password?: string;
+  // Online payment (BYO gateway). Omitted / 'cod' → Cash on Delivery
+  // (unchanged legacy behavior). 'online' is only accepted when the meta
+  // advertises it (payment_methods includes 'online') — the server 422s with
+  // error.code === 'online_unavailable' otherwise. On success the response
+  // carries `payment.redirect_url` to the gateway's hosted checkout.
+  payment_method?: 'cod' | 'online';
 };
 
 export type OrderResponse = {
@@ -593,6 +606,16 @@ export type OrderResponse = {
   // From POST /orders:
   message?: string;
   duplicate?: boolean;
+  // Present when the order was placed with payment_method 'online' (also on a
+  // `duplicate` replay of an order still awaiting its payment — the same
+  // gateway session is renewed, never a second payable one). Redirect the
+  // shopper's browser to `redirect_url` to complete payment.
+  payment?: { method: string; redirect_url: string };
+  // From GET /orders/{number} — lets the tracking page show the payment state
+  // and poll while an online order is still awaiting gateway confirmation.
+  // 'cod' | 'online' and 'unpaid' | 'paid' | 'failed' | 'refunded'.
+  payment_method?: string | null;
+  payment_status?: string | null;
   // Phase 1: present when the order was placed with `create_account: true`.
   // `customer.token` → auto-login the new account. `account_exists: true` means
   // the phone already has an account (no token issued) — invite them to log in.

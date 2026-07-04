@@ -16,6 +16,9 @@ export type OrderStatusVariant = 'default' | 'success' | 'warning' | 'brand';
 const STATUS_MAP: Record<string, { label: string; variant: OrderStatusVariant }> = {
   draft:                 { label: 'Processing', variant: 'brand' },
   awaiting_verification: { label: 'Processing', variant: 'brand' },
+  // Online order whose gateway payment hasn't been confirmed yet — the order
+  // page shows a live "Confirming your payment…" banner alongside this badge.
+  awaiting_payment:      { label: 'Awaiting Payment', variant: 'warning' },
   pending:               { label: 'Processing', variant: 'brand' },
   on_hold:               { label: 'Processing', variant: 'brand' },
   confirmed:             { label: 'Confirmed',  variant: 'brand' },
