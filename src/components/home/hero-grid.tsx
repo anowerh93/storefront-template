@@ -21,9 +21,14 @@ import { FitImage } from '../ui/fit-image';
 export function HeroGrid({
   featured,
   hero,
+  priority = false,
 }: {
   featured: ProductCard[];
   hero: HomepageConfig['hero'];
+  /** True only when the hero is the FIRST homepage section (it is the LCP).
+   *  Gates fetchPriority="high" the same way index.astro gates the head
+   *  preload — a reordered below-fold hero must not outrank the real LCP. */
+  priority?: boolean;
 }) {
   const big           = featured[0];
   const tileProducts  = featured.slice(1, 3);
@@ -40,8 +45,8 @@ export function HeroGrid({
     <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-5">
       <div className="grid lg:grid-cols-[1.9fr_1fr] gap-4 lg:gap-5 lg:items-start">
         {hero?.image_url
-          ? <ConfiguredBigBanner hero={hero} />
-          : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} /> : <BannerPlaceholder />)}
+          ? <ConfiguredBigBanner hero={hero} priority={priority} />
+          : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} priority={priority} /> : <BannerPlaceholder />)}
 
         <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
           {renderTile(0)}
@@ -61,7 +66,7 @@ const TILE_GRADIENT   = 'absolute inset-0 bg-gradient-to-r from-black/55 via-bla
 
 /* ── Configured (admin-designed) banner + tiles ──────────────────────────── */
 
-function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
+function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig['hero']; priority?: boolean }) {
   // The merchant uploaded a fully-designed banner (their own text + CTA baked
   // into the artwork), so we show it CLEAN — no gradient, no overlaid eyebrow /
   // headline / buttons / dots competing with their design. The whole banner is
@@ -83,6 +88,8 @@ function ConfiguredBigBanner({ hero }: { hero: HomepageConfig['hero'] }) {
         src={hero.image_url!}
         alt={hero.headline || 'Featured offer'}
         loading="eager"
+        decoding="async"
+        fetchPriority={priority ? 'high' : undefined}
         className="block w-full h-auto"
       />
     </a>
@@ -113,7 +120,7 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
 
 /* ── Product-driven default (same full-bleed style, no upload needed) ─────── */
 
-function ProductBigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?: string }) {
+function ProductBigBanner({ product, eyebrow, priority = false }: { product: ProductCard; eyebrow?: string; priority?: boolean }) {
   const off = discountPct(Number(product.price), product.compare_at_price ? Number(product.compare_at_price) : null);
   const badge = off ? `Get ${off}% Off` : (eyebrow || 'Featured');
 
@@ -123,7 +130,7 @@ function ProductBigBanner({ product, eyebrow }: { product: ProductCard; eyebrow?
       className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
     >
       {product.image_url && (
-        <FitImage src={product.image_url} alt={product.name} eager />
+        <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} />
       )}
       <div className={BANNER_GRADIENT} />
 

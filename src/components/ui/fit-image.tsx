@@ -13,10 +13,13 @@ export function FitImage({
   src,
   alt = '',
   eager = false,
+  fetchPriority,
 }: {
   src: string;
   alt?: string;
   eager?: boolean;
+  /** 'high' for the LCP hero image only — everything else stays default. */
+  fetchPriority?: 'high' | 'low' | 'auto';
 }) {
   const loading = eager ? 'eager' : 'lazy';
 
@@ -28,6 +31,7 @@ export function FitImage({
         alt=""
         aria-hidden="true"
         loading={loading}
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover blur-2xl scale-110"
       />
       {/* The actual image — fully visible, never cropped. */}
@@ -35,6 +39,8 @@ export function FitImage({
         src={src}
         alt={alt}
         loading={loading}
+        decoding="async"
+        fetchPriority={fetchPriority}
         className="absolute inset-0 h-full w-full object-contain transition-transform duration-500 group-hover:scale-[1.03]"
       />
     </>
