@@ -349,7 +349,7 @@ function SearchBox({ categories, currency }: { categories: Category[]; currency?
         {/* name="category" + option values so the dropdown actually
             filters — it submits ?category=<slug> to /products, which
             the product-list page reads. */}
-        <select name="category" className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
+        <select name="category" aria-label="Product category" className="bg-brand-600 hover:bg-brand-700 text-white text-xs font-semibold px-3 border-0 focus:outline-none cursor-pointer hidden sm:block">
           <option value="">All Categories</option>
           {categories.map((c) => <option key={c.slug} value={c.slug}>{c.name}</option>)}
         </select>

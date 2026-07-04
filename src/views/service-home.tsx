@@ -528,8 +528,8 @@ function Contact({ meta, config }: { meta: StorefrontMeta; config: ServiceHomeCo
               </div>
               {serviceOptions.length > 0 && (
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">What do you need?</label>
-                  <select value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}
+                  <label htmlFor="inquiry-service" className="block text-sm font-medium text-slate-700 mb-1">What do you need?</label>
+                  <select id="inquiry-service" value={form.service} onChange={(e) => setForm({ ...form, service: e.target.value })}
                           className="w-full border border-slate-300 rounded-xl text-sm px-4 py-2.5 bg-white focus:outline-none focus:ring-2 focus:ring-brand-500">
                     <option value="">Choose a service (optional)</option>
                     {serviceOptions.map((s, i) => <option key={i} value={s}>{s}</option>)}
