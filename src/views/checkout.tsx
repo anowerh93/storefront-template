@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 import { submitOrder, setToken } from '../lib/api';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
@@ -97,6 +97,26 @@ export function CheckoutPage({
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [createAccount, setCreateAccount] = useState(false);
+  // Online payment is offered only when the tenant has a connected gateway
+  // (meta advertises it). The shopper never picks WHICH gateway — the server
+  // routes to the store's own connected account (SSLCommerz / EPS / aamarPay).
+  const canPayOnline = !!meta?.payment_methods?.includes('online');
+  const [payMethod, setPayMethod] = useState<'cod' | 'online'>('cod');
+
+  // Coming BACK from the gateway (shopper changed their mind, wants COD, or
+  // the gateway page stalled) restores this page from bfcache with its React
+  // state intact — including submitting=true from the redirect, which would
+  // leave the button permanently stuck on "Starting payment…". Reset it.
+  // Resubmitting is safe: the 90s dedup window replays the SAME order and
+  // renews the SAME gateway session (order-stable transaction id), never a
+  // second payable one.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) setSubmitting(false);
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   const zones = meta?.shipping?.zones ?? [];
   // Only require a delivery zone when the selector is actually shown (shipping
@@ -223,12 +243,9 @@ export function CheckoutPage({
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
         // Only sent when the box is ticked → guest checkout is unchanged otherwise.
         ...(values.create_account ? { create_account: true, password: values.password } : {}),
-      });
-      pixel.purchase({
-        orderNumber: order.order_number,
-        value: order.total,
-        numItems,
-        contentIds: lines.map((l) => l.product_id.toString()),
+        // Only sent when the tenant offers it AND the shopper picked it —
+        // otherwise the server defaults to COD (legacy behavior unchanged).
+        ...(canPayOnline && payMethod === 'online' ? { payment_method: 'online' as const } : {}),
       });
       // Account provisioned alongside the order → auto-login by storing the
       // token. If the phone already had an account (account_exists), no token
@@ -236,10 +253,68 @@ export function CheckoutPage({
       if (order.customer?.token) {
         setToken(order.customer.token);
       }
+      const last4 = values.customer_phone.slice(-4);
+      const wasOnline = canPayOnline && payMethod === 'online';
+
+      // ── Online payment: hand the browser to the gateway ──
+      // The order is parked awaiting payment; the gateway page collects
+      // bKash/Nagad/card and bounces back to /order/{number}?payment=…. The
+      // return URL carries NO phone param, so stash the last-4 (and the
+      // account-exists nudge) for the order page (same browser comes back —
+      // it's a redirect flow). The CART IS NOT CLEARED here: it's the resume
+      // mechanism if the shopper backs out of the gateway — resubmitting
+      // replays the same order + same gateway session (no double charge). The
+      // order page clears it once the payment is confirmed.
+      // No client-side Purchase pixel here: the order isn't paid yet, and the
+      // server fires CAPI Purchase only on confirmed payment — firing now
+      // would count abandoned payment attempts as sales.
+      if (order.payment?.redirect_url) {
+        try {
+          sessionStorage.setItem(`replybd:pay-phone:${order.order_number}`, last4);
+          if (order.account_exists && !order.customer?.token) {
+            sessionStorage.setItem(`replybd:pay-acct:${order.order_number}`, '1');
+          }
+        } catch {
+          /* storage blocked — the order page falls back to its lookup form */
+        }
+        window.location.href = order.payment.redirect_url;
+        return;
+      }
+
+      // Online requested but NO payment link came back. Two shapes, neither
+      // of which may fall into the COD success path:
+      //  - a 90s-dedup replay of an order still awaiting payment whose
+      //    gateway re-init failed (the server falls through without a link)
+      //    → surface an error so the shopper can retry, don't fake success;
+      //  - a replay of an order that already resolved (paid / cancelled)
+      //    → send them to the order page, whose banners show the REAL payment
+      //    outcome. Never placed=1, and never the client Purchase pixel — the
+      //    server CAPI reports online purchases on confirm; firing here would
+      //    double-count a paid order or invent a purchase for an unpaid one.
+      if (wasOnline) {
+        if (order.status === 'awaiting_payment') {
+          setError('We could not start the online payment. Please try again, or choose Cash on Delivery.');
+          setSubmitting(false);
+          return;
+        }
+        try {
+          sessionStorage.setItem(`replybd:pay-phone:${order.order_number}`, last4);
+        } catch { /* falls back to the lookup form */ }
+        if (!isExpress) clearCart();
+        window.location.href = `/order/${order.order_number}?phone=${last4}`;
+        return;
+      }
+
+      pixel.purchase({
+        orderNumber: order.order_number,
+        value: order.total,
+        numItems,
+        contentIds: lines.map((l) => l.product_id.toString()),
+      });
       // Cart-mode order succeeded → empty the cart so the badge clears.
       if (!isExpress) clearCart();
       const acctFlag = order.account_exists && !order.customer?.token ? '&account_exists=1' : '';
-      window.location.href = `/order/${order.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}${acctFlag}`;
+      window.location.href = `/order/${order.order_number}?placed=1&phone=${last4}${acctFlag}`;
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
       // 422 password_required (create_account set without a password) — the
@@ -433,23 +508,67 @@ export function CheckoutPage({
                 </div>
               </div>
 
-              {/* COD + Place Order */}
+              {/* Payment method + Place Order */}
               <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6">
-                <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4">
-                  <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
-                  <div>
-                    <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
-                    <p className="text-xs text-brand-700">Pay when your order arrives. No upfront payment needed.</p>
+                {canPayOnline ? (
+                  <div className="space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Payment Method</p>
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${payMethod === 'cod' ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="cod"
+                        checked={payMethod === 'cod'}
+                        onChange={() => setPayMethod('cod')}
+                        className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="flex items-start gap-3">
+                        <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-900">Cash on Delivery</span>
+                          <span className="block text-xs text-slate-500">Pay when your order arrives. No upfront payment needed.</span>
+                        </span>
+                      </span>
+                    </label>
+                    <label className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${payMethod === 'online' ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
+                      <input
+                        type="radio"
+                        name="payment_method"
+                        value="online"
+                        checked={payMethod === 'online'}
+                        onChange={() => setPayMethod('online')}
+                        className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      <span className="flex items-start gap-3">
+                        <CreditCard className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
+                        <span>
+                          <span className="block text-sm font-semibold text-slate-900">Pay Online</span>
+                          <span className="block text-xs text-slate-500">bKash, Nagad, Rocket or card — you'll be taken to a secure payment page.</span>
+                        </span>
+                      </span>
+                    </label>
                   </div>
-                </div>
+                ) : (
+                  <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 p-4">
+                    <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
+                    <div>
+                      <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
+                      <p className="text-xs text-brand-700">Pay when your order arrives. No upfront payment needed.</p>
+                    </div>
+                  </div>
+                )}
 
                 <p className="mt-4 text-xs text-slate-500">
                   Your details are used only to process and deliver this order.
                 </p>
 
                 <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
-                  <ShoppingCart className="h-4 w-4" />
-                  {submitting ? 'Placing order…' : `Place Order — ${formatBDT(total, { currency })}`}
+                  {canPayOnline && payMethod === 'online' ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                  {submitting
+                    ? (canPayOnline && payMethod === 'online' ? 'Starting payment…' : 'Placing order…')
+                    : (canPayOnline && payMethod === 'online'
+                        ? `Pay Now — ${formatBDT(total, { currency })}`
+                        : `Place Order — ${formatBDT(total, { currency })}`)}
                 </Button>
               </div>
             </div>
