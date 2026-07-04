@@ -73,6 +73,20 @@ const {
   sectionOrder,
 } = resolveHomeData(home, all, categories);
 
+// The LCP element on mobile is the hero's big banner image. It's already in
+// the prerendered HTML with loading="eager", but without a preload +
+// fetchpriority the browser ranks it like any other image and PageSpeed
+// flags "LCP request discovery". Mirror the hero's own render rules exactly
+// (visible + has an image) and only when hero is the FIRST section — if the
+// tenant reordered it below the fold, a high-priority preload would steal
+// bandwidth from the real LCP instead.
+const heroIsFirst = !isServiceSite
+  && !!home?.hero?.visible
+  && sectionOrder[0] === "hero";
+const lcpImage = heroIsFirst
+  ? (home!.hero.image_url || heroProducts[0]?.image_url || null)
+  : null;
+
 // JSON-LD. This page is PRERENDERED, so the request origin is meaningless
 // at build time — schemas only render once the tenant has a public_url
 // (i.e. after the first deploy), which is exactly when they matter.
@@ -97,6 +111,8 @@ const schemas: Record<string, unknown>[] =
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
 <Base schema={schemas} meta={meta}>
+  {lcpImage && <link slot="head" rel="preload" as="image" href={lcpImage} fetchpriority="high" />}
+
   {/* Service tenants: block-based service website with its own anchor-nav
       header — the product Header/sections below never render for them. */}
   {meta && isServiceSite && <ServiceHome client:load meta={meta} config={meta.service_home!} />}
@@ -108,7 +124,7 @@ const schemas: Record<string, unknown>[] =
       switch (key) {
         case 'hero':
           return home.hero.visible && (home.hero.image_url || heroProducts.length > 0)
-            ? <HeroGrid featured={heroProducts} hero={home.hero} />
+            ? <HeroGrid featured={heroProducts} hero={home.hero} priority={heroIsFirst} />
             : null;
         case 'categories':
           return home.categories.visible
