@@ -178,7 +178,7 @@ function ProductTile({ product }: { product: ProductCard }) {
       )}
       <div className={TILE_GRADIENT} />
       {off && (
-        <span className="absolute top-2.5 right-2.5 z-10 bg-rose-500 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
+        <span className="absolute top-2.5 right-2.5 z-10 bg-rose-600 text-white text-[11px] font-bold px-2 py-0.5 rounded-full">
           -{off}%
         </span>
       )}

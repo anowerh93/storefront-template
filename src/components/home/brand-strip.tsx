@@ -31,7 +31,7 @@ export function BrandStrip({ items }: { items: HomepageConfig['brand_strip']['it
             <div key={i} className={`${tone.bg} rounded-2xl p-4 sm:p-5 hover:shadow-md transition`}>
               <span className={`text-[10px] uppercase tracking-wider font-bold ${tone.accent}`}>{b.badge}</span>
               <p className="font-bold text-slate-900 text-base mt-1">{b.name}</p>
-              {b.detail && <p className="text-xs text-slate-500 mt-0.5">{b.detail}</p>}
+              {b.detail && <p className="text-xs text-slate-600 mt-0.5">{b.detail}</p>}
             </div>
           );
         })}

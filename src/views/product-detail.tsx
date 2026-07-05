@@ -208,7 +208,7 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
           <span className="text-sm font-medium text-slate-500">Price:</span>
           <span className="text-2xl font-bold text-rose-600">{formatBDT(unitPrice, { currency: product.currency })}</span>
           {product.compare_at_price && product.compare_at_price > unitPrice && (
-            <span className="text-base text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
+            <span className="text-base text-slate-500 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
           )}
           {discount && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Save {discount}%</span>}
         </div>

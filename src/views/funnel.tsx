@@ -647,7 +647,7 @@ function PriceBlock({ config, product }: { config: FunnelBlockConfig['price']; p
       <div className="inline-flex flex-wrap items-baseline justify-center gap-3 rounded-2xl bg-brand-50 px-6 py-4 ring-1 ring-brand-100">
         <span className="text-3xl font-extrabold text-rose-600">{formatBDT(product.price, { currency: product.currency })}</span>
         {product.compare_at_price && product.compare_at_price > product.price && (
-          <span className="text-lg text-slate-400 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
+          <span className="text-lg text-slate-500 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
         )}
         {off && <span className="rounded-full bg-rose-600 px-2.5 py-1 text-xs font-bold text-white">Save {off}%</span>}
       </div>
@@ -874,7 +874,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
                     <span className="shrink-0 text-right">
                       <span className="block">
                         <span className="text-sm font-bold text-rose-600">{formatBDT(vp, { currency: product.currency })}</span>
-                        {vc && vc > vp && <span className="ml-1 text-xs text-slate-400 line-through">{formatBDT(vc, { currency: product.currency })}</span>}
+                        {vc && vc > vp && <span className="ml-1 text-xs text-slate-500 line-through">{formatBDT(vc, { currency: product.currency })}</span>}
                         {off && <span className="ml-1 rounded-full bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-600">-{off}%</span>}
                       </span>
                       {vc && vc > vp && (
