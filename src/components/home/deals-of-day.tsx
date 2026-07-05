@@ -63,7 +63,7 @@ export function DealsOfDay({
               />
             )}
             {discount && (
-              <span className="absolute top-3 left-3 bg-rose-500 text-white text-xs font-bold px-2.5 py-1 rounded-full">
+              <span className="absolute top-3 left-3 bg-rose-600 text-white text-xs font-bold px-2.5 py-1 rounded-full">
                 -{discount}%
               </span>
             )}
@@ -85,7 +85,7 @@ export function DealsOfDay({
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-bold text-slate-900">{formatBDT(featured.price, { currency: featured.currency })}</span>
             {featured.compare_at_price && featured.compare_at_price > featured.price && (
-              <span className="text-sm text-slate-400 line-through">{formatBDT(featured.compare_at_price, { currency: featured.currency })}</span>
+              <span className="text-sm text-slate-500 line-through">{formatBDT(featured.compare_at_price, { currency: featured.currency })}</span>
             )}
           </div>
 
@@ -142,7 +142,7 @@ function TimeBlock({ label, value }: { label: string; value: number }) {
   return (
     <div className="bg-slate-100 rounded-lg py-2 text-center">
       <div className="text-base font-bold text-slate-900 tabular-nums">{value.toString().padStart(2, '0')}</div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-slate-600">{label}</div>
     </div>
   );
 }
