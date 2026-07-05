@@ -32,6 +32,7 @@ import { DealsOfDay } from '../components/home/deals-of-day';
 import { ServicesRow } from '../components/home/services-row';
 import { TrustBadges } from '../components/home/trust-badges';
 import type { HomepageSectionKey } from '../lib/types';
+import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES } from '../lib/img';
 
 // Build-time fetch — same shape as views/home.tsx's async function. Three
 // API calls in parallel since the homepage is the most-hit route; we want
@@ -86,6 +87,10 @@ const heroIsFirst = !isServiceSite
 const lcpImage = heroIsFirst
   ? (home!.hero.image_url || heroProducts[0]?.image_url || null)
   : null;
+// Responsive preload — MUST use the same ladder + sizes as the hero <img>
+// (BANNER_WIDTHS/BANNER_SIZES), or the browser preloads one candidate and
+// renders another = double download. undefined when resizing is disabled.
+const lcpSrcSet = lcpImage ? cdnSrcSet(lcpImage, BANNER_WIDTHS) : undefined;
 
 // JSON-LD. This page is PRERENDERED, so the request origin is meaningless
 // at build time — schemas only render once the tenant has a public_url
@@ -111,7 +116,7 @@ const schemas: Record<string, unknown>[] =
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
 <Base schema={schemas} meta={meta}>
-  {lcpImage && <link slot="head" rel="preload" as="image" href={lcpImage} fetchpriority="high" />}
+  {lcpImage && <link slot="head" rel="preload" as="image" href={lcpSrcSet ? undefined : lcpImage} imagesrcset={lcpSrcSet} imagesizes={lcpSrcSet ? BANNER_SIZES : undefined} fetchpriority="high" />}
 
   {/* Service tenants: block-based service website with its own anchor-nav
       header — the product Header/sections below never render for them. */}

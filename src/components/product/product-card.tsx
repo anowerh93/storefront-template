@@ -15,7 +15,7 @@ export function ProductCard({ product }: { product: ProductCardType }) {
       {/* Image */}
       <div className="relative aspect-square bg-slate-100 overflow-hidden">
         {product.image_url ? (
-          <FitImage src={product.image_url} alt={product.name} />
+          <FitImage src={product.image_url} alt={product.name} sizes="(min-width: 1024px) 300px, 70vw" />
         ) : (
           <div className="absolute inset-0 flex items-center justify-center text-slate-300 text-3xl font-bold">
             {product.name.charAt(0).toUpperCase()}

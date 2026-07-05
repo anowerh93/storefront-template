@@ -1,5 +1,6 @@
 import { ArrowRight, Apple, Cookie, Coffee, GlassWater, Package, Sandwich, Carrot, Leaf } from 'lucide-react';
 import type { Category } from '../../lib/types';
+import { cdnImage } from '../../lib/img';
 
 const ICON_MAP: Record<string, React.ComponentType<{ className?: string }>> = {
   snacks:     Cookie,
@@ -55,7 +56,7 @@ export function CategoryStrip({
               {c.image_url ? (
                 // Tenant's uploaded category image takes precedence over the
                 // generated icon so their branding shows on the storefront.
-                <img src={c.image_url} alt={c.name} loading="lazy"
+                <img src={cdnImage(c.image_url, 144)} alt={c.name} loading="lazy"
                      className="h-9 w-9 sm:h-11 sm:w-11 object-contain" />
               ) : (
                 <Icon className="h-8 w-8 sm:h-10 sm:w-10" />

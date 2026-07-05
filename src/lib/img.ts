@@ -1,0 +1,68 @@
+/**
+ * Responsive images via Cloudflare Image Transformations.
+ *
+ * Tenant uploads live on the R2 custom domain (cdn.reply.bd), which is served
+ * through the Cloudflare zone — so the edge can resize ON THE FLY via the
+ * `/cdn-cgi/image/<options>/<path>` URL form. No upload-pipeline changes, no
+ * stored variants, works retroactively for every image already in the bucket,
+ * and the original files are never touched.
+ *
+ * SAFETY MODEL (production-first):
+ *   • Everything is gated on PUBLIC_IMAGE_RESIZE === '1' (build-time env from
+ *     the deploy pipeline). Off ⇒ every helper returns the original URL /
+ *     undefined ⇒ the rendered HTML is byte-identical to today. The flag must
+ *     stay off until Image Transformations is enabled on the reply.bd zone —
+ *     /cdn-cgi/image/ URLs 404 without it.
+ *   • Only URLs on PUBLIC_IMAGE_CDN_HOST are rewritten. Dashboard-preview
+ *     blobs, dev URLs, external images: passed through untouched.
+ *   • fit=scale-down NEVER upscales — a small original is served as-is, so
+ *     quality can only be preserved. quality=85 + format=auto is Cloudflare's
+ *     visually-lossless-tuned default (AVIF/WebP per browser).
+ */
+
+const ENABLED = (import.meta.env.PUBLIC_IMAGE_RESIZE ?? '') === '1';
+const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undefined) || 'cdn.reply.bd';
+
+/** Default srcset width ladder for fluid images (FitImage etc.). */
+export const DEFAULT_WIDTHS = [320, 640, 1024] as const;
+
+/** The homepage big banner (the mobile LCP). One source of truth — the
+ *  <img srcset> in hero-grid and the <link rel=preload imagesrcset> in
+ *  index.astro MUST agree, or the browser double-downloads. */
+export const BANNER_WIDTHS = [480, 768, 1080, 1440, 1920] as const;
+export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
+/** Hero side tiles (two-up on mobile, single column on desktop). */
+export const TILE_SIZES = '(min-width: 1024px) 420px, 50vw';
+
+/** Is this a URL the CDN can transform (right host, not already transformed)? */
+function transformable(url: string): URL | null {
+  if (!ENABLED || !url) return null;
+  try {
+    const u = new URL(url);
+    if (u.hostname !== CDN_HOST) return null;
+    if (u.pathname.startsWith('/cdn-cgi/')) return null; // never double-wrap
+    return u;
+  } catch {
+    return null; // relative/invalid URLs (previews, placeholders) — untouched
+  }
+}
+
+/** Single resized URL, or the original when resizing is off / not applicable. */
+export function cdnImage(url: string, width: number, quality = 85): string {
+  const u = transformable(url);
+  if (!u) return url;
+  return `https://${CDN_HOST}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=scale-down${u.pathname}${u.search}`;
+}
+
+/** srcset covering the given widths, or undefined when resizing is off (the
+ *  attribute is then omitted entirely — HTML identical to today). */
+export function cdnSrcSet(url: string, widths: readonly number[] = DEFAULT_WIDTHS): string | undefined {
+  if (!transformable(url)) return undefined;
+  return widths.map((w) => `${cdnImage(url, w)} ${w}w`).join(', ');
+}
+
+/** Tiny, cheap version for FitImage's blurred backdrop layer — it renders
+ *  behind blur-2xl, so 64px is indistinguishable from the full file. */
+export function cdnBlurThumb(url: string): string {
+  return cdnImage(url, 64, 50);
+}

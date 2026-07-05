@@ -5,6 +5,7 @@ import { ChevronDown, MapPin, Menu, Search, ShoppingCart, User, UserCircle, X } 
 import type { StorefrontMeta, Category, SuggestProduct } from '../../lib/types';
 import { getToken, suggestProducts } from '../../lib/api';
 import { formatBDT } from '../../lib/format';
+import { cdnImage } from '../../lib/img';
 import { useCart, cartCount, useCartHydrated } from '../../stores/cart';
 
 /**
@@ -58,7 +59,7 @@ export function Header({
                 // crop them to a meaningless centre slice (e.g. showing
                 // "larriag" out of a longer name). Contain shows the whole
                 // logo; w-auto lets a wordmark be wide and an icon stay square.
-                <img src={meta.logo_url} alt={meta.name}
+                <img src={cdnImage(meta.logo_url, 480)} alt={meta.name}
                        className="h-8 w-auto max-w-[130px] sm:h-9 sm:max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-500 flex items-center justify-center text-white font-bold">
@@ -390,7 +391,7 @@ function SearchBox({ categories, currency }: { categories: Category[]; currency?
             >
               <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                 {p.image_url && (
-                  <img src={p.image_url} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-0.5" />
+                  <img src={cdnImage(p.image_url, 144)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-0.5" />
                 )}
               </span>
               <span className="min-w-0 flex-1">
