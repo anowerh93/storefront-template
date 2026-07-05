@@ -6,6 +6,7 @@ import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { FitImage } from '../components/ui/fit-image';
+import { cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
 import { pixel } from '../lib/pixel';
@@ -103,13 +104,13 @@ function ProductGallery({ product }: { product: ProductDetail }) {
               aria-label={`View image ${i + 1}`}
               className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-xl bg-white ring-2 transition ${i === active ? 'ring-brand-500' : 'ring-slate-200 hover:ring-slate-300'}`}
             >
-              <img src={src} alt={`${product.name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />
+              <img src={cdnImage(src, 192)} alt={`${product.name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />
             </button>
           ))}
         </div>
       )}
       <div className="relative aspect-square flex-1 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-        <FitImage src={urls[active]} alt={product.name} eager />
+        <FitImage src={urls[active]} alt={product.name} eager sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
       </div>
     </div>
   );
@@ -427,7 +428,7 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {customerGalleryUrls.map((src, i) => (
               <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-                <img src={src} alt={`${product.name} — customer photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
+                <img src={src} srcSet={cdnSrcSet(src)} sizes={cdnSrcSet(src) ? '(min-width: 640px) 33vw, 50vw' : undefined} alt={`${product.name} — customer photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
               </div>
             ))}
           </div>
@@ -535,7 +536,7 @@ function Sidebar({
             {related.map((p) => (
               <a key={p.slug} href={`/products/${p.slug}`} className="flex items-center gap-3 rounded-xl p-1.5 hover:bg-slate-50">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                  {p.image_url && <img src={p.image_url} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
+                  {p.image_url && <img src={cdnImage(p.image_url, 168)} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
                 </div>
                 <div className="min-w-0">
                   <p className="line-clamp-2 text-xs font-semibold text-slate-900">{p.name}</p>
@@ -552,7 +553,7 @@ function Sidebar({
 
         {product.image_url && (
           <div className="relative my-4 aspect-square overflow-hidden rounded-xl bg-white ring-1 ring-slate-100">
-            <img src={product.image_url} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
+            <img src={product.image_url} srcSet={cdnSrcSet(product.image_url)} sizes={cdnSrcSet(product.image_url) ? '(min-width: 1024px) 300px, 90vw' : undefined} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-2" />
           </div>
         )}
 
