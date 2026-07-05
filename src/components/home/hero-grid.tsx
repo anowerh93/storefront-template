@@ -2,6 +2,7 @@ import { ArrowRight } from 'lucide-react';
 import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 import { FitImage } from '../ui/fit-image';
+import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES, TILE_SIZES } from '../../lib/img';
 
 /**
  * Hero — big banner on the left + two tiles stacked on the right (Shopwise
@@ -72,6 +73,7 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
   // headline / buttons / dots competing with their design. The whole banner is
   // one click target: button 1's link, then button 2's, then /products.
   const href = hero.button1?.url || hero.button2?.url || '/products';
+  const srcSet = cdnSrcSet(hero.image_url!, BANNER_WIDTHS);
 
   // Render the upload at its OWN aspect ratio (w-full h-auto) — no fixed height
   // and no FitImage blur-fill. FitImage letterboxed a wide banner inside the
@@ -86,6 +88,8 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
     >
       <img
         src={hero.image_url!}
+        srcSet={srcSet}
+        sizes={srcSet ? BANNER_SIZES : undefined}
         alt={hero.headline || 'Featured offer'}
         loading="eager"
         decoding="async"
@@ -97,6 +101,7 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
 }
 
 function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number] }) {
+  const srcSet = cdnSrcSet(tile.image_url!);
   // Image-first: the merchant uploaded fully-designed tile art (its own text /
   // CTA baked in), so we show it CLEAN — one click target, no overlaid copy
   // competing with the artwork. The only thing configured besides the image is
@@ -110,6 +115,8 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
           upload fills with no crop; off-ratio images lose a sliver of an edge. */}
       <img
         src={tile.image_url!}
+        srcSet={srcSet}
+        sizes={srcSet ? TILE_SIZES : undefined}
         alt="Promotional banner"
         loading="eager"
         className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
@@ -130,7 +137,7 @@ function ProductBigBanner({ product, eyebrow, priority = false }: { product: Pro
       className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
     >
       {product.image_url && (
-        <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} />
+        <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} sizes={BANNER_SIZES} widths={BANNER_WIDTHS} />
       )}
       <div className={BANNER_GRADIENT} />
 
@@ -174,7 +181,7 @@ function ProductTile({ product }: { product: ProductCard }) {
       className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
     >
       {product.image_url && (
-        <FitImage src={product.image_url} alt={product.name} eager />
+        <FitImage src={product.image_url} alt={product.name} eager sizes={TILE_SIZES} />
       )}
       <div className={TILE_GRADIENT} />
       {off && (
