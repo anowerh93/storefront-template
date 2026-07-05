@@ -904,6 +904,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           <Textarea id="f-address" placeholder="House/road, area, district…" {...form.register('customer_address')} className="mt-1.5" />
           {form.formState.errors.customer_address && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_address.message}</p>}
         </div>
+        <div>
+          <Label htmlFor="f-notes">Order Notes <span className="font-normal text-slate-400">(optional)</span></Label>
+          <Textarea id="f-notes" placeholder="Special notes for delivery, etc." {...form.register('notes')} className="mt-1.5" />
+        </div>
 
         {meta.shipping?.enabled && zones.length > 0 && (
           <div>
