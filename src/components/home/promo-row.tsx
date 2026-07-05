@@ -1,4 +1,5 @@
 import type { ProductCard, HomepageConfig } from '../../lib/types';
+import { cdnSrcSet } from '../../lib/img';
 
 /**
  * 3-column promo row — "Shopwise" promo style. Each card is a light, neutral
@@ -52,6 +53,8 @@ export function PromoRow({
                 {p.image_url && (
                   <img
                     src={p.image_url}
+                    srcSet={cdnSrcSet(p.image_url)}
+                    sizes={cdnSrcSet(p.image_url) ? '(min-width: 1024px) 260px, 40vw' : undefined}
                     alt={p.name}
                     loading="lazy"
                     className="absolute inset-0 h-full w-full object-contain object-center p-3 transition-transform duration-500 group-hover:scale-105"

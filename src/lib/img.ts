@@ -20,7 +20,13 @@
  *     visually-lossless-tuned default (AVIF/WebP per browser).
  */
 
-const ENABLED = (import.meta.env.PUBLIC_IMAGE_RESIZE ?? '') === '1';
+// Explicit '0'/'1' (deploy pipeline env, either name) always wins; with no
+// opinion, production builds default ON (zone Transformations are enabled —
+// verified live) and dev builds stay OFF (no /cdn-cgi/ on localhost).
+// Kill switches: STOREFRONT_IMAGE_RESIZE=false (pipeline) or
+// PUBLIC_IMAGE_TRANSFORMS=0 (direct build env).
+const RAW = ((import.meta.env.PUBLIC_IMAGE_RESIZE ?? import.meta.env.PUBLIC_IMAGE_TRANSFORMS) ?? '') as string;
+const ENABLED = RAW === '1' || (RAW !== '0' && !import.meta.env.DEV);
 const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undefined) || 'cdn.reply.bd';
 
 /** Default srcset width ladder for fluid images (FitImage etc.). */
@@ -33,6 +39,9 @@ export const BANNER_WIDTHS = [480, 768, 1080, 1440, 1920] as const;
 export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
 /** Hero side tiles (two-up on mobile, single column on desktop). */
 export const TILE_SIZES = '(min-width: 1024px) 420px, 50vw';
+/** Funnel + PDP main image — the LCP of ad landing pages. */
+export const DETAIL_WIDTHS = [480, 828, 1200] as const;
+export const DETAIL_SIZES = '(min-width: 1024px) 600px, 100vw';
 
 /** Is this a URL the CDN can transform (right host, not already transformed)? */
 function transformable(url: string): URL | null {

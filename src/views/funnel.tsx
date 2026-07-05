@@ -16,6 +16,7 @@ import { submitOrder } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
+import { cdnBlurThumb, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -371,7 +372,7 @@ function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; pro
     : slides.length === 1
       ? (
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-          <FitImage src={slides[0]} alt={product.name} eager />
+          <FitImage src={slides[0]} alt={product.name} eager sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
         </div>
       )
       : null;
@@ -432,7 +433,7 @@ function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
       {images.map((src, idx) => (
-        <img key={idx} src={src} alt={alt} loading={idx === 0 ? 'eager' : 'lazy'}
+        <img key={idx} src={src} srcSet={cdnSrcSet(src, DETAIL_WIDTHS)} sizes={cdnSrcSet(src, DETAIL_WIDTHS) ? DETAIL_SIZES : undefined} alt={alt} loading={idx === 0 ? 'eager' : 'lazy'}
              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${idx === i ? 'opacity-100' : 'opacity-0'}`} />
       ))}
       <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
@@ -520,8 +521,8 @@ function ReviewScreenshots({ images }: { images: string[] }) {
     return (
       <div className="mx-auto max-w-xs">
         <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
-          <img src={images[0]} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
-          <img src={images[0]} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
+          <img src={cdnBlurThumb(images[0])} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+          <img src={images[0]} srcSet={cdnSrcSet(images[0])} sizes={cdnSrcSet(images[0]) ? '(min-width: 640px) 420px, 90vw' : undefined} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
         </div>
       </div>
     );
@@ -550,8 +551,8 @@ function ReviewScreenshots({ images }: { images: string[] }) {
                   so nothing is cropped regardless of the upload's dimensions. */}
               <div className="cf-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-2xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
-                <img src={src} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
-                <img src={src} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
+                <img src={cdnBlurThumb(src)} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
+                <img src={src} srcSet={cdnSrcSet(src)} sizes={cdnSrcSet(src) ? '(min-width: 640px) 300px, 45vw' : undefined} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
                 <div className="cf-shade pointer-events-none absolute inset-0 z-[2] bg-slate-900" style={{ opacity: 0 }} />
               </div>
             </div>
@@ -633,7 +634,7 @@ function Gallery({ images, name }: { images: string[]; name: string }) {
     <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {images.slice(0, 8).map((src, i) => (
         <div key={i} className="relative aspect-square overflow-hidden rounded-xl bg-slate-100 ring-1 ring-slate-200">
-          <img src={src} alt={`${name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={src} srcSet={cdnSrcSet(src)} sizes={cdnSrcSet(src) ? '(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw' : undefined} alt={`${name} — photo ${i + 1}`} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         </div>
       ))}
     </section>
