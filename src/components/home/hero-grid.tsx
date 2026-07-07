@@ -75,28 +75,37 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
   const href = hero.button1?.url || hero.button2?.url || '/products';
   const srcSet = cdnSrcSet(hero.image_url!, BANNER_WIDTHS);
 
-  // Render the upload at its OWN aspect ratio (w-full h-auto) — no fixed height
-  // and no FitImage blur-fill. FitImage letterboxed a wide banner inside the
-  // taller hero box and filled the gap with a blurred copy, which showed up as
-  // lighter bands above/below the artwork. h-auto means the banner is exactly
-  // the image: no bands, no crop, whatever ratio the merchant uploads.
+  // Sizing, two modes (no FitImage blur-fill in either — that letterboxed the
+  // artwork with blurred bands):
+  //   • MOBILE (below lg): the banner is alone on its row → render at the
+  //     image's OWN aspect ratio (w-full h-auto). No bands, no crop.
+  //   • DESKTOP (lg+): the banner sits BESIDE the two tiles, so the tiles
+  //     column (2 × aspect-[840/400] + gap) defines the row height and the
+  //     banner FILLS it exactly: zero-intrinsic-height wrapper (absolute-fill
+  //     link) + object-cover. The two columns bottom-align at every viewport.
+  //     A recommended 1600×840 (~1.9:1) upload fills with ~no crop; off-ratio
+  //     art loses a sliver at the sides instead of leaving the layout ragged
+  //     (the previous h-auto-everywhere left a gap under wide banners — a
+  //     hint-perfect 1600×750 upload ended ~40px above the tiles column).
   return (
-    <a
-      href={href}
-      className="group block overflow-hidden rounded-2xl"
-      aria-label={hero.headline || 'Shop now'}
-    >
-      <img
-        src={hero.image_url!}
-        srcSet={srcSet}
-        sizes={srcSet ? BANNER_SIZES : undefined}
-        alt={hero.headline || 'Featured offer'}
-        loading="eager"
-        decoding="async"
-        fetchPriority={priority ? 'high' : undefined}
-        className="block w-full h-auto"
-      />
-    </a>
+    <div className="relative lg:self-stretch">
+      <a
+        href={href}
+        className="group block overflow-hidden rounded-2xl lg:absolute lg:inset-0"
+        aria-label={hero.headline || 'Shop now'}
+      >
+        <img
+          src={hero.image_url!}
+          srcSet={srcSet}
+          sizes={srcSet ? BANNER_SIZES : undefined}
+          alt={hero.headline || 'Featured offer'}
+          loading="eager"
+          decoding="async"
+          fetchPriority={priority ? 'high' : undefined}
+          className="block w-full h-auto lg:h-full lg:w-full lg:object-cover"
+        />
+      </a>
+    </div>
   );
 }
 
