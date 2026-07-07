@@ -49,7 +49,10 @@ export function HeroGrid({
           ? <ConfiguredBigBanner hero={hero} priority={priority} />
           : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} priority={priority} /> : <BannerPlaceholder />)}
 
-        <div className="grid grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
+        {/* Phones: tiles stack FULL-WIDTH (2.1:1 designed art with baked-in
+            text is unreadable at 50vw and was cropped ~46% by the old
+            near-square min-h boxes). Tablets: two-up. Desktop: right column. */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
           {renderTile(0)}
           {renderTile(1)}
         </div>
@@ -118,7 +121,10 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
   return (
     <a
       href={tile.url || '/products'}
-      className="group relative block overflow-hidden rounded-2xl min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] bg-slate-800"
+      // aspect-locked at EVERY breakpoint: the recommended 840×400 art always
+      // shows complete. The old mobile min-h boxes (~1.14:1) cover-cropped
+      // ~46% of a hint-perfect 2.1:1 upload on phones.
+      className="group relative block overflow-hidden rounded-2xl aspect-[840/400] bg-slate-800"
     >
       {/* Artwork fills the slot edge-to-edge (cover). A correctly-sized 840x400
           upload fills with no crop; off-ratio images lose a sliver of an edge. */}
@@ -230,7 +236,7 @@ function BannerPlaceholder() {
 
 function TilePlaceholder() {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 min-h-[150px] sm:min-h-[175px] lg:min-h-0 lg:aspect-[840/400] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
+    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 aspect-[840/400] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
       Featured slot
     </div>
   );
