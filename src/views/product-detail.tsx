@@ -125,7 +125,9 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
   const selected = product.variants.find((v) => v.index === variantIdx) ?? null;
   const unitPrice = selected?.price ?? product.price;
   const inStock = selected ? selected.in_stock : product.in_stock;
-  const maxStock = selected ? selected.stock : null;
+  // Qty ceiling: the selected variant's stock, or the parent stock for
+  // simple products (null = untracked → no ceiling).
+  const maxStock = selected ? selected.stock : (product.stock ?? null);
   // Discount follows the SELECTED variant: its own compare-at ("Was") wins, so
   // picking a variant shows THAT variant's strike-through + Save%. Fall back to
   // the product-level compare-at only when the variant doesn't override the
@@ -294,9 +296,23 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
           </div>
         </div>
       ) : (
-        <span className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 px-6 py-3.5 text-base font-bold text-slate-500">
-          Out of Stock
-        </span>
+        <div className="space-y-2">
+          <span className="flex w-full cursor-not-allowed items-center justify-center rounded-xl bg-slate-200 px-6 py-3.5 text-base font-bold text-slate-500">
+            Out of Stock
+          </span>
+          {/* Dead end → lead: let the shopper ask when it's back. The
+              tenant's bot answers restock questions in Messenger. */}
+          {meta.messenger?.url && (
+            <a
+              href={meta.messenger.url}
+              target="_blank"
+              rel="noopener"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-300 px-6 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
+            >
+              <MessageCircle className="h-4 w-4 text-brand-600" /> Message us — ask when it's back
+            </a>
+          )}
+        </div>
       )}
     </div>
   );
