@@ -37,8 +37,10 @@ export const DEFAULT_WIDTHS = [320, 640, 1024] as const;
  *  index.astro MUST agree, or the browser double-downloads. */
 export const BANNER_WIDTHS = [480, 768, 1080, 1440, 1920] as const;
 export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
-/** Hero side tiles (two-up on mobile, single column on desktop). */
-export const TILE_SIZES = '(min-width: 1024px) 420px, 50vw';
+/** Hero side tiles: full-width stacked on phones, two-up on tablets, single
+ *  right column on desktop — MUST mirror hero-grid's tile wrapper
+ *  (grid-cols-1 sm:grid-cols-2 lg:grid-cols-1) or phones fetch half-size. */
+export const TILE_SIZES = '(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw';
 /** Funnel + PDP main image — the LCP of ad landing pages. */
 export const DETAIL_WIDTHS = [480, 828, 1200] as const;
 export const DETAIL_SIZES = '(min-width: 1024px) 600px, 100vw';
