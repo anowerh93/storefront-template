@@ -41,7 +41,9 @@ export type StorefrontMeta = {
   about_title?: string | null;
   /** Full About article — sanitized HTML rendered from tenant Markdown. */
   about_html?: string | null;
-  /** Optional About-page banner / group photo (null until uploaded). */
+  /** Optional stacked About-page images (banners / designed sections), in order. */
+  about_image_urls?: string[] | null;
+  /** First About image — backward-compat alias for about_image_urls[0]. */
   about_image_url?: string | null;
   currency: string;
   whatsapp: string | null;
