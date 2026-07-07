@@ -388,6 +388,9 @@ export type ProductDetail = ProductCard & {
   /** Customer / lifestyle photos (shown in the Galleries tab). */
   customer_gallery_urls: string[];
   variants: ProductVariant[];
+  /** Parent stock for SIMPLE products (PDP qty clamp). Null = untracked /
+   *  unlimited; products with variants clamp per-variant instead. */
+  stock?: number | null;
   reviews: { count: number; average: number | null; items: ProductReview[] };
   related_products: ProductCard[];
   funnel: FunnelPayload | null;
