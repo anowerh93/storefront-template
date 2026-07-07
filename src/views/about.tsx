@@ -3,16 +3,28 @@ import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
 import { NotFoundPage } from './not-found';
-import type { StorefrontMeta } from '../lib/types';
+import { cdnImage, cdnSrcSet } from '../lib/img';
+import type { StorefrontMeta, TeamMember } from '../lib/types';
 
-// Astro+CF port: meta arrives as a prop (fetched in src/pages/about.astro).
+// Astro+CF port: meta + team arrive as props (fetched in src/pages/about.astro).
 // Pure content page, no interactivity → rendered as static HTML.
-export function AboutPage({ meta }: { meta: StorefrontMeta | null }) {
+export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; team?: TeamMember[] }) {
   if (!meta) return <NotFoundPage />;
   return (
     <>
       <Header meta={meta} />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
+        {/* Optional banner / group photo */}
+        {meta.about_image_url && (
+          <img
+            src={meta.about_image_url}
+            srcSet={cdnSrcSet(meta.about_image_url)}
+            sizes={cdnSrcSet(meta.about_image_url) ? '(min-width: 768px) 768px, 100vw' : undefined}
+            alt={meta.about_title || meta.name}
+            className="mb-8 w-full rounded-2xl object-cover ring-1 ring-slate-200"
+          />
+        )}
+
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.about_title || meta.name}</h1>
         {meta.about_html ? (
           // Sanitized server-side: tenant Markdown → HTML via Markdown::toHtml
@@ -29,7 +41,35 @@ export function AboutPage({ meta }: { meta: StorefrontMeta | null }) {
           <p className="text-slate-500 mt-4">More about us coming soon.</p>
         )}
 
-        <div className="mt-10 flex flex-wrap gap-3">
+        {/* Meet Our Team — structured cards (photo + name + role + bio) */}
+        {team.length > 0 && (
+          <section className="mt-14">
+            <h2 className="text-2xl font-bold text-slate-900">Meet Our Team</h2>
+            <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+              {team.map((m, i) => (
+                <div key={i} className="rounded-2xl bg-white p-5 text-center ring-1 ring-slate-200 sm:p-6">
+                  {m.image_url ? (
+                    <img
+                      src={cdnImage(m.image_url, 240)}
+                      alt={m.name}
+                      loading="lazy"
+                      className="mx-auto h-24 w-24 rounded-full object-cover ring-1 ring-slate-200"
+                    />
+                  ) : (
+                    <div className="mx-auto flex h-24 w-24 items-center justify-center rounded-full bg-brand-50 text-2xl font-bold text-brand-300">
+                      {m.name.charAt(0)}
+                    </div>
+                  )}
+                  <h3 className="mt-4 font-bold text-slate-900">{m.name}</h3>
+                  {m.role && <p className="text-sm font-medium text-brand-700">{m.role}</p>}
+                  {m.bio && <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-slate-600">{m.bio}</p>}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        <div className="mt-12 flex flex-wrap gap-3">
           <a href="/products"><Button variant="brand">Shop our products</Button></a>
           {meta.messenger?.url && (
             <a href={meta.messenger.url} target="_blank" rel="noopener">
