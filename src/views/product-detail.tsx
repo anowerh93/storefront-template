@@ -126,7 +126,14 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
   const unitPrice = selected?.price ?? product.price;
   const inStock = selected ? selected.in_stock : product.in_stock;
   const maxStock = selected ? selected.stock : null;
-  const discount = discountPct(unitPrice, product.compare_at_price);
+  // Discount follows the SELECTED variant: its own compare-at ("Was") wins, so
+  // picking a variant shows THAT variant's strike-through + Save%. Fall back to
+  // the product-level compare-at only when the variant doesn't override the
+  // price — never strike a variant's own price against an unrelated base was.
+  const compareAt =
+    selected?.compare_at_price ??
+    ((selected?.price ?? null) === null ? product.compare_at_price : null);
+  const discount = discountPct(unitPrice, compareAt);
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
 
@@ -208,8 +215,8 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
         <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
           <span className="text-sm font-medium text-slate-500">Price:</span>
           <span className="text-2xl font-bold text-rose-600">{formatBDT(unitPrice, { currency: product.currency })}</span>
-          {product.compare_at_price && product.compare_at_price > unitPrice && (
-            <span className="text-base text-slate-500 line-through">{formatBDT(product.compare_at_price, { currency: product.currency })}</span>
+          {compareAt && compareAt > unitPrice && (
+            <span className="text-base text-slate-500 line-through">{formatBDT(compareAt, { currency: product.currency })}</span>
           )}
           {discount && <span className="rounded-full bg-rose-50 px-2 py-0.5 text-xs font-semibold text-rose-600">Save {discount}%</span>}
         </div>
