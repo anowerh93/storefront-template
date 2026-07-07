@@ -10,19 +10,33 @@ import type { StorefrontMeta, TeamMember } from '../lib/types';
 // Pure content page, no interactivity → rendered as static HTML.
 export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; team?: TeamMember[] }) {
   if (!meta) return <NotFoundPage />;
+  // Ordered list of About images; fall back to the single-image alias so an
+  // older API payload (about_image_url only) still renders one.
+  const aboutImages =
+    meta.about_image_urls && meta.about_image_urls.length > 0
+      ? meta.about_image_urls
+      : meta.about_image_url
+        ? [meta.about_image_url]
+        : [];
   return (
     <>
       <Header meta={meta} />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
-        {/* Optional banner / group photo */}
-        {meta.about_image_url && (
-          <img
-            src={meta.about_image_url}
-            srcSet={cdnSrcSet(meta.about_image_url)}
-            sizes={cdnSrcSet(meta.about_image_url) ? '(min-width: 768px) 768px, 100vw' : undefined}
-            alt={meta.about_title || meta.name}
-            className="mb-8 w-full rounded-2xl object-cover ring-1 ring-slate-200"
-          />
+        {/* Optional stacked banners / designed sections, in order */}
+        {aboutImages.length > 0 && (
+          <div className="mb-8 space-y-4">
+            {aboutImages.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                srcSet={cdnSrcSet(url)}
+                sizes={cdnSrcSet(url) ? '(min-width: 768px) 768px, 100vw' : undefined}
+                alt={`${meta.about_title || meta.name} — ${i + 1}`}
+                loading={i === 0 ? 'eager' : 'lazy'}
+                className="w-full rounded-2xl object-cover ring-1 ring-slate-200"
+              />
+            ))}
+          </div>
         )}
 
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.about_title || meta.name}</h1>
