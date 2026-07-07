@@ -1,0 +1,47 @@
+---
+/**
+ * Default info page (/pages/[slug]) — Terms / Privacy / Refund / Careers.
+ * SSR — fetched per request, CDN-cached. The slug set is fixed (no renames),
+ * so an unknown OR disabled page is a REAL 404 (no redirect-table lookup).
+ * Shared by both business types.
+ */
+export const prerender = false;
+
+import Base from '../../layouts/Base.astro';
+import { getInfoPage, getStorefront, getCategories } from '../../lib/api';
+import { breadcrumbSchema } from '../../lib/schema';
+import { InfoPageView } from '../../views/info-page';
+import type { InfoPageDetail, Category, StorefrontMeta } from '../../lib/types';
+
+const slug = Astro.params.slug as string;
+
+const [page, meta, categories]: [InfoPageDetail | null, StorefrontMeta | null, Category[]] = await Promise.all([
+  getInfoPage(slug).catch((err) => { console.warn(`[pages/[slug]] getInfoPage(${slug}) failed:`, err); return null; }),
+  getStorefront().catch((err) => { console.warn('[pages/[slug]] getStorefront failed:', err); return null; }),
+  getCategories().catch(() => []),
+]);
+
+if (!page) {
+  Astro.response.status = 404;
+}
+
+const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
+const schemas = page && meta
+  ? [
+      breadcrumbSchema([
+        { name: 'Home', url: `${origin}/` },
+        { name: page.title },
+      ]),
+    ].filter((s): s is Record<string, unknown> => s !== null)
+  : [];
+---
+
+<Base
+  title={page?.seo?.title}
+  description={page?.seo?.description ?? undefined}
+  noindex={page?.seo?.noindex}
+  schema={schemas}
+  meta={meta}
+>
+  <InfoPageView client:load meta={meta} page={page} categories={categories} />
+</Base>

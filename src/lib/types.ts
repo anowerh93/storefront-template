@@ -98,6 +98,28 @@ export type StorefrontMeta = {
   has_team?: boolean;
   /** Tenant has ≥1 published blog post (BOTH business types) → show /blog nav. */
   has_blog?: boolean;
+  /** Enabled default info pages (Terms/Privacy/Refund/Careers) for the footer. */
+  info_pages?: InfoPageLink[];
+};
+
+/** Footer link to a default info page. `path` is '/pages/{slug}'. */
+export type InfoPageLink = {
+  key: string;
+  title: string;
+  slug: string;
+  path: string;
+  noindex?: boolean;
+};
+
+/** A single info page detail (/pages/[slug]). */
+export type InfoPageDetail = {
+  key: string;
+  title: string;
+  slug: string;
+  /** Server-rendered, sanitized HTML from the Markdown source. */
+  body_html: string | null;
+  updated_at: string | null;
+  seo: { title: string; description: string | null; noindex: boolean };
 };
 
 // ──────────────────────────────────────────────────────────────
