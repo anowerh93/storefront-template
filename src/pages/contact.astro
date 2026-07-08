@@ -1,0 +1,31 @@
+---
+/**
+ * Contact page (header/footer "Contact" link). Renders the tenant's contact
+ * details + a message form that emails the shop owner
+ * (POST /storefronts/{slug}/contact). Prerendered to static HTML like About —
+ * the form island hydrates client-side and the Turnstile site key is baked
+ * from the meta payload at build time. Indexable (a real contact surface).
+ */
+import Base from '../layouts/Base.astro';
+import { getStorefront } from '../lib/api';
+import { breadcrumbSchema } from '../lib/schema';
+import { ContactPage } from '../views/contact';
+import type { StorefrontMeta } from '../lib/types';
+
+let meta: StorefrontMeta | null = null;
+try {
+  meta = await getStorefront();
+} catch (err) {
+  console.warn('[contact.astro] getStorefront() failed:', err);
+}
+
+// Prerendered page — breadcrumb only once a public origin exists.
+const origin = (meta?.public_url ?? '').replace(/\/+$/, '');
+const schemas = origin
+  ? [breadcrumbSchema([{ name: 'Home', url: `${origin}/` }, { name: 'Contact' }])]
+  : [];
+---
+
+<Base title={meta ? `Contact ${meta.name}` : 'Contact'} meta={meta} schema={schemas}>
+  <ContactPage meta={meta} client:load />
+</Base>

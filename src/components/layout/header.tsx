@@ -196,6 +196,7 @@ export function Header({
               <NavLink href="/categories">Categories</NavLink>
               <NavLink href="/about">About</NavLink>
               {meta.has_blog && <NavLink href="/blog">Blog</NavLink>}
+              <NavLink href="/contact">Contact</NavLink>
               <NavLink href="/order/lookup">Track Order</NavLink>
             </nav>
 
@@ -228,6 +229,7 @@ export function Header({
           <a onClick={() => setMobileOpen(false)} href="/categories" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Categories</a>
           <a onClick={() => setMobileOpen(false)} href="/about" className="block px-3 py-2 rounded-lg hover:bg-slate-100">About</a>
           {meta.has_blog && <a onClick={() => setMobileOpen(false)} href="/blog" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Blog</a>}
+          <a onClick={() => setMobileOpen(false)} href="/contact" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Contact</a>
           <a onClick={() => setMobileOpen(false)} href="/order/lookup" className="block px-3 py-2 rounded-lg hover:bg-slate-100">Track order</a>
           <a onClick={() => setMobileOpen(false)} href="/cart" className="flex items-center justify-between px-3 py-2 rounded-lg hover:bg-slate-100">
             <span>My Cart</span>
