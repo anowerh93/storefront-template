@@ -44,6 +44,10 @@ function makeCheckoutSchema(requireZone: boolean) {
     customer_name:    z.string().min(2, 'Please enter your full name'),
     customer_address: z.string().min(10, 'Please enter your full delivery address'),
     customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
+    // Optional — BD COD is phone-first. When blank we send `undefined` (never
+    // ''), so the API's `nullable|email` rule treats it as absent rather than a
+    // malformed email that would 422 and silently block Place Order.
+    customer_email:   z.string().trim().email('Enter a valid email address').optional().or(z.literal('')),
     shipping_zone:    z.string().optional(),
     notes:            z.string().max(500).optional(),
     // Phase 1 opt-in account creation. Password is only required (min 6) when
@@ -232,6 +236,7 @@ export function CheckoutPage({
       const order = await submitOrder({
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
+        customer_email: values.customer_email || undefined,
         address:        values.customer_address,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
@@ -340,6 +345,7 @@ export function CheckoutPage({
       customer_name:    'full name',
       customer_address: 'delivery address',
       customer_phone:   'phone number',
+      customer_email:   'email address',
       shipping_zone:    'delivery area',
       password:         'password',
       notes:            'order notes',
@@ -387,6 +393,11 @@ export function CheckoutPage({
                   <Label htmlFor="co-phone">Phone <span className="text-rose-500">*</span></Label>
                   <Input id="co-phone" placeholder="01XXXXXXXXX" inputMode="tel" {...form.register('customer_phone')} className="mt-1.5" />
                   {form.formState.errors.customer_phone && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_phone.message}</p>}
+                </div>
+                <div>
+                  <Label htmlFor="co-email">Email <span className="font-normal text-slate-400">(optional)</span></Label>
+                  <Input id="co-email" type="email" placeholder="you@example.com" inputMode="email" autoComplete="email" {...form.register('customer_email')} className="mt-1.5" />
+                  {form.formState.errors.customer_email && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_email.message}</p>}
                 </div>
                 <div>
                   <Label htmlFor="co-notes">Order Notes <span className="font-normal text-slate-400">(optional)</span></Label>
