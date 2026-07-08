@@ -49,10 +49,10 @@ export function HeroGrid({
           ? <ConfiguredBigBanner hero={hero} priority={priority} />
           : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} priority={priority} /> : <BannerPlaceholder />)}
 
-        {/* Phones: tiles stack FULL-WIDTH (2.1:1 designed art with baked-in
-            text is unreadable at 50vw and was cropped ~46% by the old
-            near-square min-h boxes). Tablets: two-up. Desktop: right column. */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4 lg:gap-5">
+        {/* Phones + tablets: the two tiles sit SIDE BY SIDE in one row (two-up)
+            at the art's native 840/400 ratio — a full-width stack looked too
+            tall/heavy under the big banner. Desktop: right column (stacked). */}
+        <div className="grid grid-cols-2 lg:grid-cols-1 gap-3 sm:gap-4 lg:gap-5">
           {renderTile(0)}
           {renderTile(1)}
         </div>
