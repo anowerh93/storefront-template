@@ -128,15 +128,19 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
       // returns at sm+ where the tile is wide enough to stand tall on its own.
       className="group relative block overflow-hidden rounded-2xl aspect-[16/10] sm:aspect-[840/400] bg-slate-800"
     >
-      {/* Artwork fills the slot edge-to-edge (cover). A correctly-sized 840x400
-          upload fills with no crop; off-ratio images lose a sliver of an edge. */}
+      {/* Artwork fills the slot edge-to-edge (cover). On phones the slot is
+          taller than the 2.1:1 art (see the 16/10 aspect above), so cover trims
+          the sides — anchored LEFT (object-left) so the trim comes off the
+          RIGHT-side background, never the headline/CTA these banners bake into
+          the left. At sm+ the slot is native 840/400, so there's no crop and the
+          anchor is a no-op. */}
       <img
         src={tile.image_url!}
         srcSet={srcSet}
         sizes={srcSet ? TILE_SIZES : undefined}
         alt="Promotional banner"
         loading="eager"
-        className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
+        className="absolute inset-0 h-full w-full object-cover object-left transition-transform duration-500 group-hover:scale-[1.03]"
       />
     </a>
   );
