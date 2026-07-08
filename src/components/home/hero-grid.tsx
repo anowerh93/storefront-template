@@ -121,10 +121,12 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
   return (
     <a
       href={tile.url || '/products'}
-      // aspect-locked at EVERY breakpoint: the recommended 840×400 art always
-      // shows complete. The old mobile min-h boxes (~1.14:1) cover-cropped
-      // ~46% of a hint-perfect 2.1:1 upload on phones.
-      className="group relative block overflow-hidden rounded-2xl aspect-[840/400] bg-slate-800"
+      // Two-up on phones, the 840×400 (2.1:1) art is only ~half-width, so at its
+      // native ratio the tile is very short (~80px) and reads as squished under
+      // the big banner. Give the PHONE tile a taller 16/10 box (~30% more height)
+      // — object-cover trims a light sliver off the left/right; the native ratio
+      // returns at sm+ where the tile is wide enough to stand tall on its own.
+      className="group relative block overflow-hidden rounded-2xl aspect-[16/10] sm:aspect-[840/400] bg-slate-800"
     >
       {/* Artwork fills the slot edge-to-edge (cover). A correctly-sized 840x400
           upload fills with no crop; off-ratio images lose a sliver of an edge. */}
@@ -236,7 +238,7 @@ function BannerPlaceholder() {
 
 function TilePlaceholder() {
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 aspect-[840/400] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
+    <div className="rounded-2xl bg-gradient-to-br from-slate-200 to-slate-300 aspect-[16/10] sm:aspect-[840/400] flex items-center justify-center text-slate-500 text-sm p-4 text-center">
       Featured slot
     </div>
   );
