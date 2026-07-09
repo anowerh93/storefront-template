@@ -51,6 +51,10 @@ export type StorefrontMeta = {
   whatsapp: string | null;
   email: string | null;
   location: string | null;
+  /** Optional Contact-page H1; falls back to "Contact {name}". */
+  contact_heading?: string | null;
+  /** Optional Contact-page intro line; falls back to the default message. */
+  contact_intro?: string | null;
   footer_links: { label: string; url: string }[];
   /** Footer menu columns — API merges defaults, so headings/links are always set. */
   footer_nav?: {
