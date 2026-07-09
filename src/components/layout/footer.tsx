@@ -88,16 +88,16 @@ export function Footer({
             {(meta.location || meta.whatsapp || meta.email) && (
               <ul className="space-y-2 text-sm">
                 {meta.location && (
-                  <ContactRow icon={MapPin}><span className="text-brand-200">{meta.location}</span></ContactRow>
+                  <ContactRow icon={MapPin} align="start"><span className="text-white">{meta.location}</span></ContactRow>
                 )}
                 {meta.whatsapp && (
                   <ContactRow icon={Phone}>
-                    <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="text-brand-200 hover:text-white">+{meta.whatsapp}</a>
+                    <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="text-white hover:text-brand-100">+{meta.whatsapp}</a>
                   </ContactRow>
                 )}
                 {meta.email && (
                   <ContactRow icon={Mail}>
-                    <a href={`mailto:${meta.email}`} className="text-brand-200 hover:text-white break-all">{meta.email}</a>
+                    <a href={`mailto:${meta.email}`} className="text-white hover:text-brand-100 break-all">{meta.email}</a>
                   </ContactRow>
                 )}
               </ul>
@@ -263,10 +263,22 @@ function FooterLink({ href, children }: { href: string; children: React.ReactNod
   );
 }
 
-function ContactRow({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
+function ContactRow({
+  icon: Icon,
+  children,
+  align = 'center',
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  children: React.ReactNode;
+  align?: 'center' | 'start';
+}) {
+  // No explicit icon colour: it inherits the footer's text colour, so it's
+  // bright (brand-50) on the dark footer and dark on a light footer (via
+  // .footer-on-light) — no invisible white-on-light icon. `align="start"`
+  // top-aligns the pin for a multi-line address.
   return (
-    <li className="flex items-center gap-2">
-      <Icon className="h-4 w-4 text-brand-400 shrink-0" />
+    <li className={`flex gap-2 ${align === 'start' ? 'items-start' : 'items-center'}`}>
+      <Icon className={`h-4 w-4 shrink-0 ${align === 'start' ? 'mt-0.5' : ''}`} />
       {children}
     </li>
   );
