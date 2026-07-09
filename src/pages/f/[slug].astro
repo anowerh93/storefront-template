@@ -1,37 +1,15 @@
 ---
 /**
- * Ad funnel landing page: /f/{slug}
+ * Legacy funnel URL — funnels now live at the clean root path /{slug}.
  *
- * SSR on CF Workers (prerender:false) — the funnel is resolved per request
- * by slug (not a build-time route), same pattern as checkout/product pages.
- * Always noindex so it never competes with the catalog product page in search.
+ * Permanently redirect /f/{slug} → /{slug} so existing Facebook-ad links (and
+ * any older printed/shared URLs) keep working. SSR (prerender:false) so the
+ * redirect runs per request and the query string — ?utm_*, fbclid, etc., which
+ * the pixel/attribution needs — is carried across unchanged.
  */
 export const prerender = false;
 
-import Base from '../../layouts/Base.astro';
-import { getFunnel, getStorefront } from '../../lib/api';
-import { FunnelPage } from '../../views/funnel';
-import type { FunnelPayload, StorefrontMeta } from '../../lib/types';
-
 const slug = Astro.params.slug as string;
 
-// Parallel fetches — sequential awaits cost an extra origin round-trip.
-const [funnel, meta]: [FunnelPayload | null, StorefrontMeta | null] = await Promise.all([
-  slug
-    ? getFunnel(slug).catch((err) => {
-        console.warn(`[f/[slug].astro] getFunnel(${slug}) failed:`, err);
-        return null;
-      })
-    : Promise.resolve(null),
-  getStorefront().catch((err) => {
-    console.warn('[f/[slug].astro] getStorefront() failed:', err);
-    return null;
-  }),
-]);
-
-if (!funnel) { Astro.response.status = 404; }
+return Astro.redirect(`/${slug}${Astro.url.search}`, 301);
 ---
-
-<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} meta={meta} bengaliFont={funnel?.config?.font === 'bengali'}>
-  <FunnelPage client:load funnel={funnel} meta={meta} />
-</Base>
