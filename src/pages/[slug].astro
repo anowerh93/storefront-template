@@ -1,0 +1,45 @@
+---
+/**
+ * Ad funnel landing page at the clean root URL: /{slug}
+ *
+ * Funnels used to live at /f/{slug}; they now resolve at the root so a
+ * customer's ad URL reads as site.com/{slug}. SSR on CF Workers
+ * (prerender:false) — resolved per request by slug, same pattern as the
+ * product page. Always noindex so it never competes with the catalog product
+ * page in search.
+ *
+ * Astro serves its static/named routes (about, cart, /products/…, sitemap.xml)
+ * with PRIORITY over this dynamic [slug] route, and the dashboard refuses to
+ * mint a funnel slug that collides with a reserved root path
+ * (Funnel::RESERVED_SLUGS), so this route only ever catches genuine funnel
+ * slugs. Anything else is a real 404.
+ */
+export const prerender = false;
+
+import Base from '../layouts/Base.astro';
+import { getFunnel, getStorefront } from '../lib/api';
+import { FunnelPage } from '../views/funnel';
+import type { FunnelPayload, StorefrontMeta } from '../lib/types';
+
+const slug = Astro.params.slug as string;
+
+// Parallel fetches — sequential awaits cost an extra origin round-trip.
+const [funnel, meta]: [FunnelPayload | null, StorefrontMeta | null] = await Promise.all([
+  slug
+    ? getFunnel(slug).catch((err) => {
+        console.warn(`[[slug].astro] getFunnel(${slug}) failed:`, err);
+        return null;
+      })
+    : Promise.resolve(null),
+  getStorefront().catch((err) => {
+    console.warn('[[slug].astro] getStorefront() failed:', err);
+    return null;
+  }),
+]);
+
+if (!funnel) { Astro.response.status = 404; }
+---
+
+<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} meta={meta} bengaliFont={funnel?.config?.font === 'bengali'}>
+  <FunnelPage client:load funnel={funnel} meta={meta} />
+</Base>

@@ -24,7 +24,7 @@ import { Button } from '../components/ui/button';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 
 /**
- * Ad funnel landing page (/f/{slug}). Renders the tenant's block config in
+ * Ad funnel landing page (/{slug}). Renders the tenant's block config in
  * `section_order`, with an embedded Cash-on-Delivery order form. Minimal
  * chrome (slim header/footer, no nav) + a sticky mobile CTA — built to
  * convert Facebook-ad traffic. Reuses the checkout order schema + submitOrder.
