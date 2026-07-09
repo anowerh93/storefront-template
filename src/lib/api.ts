@@ -41,6 +41,7 @@ import type {
   CreateOrderInput,
   Customer,
   CustomerAuthResponse,
+  ForgotPasswordInput,
   FunnelData,
   LoginCustomerInput,
   OrderResponse,
@@ -48,6 +49,7 @@ import type {
   ProductCard,
   ProductDetail,
   RegisterCustomerInput,
+  ResetPasswordInput,
   ServiceCard,
   ServiceDetail,
   StorefrontMeta,
@@ -622,6 +624,32 @@ export function loginCustomer(input: LoginCustomerInput): Promise<CustomerAuthRe
   return postAuth<CustomerAuthResponse>(
     '/customer/login',
     { identifier: input.identifier, password: input.password },
+    input.cf_turnstile_response,
+  );
+}
+
+/**
+ * Step 1 of password reset: mail/SMS a 6-digit code to the account matching
+ * `identifier`. The API always answers generically (anti-enumeration), so a
+ * resolved promise means "request accepted", NOT "an account exists".
+ */
+export function forgotPassword(input: ForgotPasswordInput): Promise<{ ok: boolean; message: string }> {
+  return postAuth<{ ok: boolean; message: string }>(
+    '/customer/password/forgot',
+    { channel: input.channel, identifier: input.identifier },
+    input.cf_turnstile_response,
+  );
+}
+
+/**
+ * Step 2: verify the code + set the new password. On success the API returns a
+ * fresh token + customer (auto-login), same shape as login. A bad/expired code
+ * throws an ApiError('reset_failed').
+ */
+export function resetPassword(input: ResetPasswordInput): Promise<CustomerAuthResponse> {
+  return postAuth<CustomerAuthResponse>(
+    '/customer/password/reset',
+    { identifier: input.identifier, code: input.code, password: input.password },
     input.cf_turnstile_response,
   );
 }

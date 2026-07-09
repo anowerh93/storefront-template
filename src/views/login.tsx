@@ -86,7 +86,10 @@ export function LoginPage({ meta }: { meta: StorefrontMeta | null }) {
             />
           </div>
           <div>
-            <Label htmlFor="login-pw">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="login-pw">Password</Label>
+              <a href="/reset-password" className="text-xs font-medium text-brand-600 hover:underline">Forgot password?</a>
+            </div>
             <Input
               id="login-pw"
               type="password"

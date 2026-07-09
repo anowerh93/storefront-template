@@ -686,6 +686,24 @@ export type CustomerAuthResponse = {
   claimed_orders?: number;
 };
 
+/** Step 1 of password reset — request a code by email or SMS. */
+export type ForgotPasswordInput = {
+  channel: 'email' | 'sms';
+  /** Phone OR email — used to find the account; the code goes to the channel. */
+  identifier: string;
+  /** Cloudflare Turnstile token — sent via the cf-turnstile-response header. */
+  cf_turnstile_response?: string;
+};
+
+/** Step 2 of password reset — verify the code + set a new password. */
+export type ResetPasswordInput = {
+  identifier: string;
+  code: string;
+  password: string;
+  /** Cloudflare Turnstile token — sent via the cf-turnstile-response header. */
+  cf_turnstile_response?: string;
+};
+
 /** A row in the account order history (GET /customer/orders). */
 export type AccountOrderSummary = {
   order_number: string;
