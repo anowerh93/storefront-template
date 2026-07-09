@@ -424,6 +424,49 @@ export async function submitLead(input: CreateLeadInput): Promise<{ ok: boolean 
 }
 
 // ──────────────────────────────────────────────────────────────
+// Storefront contact form (POST /storefronts/{slug}/contact)
+// ──────────────────────────────────────────────────────────────
+
+export type CreateContactInput = {
+  customer_name: string;
+  customer_phone: string;
+  customer_email?: string;
+  message: string;
+  source_url?: string;
+  /** Honeypot — leave empty; bots fill it. */
+  company?: string;
+  cf_turnstile_response?: string;
+};
+
+/**
+ * Submit a storefront contact message (emails the shop owner). Same defensive
+ * parsing + plain-language errors as submitOrder / submitLead.
+ */
+export async function submitContact(input: CreateContactInput): Promise<{ ok: boolean }> {
+  const url = buildUrl('/contact');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+      ...(input.cf_turnstile_response ? { 'cf-turnstile-response': input.cf_turnstile_response } : {}),
+    },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const msg =
+      json?.message ??
+      json?.error?.message ??
+      (typeof json?.error === 'string' ? json.error : undefined) ??
+      'Sorry, your message could not be sent. Please try again in a minute.';
+    throw new Error(msg);
+  }
+  return { ok: true };
+}
+
+// ──────────────────────────────────────────────────────────────
 // Customer accounts (Phase 1) — bearer-token auth, browser-only
 // ──────────────────────────────────────────────────────────────
 
