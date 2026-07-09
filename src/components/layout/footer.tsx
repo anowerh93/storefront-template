@@ -46,6 +46,11 @@ export function Footer({
   // carry a dark scrim, so they keep light text. Mirrors .funnel-dark.
   const lightBg = bgColor ? isLightColor(bgColor) : false;
 
+  // Dedicated footer logo (a light/white variant for the dark footer), falling
+  // back to the main logo. The API already resolves this fallback; the `??`
+  // keeps older cached meta payloads (no footer_logo_url) working too.
+  const footerLogo = meta.footer_logo_url ?? meta.logo_url;
+
   return (
     <footer
       className={`relative mt-16 ${lightBg ? 'footer-on-light' : 'text-brand-50'} ${bgImage || bgColor ? '' : 'bg-brand-900'}`}
@@ -64,14 +69,14 @@ export function Footer({
           {/* Brand + contact */}
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-3">
-              {meta.logo_url ? (
-                <img src={meta.logo_url} alt={meta.name} className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
+              {footerLogo ? (
+                <img src={footerLogo} alt={meta.name} className="h-9 w-auto max-w-[160px] rounded-lg object-contain" />
               ) : (
                 <div className="h-9 w-9 rounded-lg bg-brand-700 flex items-center justify-center text-white font-bold">
                   {meta.name.charAt(0).toUpperCase()}
                 </div>
               )}
-              {!meta.logo_url && (
+              {!footerLogo && (
                 <span className="font-bold text-white text-lg">{meta.name}</span>
               )}
             </div>

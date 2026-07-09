@@ -30,6 +30,8 @@ export type StorefrontMeta = {
   /** Short phrase after the site title in the homepage <title>; description fallback. */
   tagline?: string | null;
   logo_url: string | null;
+  /** Light/white logo variant for the dark footer; API falls back to logo_url. */
+  footer_logo_url?: string | null;
   /** Dedicated site icon; API falls back to the logo when unset. */
   favicon_url?: string | null;
   theme_color: string | null;
