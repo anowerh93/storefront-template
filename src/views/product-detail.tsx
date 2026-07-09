@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus } from 'lucide-react';
 import { formatBDT, discountPct } from '../lib/format';
 import { getIcon } from '../lib/icons';
@@ -57,12 +57,7 @@ export function ProductDetailPage({
             375px viewport — stretching the buy box with it and clipping the
             "Status" chip + 6th thumb off-screen. min-w-0 keeps the track at
             viewport width so the rail scrolls internally instead. */}
-        <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
-          <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
-            <ProductGallery product={product} />
-          </div>
-          <BuyBox product={product} meta={meta} />
-        </div>
+        <ProductBuySection product={product} meta={meta} />
 
         {/* Share */}
         <ShareRow name={product.name} />
@@ -80,13 +75,45 @@ export function ProductDetailPage({
   );
 }
 
+/* ── Gallery + buy box, sharing the selected variant ──────────────────────
+   The variant picker lives in the buy box, but selecting a variant must switch
+   the gallery's photo — so the selected variant is owned HERE (only mounted
+   when the product exists, so hooks stay above any early return). */
+function ProductBuySection({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
+  const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
+  const selectedVariant = product.variants.find((v) => v.index === variantIdx) ?? null;
+
+  return (
+    <div className="grid lg:grid-cols-2 gap-8 lg:gap-10">
+      <div className="min-w-0 lg:sticky lg:top-6 lg:self-start">
+        <ProductGallery product={product} activeImage={selectedVariant?.image_url ?? null} />
+      </div>
+      <BuyBox product={product} meta={meta} variantIdx={variantIdx} setVariantIdx={setVariantIdx} />
+    </div>
+  );
+}
+
 /* ── Gallery: vertical thumbnails + big image ─────────────────────────── */
-function ProductGallery({ product }: { product: ProductDetail }) {
-  const urls = [
-    ...(product.image_url ? [product.image_url] : []),
-    ...(product.gallery_urls ?? []),
-  ].filter((u, i, arr) => !!u && arr.indexOf(u) === i);
+function ProductGallery({ product, activeImage }: { product: ProductDetail; activeImage: string | null }) {
+  const urls = useMemo(
+    () =>
+      [
+        ...(product.image_url ? [product.image_url] : []),
+        ...(product.gallery_urls ?? []),
+        // Per-variant photos join the gallery so they're browsable and the big
+        // image can switch to them when the variant picker changes.
+        ...product.variants.map((v) => v.image_url).filter((u): u is string => !!u),
+      ].filter((u, i, arr) => !!u && arr.indexOf(u) === i),
+    [product],
+  );
   const [active, setActive] = useState(0);
+
+  // Selecting a variant that has its own photo jumps the big image to it.
+  useEffect(() => {
+    if (!activeImage) return;
+    const i = urls.indexOf(activeImage);
+    if (i >= 0) setActive(i);
+  }, [activeImage, urls]);
 
   if (urls.length === 0) {
     return <div className="aspect-square rounded-2xl bg-slate-100" />;
@@ -117,8 +144,17 @@ function ProductGallery({ product }: { product: ProductDetail }) {
 }
 
 /* ── Buy box ──────────────────────────────────────────────────────────── */
-function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
-  const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
+function BuyBox({
+  product,
+  meta,
+  variantIdx,
+  setVariantIdx,
+}: {
+  product: ProductDetail;
+  meta: StorefrontMeta;
+  variantIdx: number | null;
+  setVariantIdx: (index: number | null) => void;
+}) {
   const [qty, setQty] = useState(1);
   const [added, setAdded] = useState(false);
   const addToCart = useCart((s) => s.addToCart);
@@ -150,7 +186,7 @@ function BuyBox({ product, meta }: { product: ProductDetail; meta: StorefrontMet
         product_id: product.id,
         slug: product.slug,
         name: product.name,
-        image_url: product.image_url ?? product.gallery_urls?.[0] ?? null,
+        image_url: selected?.image_url ?? product.image_url ?? product.gallery_urls?.[0] ?? null,
         variant_index: selected ? selected.index : null,
         variant_label: selected ? selected.label : null,
         unit_price: unitPrice,
