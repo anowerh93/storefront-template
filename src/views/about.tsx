@@ -22,23 +22,6 @@ export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; te
     <>
       <Header meta={meta} />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
-        {/* Optional stacked banners / designed sections, in order */}
-        {aboutImages.length > 0 && (
-          <div className="mb-8 space-y-4">
-            {aboutImages.map((url, i) => (
-              <img
-                key={i}
-                src={url}
-                srcSet={cdnSrcSet(url)}
-                sizes={cdnSrcSet(url) ? '(min-width: 768px) 768px, 100vw' : undefined}
-                alt={`${meta.about_title || meta.name} — ${i + 1}`}
-                loading={i === 0 ? 'eager' : 'lazy'}
-                className="w-full rounded-2xl object-cover ring-1 ring-slate-200"
-              />
-            ))}
-          </div>
-        )}
-
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.about_title || meta.name}</h1>
         {meta.about_html ? (
           // Sanitized server-side: tenant Markdown → HTML via Markdown::toHtml
@@ -53,6 +36,25 @@ export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; te
           </div>
         ) : (
           <p className="text-slate-500 mt-4">More about us coming soon.</p>
+        )}
+
+        {/* Optional stacked banners / designed sections — shown AFTER the
+            article text so the story leads and the images support it. All
+            lazy now they're below the fold (the title/text is the LCP). */}
+        {aboutImages.length > 0 && (
+          <div className="mt-10 space-y-4">
+            {aboutImages.map((url, i) => (
+              <img
+                key={i}
+                src={url}
+                srcSet={cdnSrcSet(url)}
+                sizes={cdnSrcSet(url) ? '(min-width: 768px) 768px, 100vw' : undefined}
+                alt={`${meta.about_title || meta.name} — ${i + 1}`}
+                loading="lazy"
+                className="w-full rounded-2xl object-cover ring-1 ring-slate-200"
+              />
+            ))}
+          </div>
         )}
 
         {/* Meet Our Team — structured cards (photo + name + role + bio) */}
