@@ -80,13 +80,17 @@ export function Footer({
                 <span className="font-bold text-white text-lg">{meta.name}</span>
               )}
             </div>
-            {meta.footer_about && (
-              // ONLY the hand-written footer summary renders here — never the
-              // About article. Clamped at 7 lines as a visual safety net.
-              <p className="text-sm text-brand-200 leading-relaxed mb-4 max-w-xs line-clamp-7">{meta.footer_about}</p>
-            )}
-            {(meta.location || meta.whatsapp || meta.email) && (
+            {(meta.footer_about || meta.location || meta.whatsapp || meta.email) && (
               <ul className="space-y-2 text-sm">
+                {/* Hand-written footer summary — tenants use it for their shop
+                    ADDRESS, so it renders as a pinned contact row (📍 + white),
+                    matching phone/email, instead of a separate dim paragraph.
+                    Never the About article. Clamped as a visual safety net. */}
+                {meta.footer_about && (
+                  <ContactRow icon={MapPin} align="start">
+                    <span className="text-white whitespace-pre-line line-clamp-4">{meta.footer_about}</span>
+                  </ContactRow>
+                )}
                 {meta.location && (
                   <ContactRow icon={MapPin} align="start"><span className="text-white">{meta.location}</span></ContactRow>
                 )}
