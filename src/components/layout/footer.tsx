@@ -83,25 +83,26 @@ export function Footer({
             {(meta.footer_about || meta.location || meta.whatsapp || meta.email) && (
               <ul className="space-y-2 text-sm">
                 {/* Hand-written footer summary — tenants use it for their shop
-                    ADDRESS, so it renders as a pinned contact row (📍 + white),
-                    matching phone/email, instead of a separate dim paragraph.
-                    Never the About article. Clamped as a visual safety net. */}
+                    ADDRESS, so it renders as a pinned contact row (📍 + the
+                    soft brand-200 tint), matching the Department/Shop nav links
+                    instead of a harsh full-white. Never the About article.
+                    Clamped as a visual safety net. */}
                 {meta.footer_about && (
                   <ContactRow icon={MapPin} align="start">
-                    <span className="text-white whitespace-pre-line line-clamp-4">{meta.footer_about}</span>
+                    <span className="text-brand-200 whitespace-pre-line line-clamp-4">{meta.footer_about}</span>
                   </ContactRow>
                 )}
                 {meta.location && (
-                  <ContactRow icon={MapPin} align="start"><span className="text-white">{meta.location}</span></ContactRow>
+                  <ContactRow icon={MapPin} align="start"><span className="text-brand-200">{meta.location}</span></ContactRow>
                 )}
                 {meta.whatsapp && (
                   <ContactRow icon={Phone}>
-                    <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="text-white hover:text-brand-100">+{meta.whatsapp}</a>
+                    <a href={`tel:+${meta.whatsapp.replace(/\D/g, '')}`} className="text-brand-200 hover:text-white transition">+{meta.whatsapp}</a>
                   </ContactRow>
                 )}
                 {meta.email && (
                   <ContactRow icon={Mail}>
-                    <a href={`mailto:${meta.email}`} className="text-white hover:text-brand-100 break-all">{meta.email}</a>
+                    <a href={`mailto:${meta.email}`} className="text-brand-200 hover:text-white break-all transition">{meta.email}</a>
                   </ContactRow>
                 )}
               </ul>
