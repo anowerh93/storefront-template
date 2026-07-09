@@ -64,9 +64,11 @@ export function ContactPage({ meta }: { meta: StorefrontMeta | null }) {
       <Header meta={meta} />
 
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-10 sm:py-16">
-        <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">Contact {meta.name}</h1>
-        <p className="text-slate-500 mb-8 max-w-2xl">
-          Have a question about a product or your order? Send us a message and we'll get back to you.
+        <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">
+          {meta.contact_heading?.trim() || `Contact ${meta.name}`}
+        </h1>
+        <p className="text-slate-500 mb-8 max-w-2xl whitespace-pre-line">
+          {meta.contact_intro?.trim() || "Have a question about a product or your order? Send us a message and we'll get back to you."}
         </p>
 
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12 items-start">
