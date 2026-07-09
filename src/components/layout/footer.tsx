@@ -89,7 +89,14 @@ export function Footer({
                     Clamped as a visual safety net. */}
                 {meta.footer_about && (
                   <ContactRow icon={MapPin} align="start">
-                    <span className="text-brand-200 whitespace-pre-line line-clamp-4">{meta.footer_about}</span>
+                    {/* whitespace-pre-line turns real newlines into line breaks.
+                        Legacy values may still hold a literal "<br>" a tenant
+                        typed before the dashboard normalised it — fold those to
+                        newlines here so the address wraps instead of showing the
+                        tag. Still plain text (React escapes it): no HTML runs. */}
+                    <span className="text-brand-200 whitespace-pre-line line-clamp-4">
+                      {meta.footer_about.replace(/<br\s*\/?>/gi, '\n')}
+                    </span>
                   </ContactRow>
                 )}
                 {meta.location && (
