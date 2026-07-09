@@ -37,6 +37,7 @@ import type {
   AccountOrderSummary,
   BlogPostCard,
   BlogPostDetail,
+  InfoPageDetail,
   Category,
   CreateOrderInput,
   Customer,
@@ -224,6 +225,13 @@ export function getBlogPosts(opts: { page?: number; perPage?: number; search?: s
 export function getBlogPost(slug: string) {
   return apiFetch<BlogPostDetail>(`/blog/${encodeURIComponent(slug)}`, {
     tags: ['blog', `blog:${slug}`],
+  });
+}
+
+/** A default info page (Terms/Privacy/Refund/Careers) by its /pages/{slug}. */
+export function getInfoPage(slug: string) {
+  return apiFetch<InfoPageDetail>(`/pages/${encodeURIComponent(slug)}`, {
+    tags: ['pages', `page:${slug}`],
   });
 }
 

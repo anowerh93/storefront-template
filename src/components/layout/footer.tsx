@@ -15,6 +15,10 @@ export function Footer({
 }) {
   const social = (meta.social_links ?? {}) as Record<string, string>;
   const footerLinks = meta.footer_links ?? [];
+  // Default info pages (Terms/Privacy/Refund/Careers) — rendered as a legal
+  // links row in the bottom bar so they appear on every store without
+  // disturbing the tenant-configurable column grid above.
+  const infoPages = meta.info_pages ?? [];
   // Editable menu columns; fallbacks keep cached payloads (no footer_nav
   // yet) rendering exactly the old hardcoded columns.
   const dept = meta.footer_nav?.department ?? { visible: true, heading: 'Department' };
@@ -196,8 +200,17 @@ export function Footer({
           )}
         </div>
 
+        {/* Legal / company links — the default info pages, on every store. */}
+        {infoPages.length > 0 && (
+          <div className="mt-10 pt-6 border-t border-brand-800 flex flex-wrap gap-x-5 gap-y-2">
+            {infoPages.map((p) => (
+              <a key={p.key} href={p.path} className="text-sm text-brand-200 hover:text-white transition">{p.title}</a>
+            ))}
+          </div>
+        )}
+
         {/* Bottom strip */}
-        <div className="mt-10 pt-6 border-t border-brand-800 flex flex-col sm:flex-row items-center justify-between gap-4">
+        <div className={`${infoPages.length > 0 ? 'mt-6' : 'mt-10 pt-6 border-t border-brand-800'} flex flex-col sm:flex-row items-center justify-between gap-4`}>
           <p className="text-xs text-brand-300">© {new Date().getFullYear()} {meta.name}. All rights reserved.</p>
 
           <div className="flex items-center gap-2">
