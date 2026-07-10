@@ -223,6 +223,12 @@ export function Footer({
             {infoPages.map((p) => (
               <a key={p.key} href={p.path} className="text-sm text-brand-200 hover:text-white transition">{p.title}</a>
             ))}
+            {/* Contact sits here (after Careers), NOT in the header nav —
+                tenant feedback. Service sites keep their own Contact quick
+                link (/#contact) in the column above instead. */}
+            {!isService && (
+              <a href="/contact" className="text-sm text-brand-200 hover:text-white transition">Contact</a>
+            )}
           </div>
         )}
 
