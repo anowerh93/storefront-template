@@ -1,8 +1,9 @@
 ---
 /**
  * Team page (service tenants). SSR — fetched per request and CDN-cached.
- * Service-tenant only; e-commerce tenants have no team and the nav never
- * links here. noindex when there are no members (avoids a thin/soft page).
+ * Service-tenant only BY DESIGN: e-commerce tenants render their team on
+ * About and this page is noindexed for them (their sitemap never lists it),
+ * as well as when there are no members (avoids a thin/soft page).
  */
 export const prerender = false;
 
@@ -26,7 +27,7 @@ const schemas = meta
   : [];
 ---
 
-<Base title="Our team" noindex={members.length === 0} schema={schemas} meta={meta}>
+<Base title="Our team" noindex={members.length === 0 || meta?.business_type !== 'service'} schema={schemas} meta={meta}>
   {/* client:load — the header's mobile menu inside the view needs hydration */}
   <TeamPage client:load team={members} meta={meta} />
 </Base>

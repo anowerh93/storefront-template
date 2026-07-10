@@ -275,7 +275,9 @@ export function getFunnel(funnelSlug: string) {
   });
 }
 
-export type SitemapPage = { path: string; lastmod: string | null };
+// `image` (product photo / category banner / blog cover) is optional so
+// older cached API payloads without the key stay type-honest.
+export type SitemapPage = { path: string; lastmod: string | null; image?: string | null };
 
 /**
  * Page inventory for sitemap.xml. Paths only — the SSR route prefixes its

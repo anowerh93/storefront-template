@@ -41,6 +41,7 @@ const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Pro
 ]);
 ---
 
-<Base title="Checkout" description="Secure checkout" meta={meta}>
+{/* noindex like cart/account: thin utility shell, reachable from every PDP */}
+<Base title="Checkout" description="Secure checkout" noindex={true} meta={meta}>
   <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} />
 </Base>
