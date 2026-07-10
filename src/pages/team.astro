@@ -27,5 +27,6 @@ const schemas = meta
 ---
 
 <Base title="Our team" noindex={members.length === 0} schema={schemas} meta={meta}>
-  <TeamPage team={members} meta={meta} />
+  {/* client:load — the header's mobile menu inside the view needs hydration */}
+  <TeamPage client:load team={members} meta={meta} />
 </Base>

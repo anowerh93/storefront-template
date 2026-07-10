@@ -1,9 +1,11 @@
 ---
 /**
- * Category index (footer/header "Categories" link). Pure presentational —
- * no query params, no interactivity — so it's prerendered to static HTML
- * at build time (Astro default). The category list is fetched per-tenant
- * at build; a content change triggers a full rebuild (RevalidateStorefrontJob).
+ * Category index (footer/header "Categories" link). The category list is
+ * fetched per-tenant at build; a content change triggers a full rebuild
+ * (RevalidateStorefrontJob). The view MUST hydrate (client:load): the list
+ * itself is static, but the shared <Header> inside it carries the mobile
+ * hamburger / search / cart badge — without hydration they render but do
+ * nothing (that bug shipped once on this exact page).
  */
 import Base from '../../layouts/Base.astro';
 import { getStorefront, getCategories } from '../../lib/api';
@@ -24,5 +26,5 @@ try {
 ---
 
 <Base title="Categories" meta={meta}>
-  <CategoryListPage meta={meta} categories={categories} />
+  <CategoryListPage client:load meta={meta} categories={categories} />
 </Base>

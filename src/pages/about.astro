@@ -43,5 +43,7 @@ const schemas = origin
 ---
 
 <Base title={aboutTitle} schema={schemas} meta={meta}>
-  {isService ? <ServiceAboutPage meta={meta} /> : <AboutPage meta={meta} team={team} />}
+  {/* client:load is required — the shared header inside each view carries the
+      mobile hamburger / cart badge; without hydration they render but do nothing. */}
+  {isService ? <ServiceAboutPage client:load meta={meta} /> : <AboutPage client:load meta={meta} team={team} />}
 </Base>
