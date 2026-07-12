@@ -49,6 +49,7 @@ import type {
   Paginated,
   ProductCard,
   ProductDetail,
+  Certification,
   RegisterCustomerInput,
   ResetPasswordInput,
   ServiceCard,
@@ -206,6 +207,10 @@ export function getServices() {
 
 export function getTeam() {
   return apiFetch<TeamMember[]>('/team', { tags: ['team'] });
+}
+
+export function getCertifications() {
+  return apiFetch<Certification[]>('/certifications', { tags: ['certifications'] });
 }
 
 export function getService(slug: string) {

@@ -4,11 +4,21 @@ import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
 import { NotFoundPage } from './not-found';
 import { cdnImage, cdnSrcSet } from '../lib/img';
-import type { StorefrontMeta, TeamMember } from '../lib/types';
+import { CertSlider } from '../components/ui/cert-slider';
+import type { StorefrontMeta, TeamMember, Certification } from '../lib/types';
 
-// Astro+CF port: meta + team arrive as props (fetched in src/pages/about.astro).
-// Pure content page, no interactivity → rendered as static HTML.
-export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; team?: TeamMember[] }) {
+// Astro+CF port: meta + team + certifications arrive as props (fetched in
+// src/pages/about.astro). Pure content page → rendered as static HTML, but the
+// cert slider hydrates as a client island (client:load on the page).
+export function AboutPage({
+  meta,
+  team = [],
+  certifications = [],
+}: {
+  meta: StorefrontMeta | null;
+  team?: TeamMember[];
+  certifications?: Certification[];
+}) {
   if (!meta) return <NotFoundPage />;
   // Ordered list of About images; fall back to the single-image alias so an
   // older API payload (about_image_url only) still renders one.
@@ -84,6 +94,23 @@ export function AboutPage({ meta, team = [] }: { meta: StorefrontMeta | null; te
             </div>
           </section>
         )}
+
+        {/* Certifications — registration / approval scans in a swipeable slider,
+            right after the team so the "who we are" story flows into "and here's
+            our proof". Filtered to rows that actually have an image. */}
+        {(() => {
+          const certs = certifications.filter((c) => c.image_url);
+          if (certs.length === 0) return null;
+          return (
+            <section className="mt-14">
+              <h2 className="text-2xl font-bold text-slate-900">Our Certifications</h2>
+              <p className="mt-1 text-sm text-slate-500">Our registrations &amp; approvals.</p>
+              <div className="mt-6">
+                <CertSlider items={certs.map((c) => ({ url: c.image_url as string, caption: c.title }))} />
+              </div>
+            </section>
+          );
+        })()}
 
         <div className="mt-12 flex flex-wrap gap-3">
           <a href="/products"><Button variant="brand">Shop our products</Button></a>

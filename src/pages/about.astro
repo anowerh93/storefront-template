@@ -4,11 +4,11 @@
  * HTML at build time. Renders the tenant's `about` text from storefront meta.
  */
 import Base from '../layouts/Base.astro';
-import { getStorefront, getTeam } from '../lib/api';
+import { getStorefront, getTeam, getCertifications } from '../lib/api';
 import { breadcrumbSchema } from '../lib/schema';
 import { AboutPage } from '../views/about';
 import { ServiceAboutPage } from '../views/service-about';
-import type { StorefrontMeta, TeamMember } from '../lib/types';
+import type { StorefrontMeta, TeamMember, Certification } from '../lib/types';
 
 let meta: StorefrontMeta | null = null;
 try {
@@ -22,14 +22,15 @@ try {
 const isService = meta?.business_type === 'service' && !!meta?.service_home;
 
 // The e-commerce About page renders a "Meet Our Team" section from the same
-// team-members API service tenants use. Best-effort — never blocks the page.
+// team-members API service tenants use, then a "Certifications" slider of the
+// tenant's registration/approval scans. Both best-effort — never block the page.
 let team: TeamMember[] = [];
+let certifications: Certification[] = [];
 if (meta && !isService) {
-  try {
-    team = await getTeam();
-  } catch (err) {
-    console.warn('[about.astro] getTeam() failed:', err);
-  }
+  [team, certifications] = await Promise.all([
+    getTeam().catch((err) => { console.warn('[about.astro] getTeam() failed:', err); return []; }),
+    getCertifications().catch((err) => { console.warn('[about.astro] getCertifications() failed:', err); return []; }),
+  ]);
 }
 const aboutTitle = isService
   ? (meta!.service_home!.about?.title?.replace(/<[^>]*>/g, '') || `About ${meta!.name}`)
@@ -45,5 +46,5 @@ const schemas = origin
 <Base title={aboutTitle} schema={schemas} meta={meta}>
   {/* client:load is required — the shared header inside each view carries the
       mobile hamburger / cart badge; without hydration they render but do nothing. */}
-  {isService ? <ServiceAboutPage client:load meta={meta} /> : <AboutPage client:load meta={meta} team={team} />}
+  {isService ? <ServiceAboutPage client:load meta={meta} /> : <AboutPage client:load meta={meta} team={team} certifications={certifications} />}
 </Base>

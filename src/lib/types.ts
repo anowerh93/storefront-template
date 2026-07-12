@@ -163,6 +163,13 @@ export type TeamMember = {
   image_url: string | null;
 };
 
+/** A registration / approval document shown on the About page (after team). */
+export type Certification = {
+  /** Optional caption; the image itself is the document. */
+  title: string | null;
+  image_url: string | null;
+};
+
 /** A blog post card on the /blog listing. */
 export type BlogPostCard = {
   title: string;
@@ -546,6 +553,8 @@ export type FunnelBlockConfig = {
   order_form: { visible: boolean; heading: string; button_label: string };
   why_us: { visible: boolean; title: string; items: { title: string; body: string }[] };
   reviews: { visible: boolean; title: string; screenshot_urls?: string[] };
+  /** Registration / approval document scans → swipeable slider. */
+  certifications?: { visible: boolean; title: string; image_urls?: string[] };
   /** YouTube lite-embed section — the API exposes only the validated video id. */
   video?: { visible: boolean; title: string; youtube_id?: string | null };
   faq: { visible: boolean; items: { q: string; a: string }[] };

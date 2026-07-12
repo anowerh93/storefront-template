@@ -16,6 +16,7 @@ import { submitOrder } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
+import { CertSlider } from '../components/ui/cert-slider';
 import { cdnBlurThumb, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -127,6 +128,12 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         // review screenshots (product catalog reviews are not used on funnels).
         const hasShots = (config.reviews.screenshot_urls?.length ?? 0) > 0;
         return config.reviews.visible && hasShots ? <Reviews config={config.reviews} /> : null;
+      }
+      case 'certifications': {
+        // Optional chain: cached payloads from before this block existed lack the key.
+        const c = config.certifications;
+        const hasCerts = (c?.image_urls?.length ?? 0) > 0;
+        return c?.visible && hasCerts ? <Certifications config={c} /> : null;
       }
       case 'video': {
         // Optional chain: cached API payloads from before this block existed
@@ -744,6 +751,22 @@ function Reviews({ config }: { config: FunnelBlockConfig['reviews'] }) {
         </div>
       )}
       <ReviewScreenshots images={shots} />
+    </section>
+  );
+}
+
+function Certifications({ config }: { config: NonNullable<FunnelBlockConfig['certifications']> }) {
+  const imgs = config.image_urls ?? [];
+  if (imgs.length === 0) return null;
+  return (
+    <section>
+      {config.title && (
+        <div className="mb-6 text-center">
+          <RT as="h2" className="text-2xl font-extrabold text-slate-900 sm:text-3xl" html={config.title} />
+          <div className="mx-auto mt-2 h-1 w-16 rounded-full bg-brand-500" />
+        </div>
+      )}
+      <CertSlider items={imgs.map((url) => ({ url }))} />
     </section>
   );
 }
