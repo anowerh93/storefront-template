@@ -89,6 +89,9 @@ export type StorefrontMeta = {
     discourage?: boolean;
   };
   pixel: { id: string | null };
+  /** Google Tag Manager container id ("GTM-XXXXXXX") — null when unset.
+      Optional so builds against an older API (no `gtm` key yet) still work. */
+  gtm?: { id: string | null };
   /** Search-engine ownership codes (Google Search Console / Bing). */
   verification?: { google: string | null; bing: string | null };
   /** IndexNow key — served back at /indexnow-key.txt (public by design). */

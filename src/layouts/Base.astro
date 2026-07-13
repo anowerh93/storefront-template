@@ -69,6 +69,7 @@ const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
 
 const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = meta?.pixel?.id ?? null;
+const gtmId = meta?.gtm?.id ?? null;
 const siteName = meta?.name ?? '';
 const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;
 
@@ -166,6 +167,16 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
         styles.css and propagate to every brand-* utility class. */}
     {brandStyle && <style set:html={`:root { ${brandStyle} }`} />}
 
+    {/* Google Tag Manager — per-tenant container id from the dashboard
+        (Settings → Google Tag Manager). Placed high in <head> per Google's
+        guidance; the noscript iframe half of the snippet sits right after
+        the opening <body> tag below. */}
+    {gtmId && (
+      <script is:inline define:vars={{ gtmId }}>
+        {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',gtmId);`}
+      </script>
+    )}
+
     {/* Meta Pixel — fires PageView on initial load. Per-event firing is
         done client-side in components via lib/pixel.ts. The is:inline tag
         executes inline so the pixel is initialised before user-interaction
@@ -180,6 +191,16 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
     <slot name="head" />
   </head>
   <body class="bg-white text-slate-900 overflow-x-clip">
+    {/* GTM noscript pair — Google requires it immediately after <body>. */}
+    {gtmId && (
+      <noscript>
+        <iframe
+          src={`https://www.googletagmanager.com/ns.html?id=${encodeURIComponent(gtmId)}`}
+          height="0"
+          width="0"
+          style="display:none;visibility:hidden"></iframe>
+      </noscript>
+    )}
     <slot />
 
     <script>
