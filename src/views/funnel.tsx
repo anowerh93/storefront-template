@@ -826,8 +826,11 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   async function onSubmit(values: FormData) {
     setSubmitting(true);
     setError(null);
+    // GA4 item for the dataLayer half of the tracking calls (GTM tenants) —
+    // funnels are single-product by design.
+    const ga4Items = [{ item_id: product.id.toString(), item_name: product.name, price: unitPrice, quantity: qty }];
     try {
-      pixel.initiateCheckout({ value: subtotal, numItems: qty });
+      pixel.initiateCheckout({ value: subtotal, numItems: qty, items: ga4Items });
       const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const orderRes = await submitOrder({
         customer_name:  values.customer_name,
@@ -842,7 +845,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         utm_campaign:   sp?.get('utm_campaign') || undefined,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
       });
-      pixel.purchase({ orderNumber: orderRes.order_number, value: orderRes.total, numItems: qty, contentIds: [product.id.toString()] });
+      pixel.purchase({ orderNumber: orderRes.order_number, value: orderRes.total, numItems: qty, contentIds: [product.id.toString()], items: ga4Items });
       window.location.href = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');

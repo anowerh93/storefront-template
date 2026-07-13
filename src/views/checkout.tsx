@@ -231,8 +231,15 @@ export function CheckoutPage({
     if (lines.length === 0) return;
     setSubmitting(true);
     setError(null);
+    // GA4 items for the dataLayer half of the tracking calls (GTM tenants).
+    const ga4Items = lines.map((l) => ({
+      item_id: l.product_id.toString(),
+      item_name: l.name,
+      price: l.unit_price,
+      quantity: l.quantity,
+    }));
     try {
-      pixel.initiateCheckout({ value: subtotal, numItems });
+      pixel.initiateCheckout({ value: subtotal, numItems, items: ga4Items });
       const order = await submitOrder({
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
@@ -315,6 +322,7 @@ export function CheckoutPage({
         value: order.total,
         numItems,
         contentIds: lines.map((l) => l.product_id.toString()),
+        items: ga4Items,
       });
       // Cart-mode order succeeded → empty the cart so the badge clears.
       if (!isExpress) clearCart();
