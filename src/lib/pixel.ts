@@ -24,9 +24,16 @@ declare global {
   }
 }
 
-function fire(event: string, params?: Record<string, unknown>) {
+function fire(event: string, params?: Record<string, unknown>, eventId?: string | null) {
   if (typeof window === 'undefined' || typeof window.fbq !== 'function') return;
-  window.fbq('track', event, params ?? {});
+  // eventID is Meta's browser↔server dedup key: the server CAPI fire uses the
+  // same deterministic id, so Events Manager collapses the pair instead of
+  // double-counting.
+  if (eventId) {
+    window.fbq('track', event, params ?? {}, { eventID: eventId });
+  } else {
+    window.fbq('track', event, params ?? {});
+  }
 }
 
 /** GA4 e-commerce item row. */
@@ -102,16 +109,16 @@ export const pixel = {
     currency?: string;
     contentIds: string[];
     items?: Ga4Item[];
+    /** Server CAPI dedup key from OrderResponse.meta_event_id. */
+    metaEventId?: string | null;
   }) => {
     fire('Purchase', {
       content_ids: params.contentIds,
       value: params.value,
       num_items: params.numItems,
       currency: params.currency ?? 'BDT',
-      // Custom data so server-side CAPI events can be deduplicated by
-      // matching `eventID` on both sides if/when we add that.
       order_id: params.orderNumber,
-    });
+    }, params.metaEventId);
     pushGa4('purchase', {
       transaction_id: params.orderNumber,
       currency: params.currency ?? 'BDT',

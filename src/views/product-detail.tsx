@@ -29,6 +29,16 @@ export function ProductDetailPage({
   product: ProductDetail | null;
   meta: StorefrontMeta | null;
 }) {
+  // GA4 view_item / Meta ViewContent on product view — before this, the
+  // catalog product pages fired nothing until add-to-cart, so the GA4
+  // e-commerce funnel had a permanently empty first step (only funnels
+  // fired view_item). Hook sits above the early return (rules of hooks).
+  useEffect(() => {
+    if (product) {
+      pixel.viewContent({ id: product.id, name: product.name, price: product.price, currency: product.currency });
+    }
+  }, []);
+
   if (!product || !meta) return <NotFoundPage />;
 
   const category = product.categories?.[0] ?? null;

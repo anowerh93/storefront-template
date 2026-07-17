@@ -70,6 +70,21 @@ const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
 const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = meta?.pixel?.id ?? null;
 const gtmId = meta?.gtm?.id ?? null;
+
+// Inline tracking loaders, built here and emitted via set:html. IMPORTANT:
+// writing a script body as a {`...`} JSX expression does NOT work — Astro
+// treats <script> children as literal text, so the braces/backticks shipped
+// verbatim and the browser parsed a block statement holding an unused
+// template literal: a perfect no-op. gtm.js was never requested and
+// window.dataLayer never created. set:html is the documented way to emit
+// dynamic unescaped inline JS. Both ids are server-validated (GTM-[A-Z0-9]+
+// / digits) and JSON-encoded here as defense in depth.
+const gtmSnippet = gtmId
+  ? `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',${JSON.stringify(gtmId)});`
+  : null;
+const pixelSnippet = pixelId
+  ? `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${JSON.stringify(pixelId)});fbq('track','PageView');`
+  : null;
 const siteName = meta?.name ?? '';
 const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;
 
@@ -171,21 +186,13 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
         (Settings → Google Tag Manager). Placed high in <head> per Google's
         guidance; the noscript iframe half of the snippet sits right after
         the opening <body> tag below. */}
-    {gtmId && (
-      <script is:inline define:vars={{ gtmId }}>
-        {`(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',gtmId);`}
-      </script>
-    )}
+    {gtmSnippet && <script is:inline set:html={gtmSnippet} />}
 
     {/* Meta Pixel — fires PageView on initial load. Per-event firing is
         done client-side in components via lib/pixel.ts. The is:inline tag
         executes inline so the pixel is initialised before user-interaction
         events fire. */}
-    {pixelId && (
-      <script is:inline define:vars={{ pixelId }}>
-        {`!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',pixelId);fbq('track','PageView');`}
-      </script>
-    )}
+    {pixelSnippet && <script is:inline set:html={pixelSnippet} />}
 
     {/* Page-specific head extras (e.g. the homepage's LCP image preload). */}
     <slot name="head" />

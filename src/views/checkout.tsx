@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -220,6 +220,27 @@ export function CheckoutPage({
   const total = subtotal + shippingFee;
   const numItems = lines.reduce((n, l) => n + l.quantity, 0);
 
+  // GA4 begin_checkout / Meta InitiateCheckout — once per checkout ENTRY (the
+  // standard funnel step), not per Place-Order click: submit-time firing both
+  // missed abandoners who never clicked and re-fired on every failed-submit
+  // retry. Ref-guarded so re-renders and bfcache restores don't re-push.
+  const beganCheckout = useRef(false);
+  useEffect(() => {
+    if (beganCheckout.current || lines.length === 0) return;
+    beganCheckout.current = true;
+    pixel.initiateCheckout({
+      value: subtotal,
+      numItems,
+      currency,
+      items: lines.map((l) => ({
+        item_id: l.product_id.toString(),
+        item_name: l.name,
+        price: l.unit_price,
+        quantity: l.quantity,
+      })),
+    });
+  }, [lines.length]);
+
   // Express mode edits a local qty; cart mode writes through to the store.
   function changeQty(line: CartLine, next: number) {
     const clamped = Math.min(Math.max(1, next), lineCeiling(line.max_stock));
@@ -239,7 +260,6 @@ export function CheckoutPage({
       quantity: l.quantity,
     }));
     try {
-      pixel.initiateCheckout({ value: subtotal, numItems, items: ga4Items });
       const order = await submitOrder({
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
@@ -317,13 +337,19 @@ export function CheckoutPage({
         return;
       }
 
-      pixel.purchase({
-        orderNumber: order.order_number,
-        value: order.total,
-        numItems,
-        contentIds: lines.map((l) => l.product_id.toString()),
-        items: ga4Items,
-      });
+      // duplicate:true = the 90s-dedup window replayed an EXISTING order
+      // (bfcache back + resubmit) — firing purchase again would double-count.
+      if (!order.duplicate) {
+        pixel.purchase({
+          orderNumber: order.order_number,
+          value: order.total,
+          numItems,
+          currency: order.currency,
+          contentIds: lines.map((l) => l.product_id.toString()),
+          items: ga4Items,
+          metaEventId: order.meta_event_id ?? null,
+        });
+      }
       // Cart-mode order succeeded → empty the cart so the badge clears.
       if (!isExpress) clearCart();
       const acctFlag = order.account_exists && !order.customer?.token ? '&account_exists=1' : '';

@@ -814,6 +814,11 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
 
   const variant = (variantIdx != null ? product.variants.find((v) => v.index === variantIdx) : null) ?? null;
   const unitPrice = variant?.price ?? product.price;
+
+  // One begin_checkout/InitiateCheckout per funnel visit — a failed submit
+  // (network error, out-of-stock) re-runs onSubmit on retry and would
+  // otherwise re-push the event each click.
+  const beganCheckout = useRef(false);
   const inStock = variant ? variant.in_stock : product.in_stock;
 
   const selectedZone = form.watch('shipping_zone');
@@ -830,7 +835,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     // funnels are single-product by design.
     const ga4Items = [{ item_id: product.id.toString(), item_name: product.name, price: unitPrice, quantity: qty }];
     try {
-      pixel.initiateCheckout({ value: subtotal, numItems: qty, items: ga4Items });
+      if (!beganCheckout.current) {
+        beganCheckout.current = true;
+        pixel.initiateCheckout({ value: subtotal, numItems: qty, currency: product.currency, items: ga4Items });
+      }
       const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const orderRes = await submitOrder({
         customer_name:  values.customer_name,
@@ -845,7 +853,11 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         utm_campaign:   sp?.get('utm_campaign') || undefined,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
       });
-      pixel.purchase({ orderNumber: orderRes.order_number, value: orderRes.total, numItems: qty, contentIds: [product.id.toString()], items: ga4Items });
+      // duplicate:true = the 90s-dedup window replayed an existing order —
+      // don't double-count the purchase.
+      if (!orderRes.duplicate) {
+        pixel.purchase({ orderNumber: orderRes.order_number, value: orderRes.total, numItems: qty, currency: orderRes.currency, contentIds: [product.id.toString()], items: ga4Items, metaEventId: orderRes.meta_event_id ?? null });
+      }
       window.location.href = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');

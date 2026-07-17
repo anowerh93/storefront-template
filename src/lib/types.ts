@@ -653,6 +653,9 @@ export type OrderResponse = {
   // From POST /orders:
   message?: string;
   duplicate?: boolean;
+  /** Server CAPI Purchase dedup key — pass as fbq eventID so Meta collapses
+      the browser + server pair instead of double-counting. */
+  meta_event_id?: string | null;
   // Present when the order was placed with payment_method 'online' (also on a
   // `duplicate` replay of an order still awaiting its payment — the same
   // gateway session is renewed, never a second payable one). Redirect the
