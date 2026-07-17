@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { Search, X, PackageX } from 'lucide-react';
 import { type ProductSort } from '../lib/api';
+import { pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -29,6 +31,17 @@ export function ProductListPage({
   productsRes: Paginated<ProductCard>;
   categories: Category[];
 }) {
+  // GA4 view_item_list — hook sits above the early return (rules of hooks).
+  useEffect(() => {
+    const list = productsRes?.data ?? [];
+    if (list.length > 0) {
+      pixel.viewItemList({
+        listName: searchParams?.search ? `Search: ${searchParams.search}` : 'All products',
+        items: list.map((p) => ({ item_id: p.id.toString(), item_name: p.name, price: p.price, quantity: 1 })),
+      });
+    }
+  }, []);
+
   if (!meta) return <NotFoundPage />;
 
   const page     = parseInt(searchParams?.page ?? '1', 10);

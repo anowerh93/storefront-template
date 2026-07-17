@@ -225,6 +225,7 @@ export function CheckoutPage({
   // missed abandoners who never clicked and re-fired on every failed-submit
   // retry. Ref-guarded so re-renders and bfcache restores don't re-push.
   const beganCheckout = useRef(false);
+  const sentCheckoutSteps = useRef(false);
   useEffect(() => {
     if (beganCheckout.current || lines.length === 0) return;
     beganCheckout.current = true;
@@ -259,6 +260,16 @@ export function CheckoutPage({
       price: l.unit_price,
       quantity: l.quantity,
     }));
+    // GA4 checkout-step events at submit (validation passed = the shopper
+    // committed to these choices). Once per visit — a failed submit's retry
+    // must not re-push them.
+    if (!sentCheckoutSteps.current) {
+      sentCheckoutSteps.current = true;
+      if (requireZone && zone) {
+        pixel.addShippingInfo({ value: total, currency, shippingTier: zone.label, items: ga4Items });
+      }
+      pixel.addPaymentInfo({ value: total, currency, paymentType: canPayOnline && payMethod === 'online' ? 'online' : 'cod', items: ga4Items });
+    }
     try {
       const order = await submitOrder({
         customer_name:  values.customer_name,

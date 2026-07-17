@@ -1,5 +1,7 @@
+import { useEffect } from 'react';
 import { PackageX } from 'lucide-react';
 import { type ProductSort } from '../lib/api';
+import { pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -26,6 +28,18 @@ export function CategoryDetailPage({
   meta: StorefrontMeta | null;
   categories: Category[];
 }) {
+  // GA4 view_item_list — hook sits above the early return (rules of hooks).
+  // Re-fires on sort/page navigation, which is a fresh page load here (MPA).
+  useEffect(() => {
+    const list = res?.products?.data ?? [];
+    if (res && list.length > 0) {
+      pixel.viewItemList({
+        listName: res.category.name,
+        items: list.map((p) => ({ item_id: p.id.toString(), item_name: p.name, price: p.price, quantity: 1 })),
+      });
+    }
+  }, []);
+
   if (!res || !meta) return <NotFoundPage />;
 
   const sort = (searchParams?.sort ?? 'newest') as ProductSort;

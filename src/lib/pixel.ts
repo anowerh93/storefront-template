@@ -59,6 +59,39 @@ function pushGa4(event: string, ecommerce: Record<string, unknown>) {
 export const pixel = {
   pageView: () => fire('PageView'),
 
+  /** GA4-only: product list rendered (category page / all-products). Meta has
+      no canonical list-view event, so nothing fires to fbq. */
+  viewItemList: (p: { listName: string; items: Ga4Item[] }) => {
+    pushGa4('view_item_list', { item_list_name: p.listName, items: p.items });
+  },
+
+  /** GA4-only: cart page viewed with at least one line. */
+  viewCart: (p: { value: number; currency?: string; items: Ga4Item[] }) => {
+    pushGa4('view_cart', { currency: p.currency ?? 'BDT', value: p.value, items: p.items });
+  },
+
+  /** GA4-only: shipping zone chosen at checkout submit. */
+  addShippingInfo: (p: { value: number; currency?: string; shippingTier?: string; items?: Ga4Item[] }) => {
+    pushGa4('add_shipping_info', {
+      currency: p.currency ?? 'BDT',
+      value: p.value,
+      shipping_tier: p.shippingTier,
+      items: p.items ?? [],
+    });
+  },
+
+  /** Payment method chosen at checkout submit — dual-fired (Meta has a
+      canonical AddPaymentInfo standard event). */
+  addPaymentInfo: (p: { value: number; currency?: string; paymentType?: string; items?: Ga4Item[] }) => {
+    fire('AddPaymentInfo', { value: p.value, currency: p.currency ?? 'BDT' });
+    pushGa4('add_payment_info', {
+      currency: p.currency ?? 'BDT',
+      value: p.value,
+      payment_type: p.paymentType,
+      items: p.items ?? [],
+    });
+  },
+
   viewContent: (p: { id: number; name: string; price: number; currency?: string }) => {
     fire('ViewContent', {
       content_ids: [p.id.toString()],

@@ -1,5 +1,7 @@
+import { useEffect, useRef } from 'react';
 import { Loader2, Minus, Plus, ShoppingBag, ShoppingCart, Trash2 } from 'lucide-react';
 import { useCart, cartSubtotal, useCartHydrated, lineCeiling } from '../stores/cart';
+import { pixel } from '../lib/pixel';
 import { formatBDT } from '../lib/format';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -20,6 +22,20 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
   const removeFromCart = useCart((s) => s.removeFromCart);
+
+  // GA4 view_cart — once per visit, after localStorage hydration settles
+  // (firing pre-hydration would always report an empty cart). Qty edits and
+  // removals on the page deliberately don't re-fire.
+  const viewedCart = useRef(false);
+  useEffect(() => {
+    if (viewedCart.current || !hydrated || items.length === 0) return;
+    viewedCart.current = true;
+    pixel.viewCart({
+      value: cartSubtotal(items),
+      currency: items[0]?.currency,
+      items: items.map((l) => ({ item_id: l.product_id.toString(), item_name: l.name, price: l.unit_price, quantity: l.quantity })),
+    });
+  }, [hydrated, items.length]);
 
   if (!meta) return <NotFoundPage />;
 
