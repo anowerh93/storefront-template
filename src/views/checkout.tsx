@@ -314,15 +314,35 @@ export function CheckoutPage({
       // mechanism if the shopper backs out of the gateway — resubmitting
       // replays the same order + same gateway session (no double charge). The
       // order page clears it once the payment is confirmed.
-      // No client-side Purchase pixel here: the order isn't paid yet, and the
-      // server fires CAPI Purchase only on confirmed payment — firing now
-      // would count abandoned payment attempts as sales.
+      // No client-side Purchase pixel here: the order isn't paid yet — firing
+      // now would count abandoned payment attempts as sales. On confirmation
+      // the server fires CAPI Purchase (Meta) and the order page fires the
+      // GA4 purchase push (reading the pay-track stash set below).
       if (order.payment?.redirect_url) {
         try {
           sessionStorage.setItem(`replybd:pay-phone:${order.order_number}`, last4);
           if (order.account_exists && !order.customer?.token) {
             sessionStorage.setItem(`replybd:pay-acct:${order.order_number}`, '1');
           }
+          // Everything the order page's purchase pixel needs once the payment
+          // is CONFIRMED (see the note above): phone/email (the lookup API
+          // never echoes them), the GA4 item rows (the lookup API returns
+          // names only — stashing keeps item_id identity consistent with every
+          // other event), and the server CAPI event id (lets the order page
+          // fire a dedup-PAIRED browser fbq Purchase instead of skipping Meta).
+          // Its presence also marks this tab as the buyer's own gateway
+          // round-trip; the order page deletes it after the one-shot push.
+          // Written LAST in this block: it's the only new throw point, and the
+          // older pay-phone/pay-acct stashes must not be lost to it.
+          sessionStorage.setItem(
+            `replybd:pay-track:${order.order_number}`,
+            JSON.stringify({
+              phone: values.customer_phone,
+              email: values.customer_email || undefined,
+              items: ga4Items,
+              metaEventId: order.meta_event_id ?? undefined,
+            }),
+          );
         } catch {
           /* storage blocked — the order page falls back to its lookup form */
         }
@@ -365,6 +385,15 @@ export function CheckoutPage({
           contentIds: lines.map((l) => l.product_id.toString()),
           items: ga4Items,
           metaEventId: order.meta_event_id ?? null,
+          // Customer block for GTM (form state is still in scope here) — the
+          // marketer maps customer.first_name/…/shipping_method on this event.
+          customer: {
+            name: values.customer_name,
+            phone: values.customer_phone,
+            email: values.customer_email || null,
+            address: values.customer_address,
+            shippingMethod: zone?.label ?? null,
+          },
         });
       }
       // Cart-mode order succeeded → empty the cart so the badge clears.

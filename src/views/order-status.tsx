@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
 import { lookupOrder, getToken, getMyOrder, ApiError, UnauthenticatedError } from '../lib/api';
+import { pixel } from '../lib/pixel';
 import { useCart } from '../stores/cart';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
@@ -166,6 +167,86 @@ export function OrderStatusPage({
       /* storage blocked — worst case the cart badge lingers */
     }
   }, [paymentPaid, orderNumber, clearCart]);
+
+  // ── Purchase pixel for ONLINE orders ──
+  // Fired HERE (payment confirmed), never at checkout submit, so abandoned
+  // gateway sessions are not counted as sales. Gates besides paymentPaid:
+  //  - the checkout's `pay-track` sessionStorage stash must exist — it only
+  //    does in the buyer's own tab returning from the gateway, so a revisit
+  //    from another browser/device (or a shared order link) pushes nothing;
+  //  - a localStorage once-flag stops same-tab refreshes re-pushing.
+  // The stash is DELETED after the push (and on a failed payment): it holds
+  // plaintext phone/email, sessionStorage survives reopen-closed-tab restore
+  // on shared machines, and consuming it also hard-stops any re-push.
+  // Meta side: when the stash carries the server CAPI event id the fbq
+  // Purchase fires WITH it (Meta collapses the browser+server pair and gains
+  // _fbp/_fbc match signal); without the id it stays GA4-only — an unpaired
+  // browser fire would double-count against CAPI.
+  // Like every hook in this component it MUST stay above the early returns —
+  // a conditional hook count unmounts the island (blank page, July 2026).
+  useEffect(() => {
+    if (!order) return;
+    const stashKey = `replybd:pay-track:${orderNumber}`;
+    // Terminal failure → the stash will never be consumed; drop the PII now.
+    if (paymentFailed) {
+      try { sessionStorage.removeItem(stashKey); } catch { /* storage blocked */ }
+      return;
+    }
+    if (!paymentPaid) return;
+    type PayTrackStash = {
+      phone?: string;
+      email?: string;
+      items?: { item_id?: string; item_name: string; price: number; quantity: number }[];
+      metaEventId?: string;
+    };
+    let stash: PayTrackStash | null = null;
+    try {
+      const raw = sessionStorage.getItem(stashKey);
+      if (raw) stash = JSON.parse(raw) as PayTrackStash;
+    } catch {
+      /* storage blocked / corrupt stash → treat as a revisit, push nothing */
+    }
+    if (!stash) return;
+    try {
+      const k = `replybd:purchase-pushed:${orderNumber}`;
+      if (!localStorage.getItem(k)) {
+        // Prefer the checkout's stashed item rows (item_id identity consistent
+        // with view_item/add_to_cart/COD purchase); the lookup API returns
+        // product NAMES only, so the fallback rows are name-only (GA4 accepts
+        // either key).
+        const stashedItems = Array.isArray(stash.items) && stash.items.length > 0 ? stash.items : null;
+        const items = stashedItems ?? (order.items ?? []).map((i) => ({
+          item_name: i.variant ? `${i.product_name} (${i.variant})` : i.product_name,
+          price: i.unit_price,
+          quantity: i.quantity,
+        }));
+        pixel.purchase({
+          orderNumber,
+          value: order.total,
+          numItems: items.reduce((n, i) => n + i.quantity, 0),
+          currency: order.currency,
+          contentIds: (stashedItems ?? []).map((i) => i.item_id).filter((id): id is string => Boolean(id)),
+          items,
+          ...(stash.metaEventId ? { metaEventId: stash.metaEventId } : { ga4Only: true }),
+          customer: {
+            name: order.customer_name ?? null,
+            phone: stash.phone ?? null,
+            email: stash.email ?? null,
+            address: order.address ?? null,
+            shippingMethod:
+              meta?.shipping?.zones?.find((z) => z.code === order.shipping_zone)?.label
+                ?? order.shipping_zone
+                ?? null,
+          },
+        });
+        localStorage.setItem(k, '1');
+      }
+    } catch {
+      /* localStorage blocked — the stash removal below still stops re-pushes */
+    }
+    // Consumed (or already pushed) — always drop the plaintext-PII stash.
+    try { sessionStorage.removeItem(stashKey); } catch { /* storage blocked */ }
+  }, [paymentPaid, paymentFailed, orderNumber, order, meta]);
 
   useEffect(() => {
     if (!awaitingPayment || pollsExhausted) return;

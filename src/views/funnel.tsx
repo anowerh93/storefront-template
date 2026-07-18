@@ -856,7 +856,23 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       // duplicate:true = the 90s-dedup window replayed an existing order —
       // don't double-count the purchase.
       if (!orderRes.duplicate) {
-        pixel.purchase({ orderNumber: orderRes.order_number, value: orderRes.total, numItems: qty, currency: orderRes.currency, contentIds: [product.id.toString()], items: ga4Items, metaEventId: orderRes.meta_event_id ?? null });
+        pixel.purchase({
+          orderNumber: orderRes.order_number,
+          value: orderRes.total,
+          numItems: qty,
+          currency: orderRes.currency,
+          contentIds: [product.id.toString()],
+          items: ga4Items,
+          metaEventId: orderRes.meta_event_id ?? null,
+          // Customer block for GTM — funnels collect no email, so that key is
+          // simply absent from the push.
+          customer: {
+            name: values.customer_name,
+            phone: values.customer_phone,
+            address: values.customer_address,
+            shippingMethod: zone?.label ?? null,
+          },
+        });
       }
       window.location.href = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
     } catch (e) {
