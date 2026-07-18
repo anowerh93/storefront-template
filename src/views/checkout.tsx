@@ -20,13 +20,15 @@ import { FitImage } from '../components/ui/fit-image';
 /**
  * Checkout page with TWO entry modes, sharing one Billing form + Order Summary:
  *
- *  - Express "buy now": reached from the PDP "Order Now" button
- *    (/checkout?p=slug&v=variantIndex&q=qty). checkout.astro fetches that one
- *    product server-side and passes it as `product`; the summary is a single,
+ *  - Express "buy now" (/checkout?p=slug&v=variantIndex&q=qty): legacy deep
+ *    links only — the PDP "Order Now" button now goes through cart mode so a
+ *    stacked cart is never hidden. checkout.astro fetches that one product
+ *    server-side and passes it as `product`; the summary is a single,
  *    in-memory line (qty editable locally, not persisted to the cart).
- *  - Cart mode: reached from /cart's "Proceed to Checkout" (/checkout, no
- *    params). `product` is null; the summary is the persisted cart (qty edits
- *    and removals write through to the store). The cart is cleared on success.
+ *  - Cart mode: reached from /cart's "Proceed to Checkout" AND the PDP
+ *    "Order Now" (/checkout, no params). `product` is null; the summary is the
+ *    persisted cart (qty edits and removals write through to the store). The
+ *    cart is cleared on success only — an abandoned checkout keeps it intact.
  *
  * Both submit ONE order with an items[] body — the server prices + re-checks
  * stock per line and applies one order-level shipping fee on the combined
@@ -157,6 +159,32 @@ export function CheckoutPage({
 
   const lines: CartLine[] = isExpress ? (expressLine ? [expressLine] : []) : cartItems;
 
+  // GA4 begin_checkout / Meta InitiateCheckout — once per checkout ENTRY (the
+  // standard funnel step), not per Place-Order click. MUST sit above every
+  // early return below: cart-mode's "!hydrated" loading return otherwise
+  // changes the hook count between renders and React unmounts the island —
+  // this exact mistake shipped a blank live /checkout page (July 2026).
+  // Values are computed inside the effect because subtotal/currency are only
+  // derived after the early returns.
+  const beganCheckout = useRef(false);
+  const sentCheckoutSteps = useRef(false);
+  useEffect(() => {
+    if (beganCheckout.current || lines.length === 0) return;
+    if (!isExpress && !hydrated) return; // wait for the real cart, not the SSR-empty one
+    beganCheckout.current = true;
+    pixel.initiateCheckout({
+      value: lines.reduce((n, l) => n + l.unit_price * l.quantity, 0),
+      numItems: lines.reduce((n, l) => n + l.quantity, 0),
+      currency: meta?.currency,
+      items: lines.map((l) => ({
+        item_id: l.product_id.toString(),
+        item_name: l.name,
+        price: l.unit_price,
+        quantity: l.quantity,
+      })),
+    });
+  }, [hydrated, lines.length]);
+
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
   // out" — NOT cart mode (which would surface the shopper's persisted cart for
@@ -219,28 +247,6 @@ export function CheckoutPage({
     : zone?.fee ?? 0;
   const total = subtotal + shippingFee;
   const numItems = lines.reduce((n, l) => n + l.quantity, 0);
-
-  // GA4 begin_checkout / Meta InitiateCheckout — once per checkout ENTRY (the
-  // standard funnel step), not per Place-Order click: submit-time firing both
-  // missed abandoners who never clicked and re-fired on every failed-submit
-  // retry. Ref-guarded so re-renders and bfcache restores don't re-push.
-  const beganCheckout = useRef(false);
-  const sentCheckoutSteps = useRef(false);
-  useEffect(() => {
-    if (beganCheckout.current || lines.length === 0) return;
-    beganCheckout.current = true;
-    pixel.initiateCheckout({
-      value: subtotal,
-      numItems,
-      currency,
-      items: lines.map((l) => ({
-        item_id: l.product_id.toString(),
-        item_name: l.name,
-        price: l.unit_price,
-        quantity: l.quantity,
-      })),
-    });
-  }, [lines.length]);
 
   // Express mode edits a local qty; cart mode writes through to the store.
   function changeQty(line: CartLine, next: number) {

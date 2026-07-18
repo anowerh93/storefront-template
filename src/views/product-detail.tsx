@@ -185,12 +185,9 @@ function BuyBox({
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
 
-  // "Order Now" is an express single-item buy-now; "Add to Cart" stacks lines
-  // for a combined checkout. Both carry the chosen variant + quantity.
-  const checkoutHref = `/checkout?p=${encodeURIComponent(product.slug)}${variantIdx != null ? `&v=${variantIdx}` : ''}&q=${qty}`;
-
-  function handleAddToCart() {
-    if (!inStock) return;
+  // Write the selected variant + quantity into the cart store — shared by
+  // both CTAs below.
+  function addSelectionToCart() {
     addToCart(
       {
         product_id: product.id,
@@ -206,8 +203,25 @@ function BuyBox({
       qty,
     );
     pixel.addToCart({ id: product.id, name: product.name, price: unitPrice, quantity: qty, currency: product.currency });
+  }
+
+  function handleAddToCart() {
+    if (!inStock) return;
+    addSelectionToCart();
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
+  }
+
+  // "Order Now" = add to cart + straight to the (cart-mode) checkout. The
+  // checkout then shows EVERYTHING in the cart including this line; the cart
+  // keeps its items until the order completes (cart mode clears on success),
+  // and an abandoned checkout leaves the cart intact. Previously this was an
+  // express ?p&v&q link that HID the shopper's other cart lines — buyers who
+  // stacked a cart and then hit Order Now lost their combined order.
+  function handleOrderNow() {
+    if (!inStock) return;
+    addSelectionToCart();
+    window.location.href = '/checkout';
   }
 
   return (
@@ -333,12 +347,13 @@ function BuyBox({
               {added ? <Check className="h-5 w-5 text-emerald-600" /> : <ShoppingCart className="h-5 w-5" />}
               {added ? 'Added to cart' : 'Add to Cart'}
             </button>
-            <a
-              href={checkoutHref}
+            <button
+              type="button"
+              onClick={handleOrderNow}
               className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800"
             >
               <ShoppingBag className="h-5 w-5" /> Order Now
-            </a>
+            </button>
           </div>
         </div>
       ) : (

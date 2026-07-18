@@ -3,8 +3,9 @@
  * Product detail page — the catalog entry point.
  *
  * Customers land here after clicking a product card. The buy box's
- * "Add to Cart" stacks lines for a combined /cart → /checkout flow, while
- * "Order Now" is an express single-item buy-now to /checkout?p=…&v=…&q=….
+ * "Add to Cart" stacks lines for a combined /cart → /checkout flow;
+ * "Order Now" adds the selection to that same cart and jumps straight to
+ * /checkout (cart mode), so any previously carted items ride along.
  *
  * Render mode: SSR on CF Workers (prerender:false). Pre-rendering each
  * PDP at build time would mean rebuilding the whole storefront every
