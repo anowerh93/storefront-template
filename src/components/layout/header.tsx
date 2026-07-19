@@ -5,6 +5,7 @@ import { ChevronDown, MapPin, Menu, Search, ShoppingCart, User, UserCircle, X } 
 import type { StorefrontMeta, Category, SuggestProduct } from '../../lib/types';
 import { getToken, suggestProducts } from '../../lib/api';
 import { formatBDT } from '../../lib/format';
+import { waHref } from '../../lib/wa';
 import { cdnImage } from '../../lib/img';
 import { useCart, cartCount, useCartHydrated } from '../../stores/cart';
 
@@ -206,7 +207,7 @@ export function Header({
             <div className="ml-auto hidden lg:block">
               {meta.whatsapp && (
                 <a
-                  href={`https://wa.me/${meta.whatsapp.replace(/\D/g, '')}`}
+                  href={waHref(meta.whatsapp) ?? '#'}
                   target="_blank"
                   rel="noopener"
                   className="inline-flex items-center gap-1.5 text-xs font-medium px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition"

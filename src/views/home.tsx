@@ -134,7 +134,7 @@ export async function HomePage() {
         {order.map(renderSection)}
       </main>
       <Footer meta={meta} categories={categories} />
-      <MessengerCTA href={meta.messenger?.url ?? null} />
+      <MessengerCTA href={meta.messenger?.url ?? null} whatsapp={meta.whatsapp} />
     </>
   );
 }

@@ -88,7 +88,7 @@ export function CategoryDetailPage({
         )}
       </main>
       <Footer meta={meta} />
-      <MessengerCTA href={meta.messenger?.url ?? null} />
+      <MessengerCTA href={meta.messenger?.url ?? null} whatsapp={meta.whatsapp} />
     </>
   );
 }

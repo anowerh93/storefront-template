@@ -1,5 +1,6 @@
 import { Mail, Phone, Clock, Facebook, Instagram, Youtube, MessageCircle } from 'lucide-react';
 import type { ServiceHomeConfig, StorefrontMeta } from '../../lib/types';
+import { waHref } from '../../lib/wa';
 
 /**
  * Unified service-tenant header — ONE header on EVERY page (home, /services,
@@ -131,7 +132,7 @@ function TopBar({ meta, hero }: { meta: StorefrontMeta; hero?: Hero }) {
 /** Floating call + WhatsApp buttons (bottom-right, every page). */
 function FloatingButtons({ meta, hero }: { meta: StorefrontMeta; hero?: Hero }) {
   const callNumber = (hero?.phones ?? []).filter(Boolean)[0] || meta.whatsapp || '';
-  const wa = meta.whatsapp ? meta.whatsapp.replace(/\D/g, '') : '';
+  const wa = waHref(meta.whatsapp);
   if (!callNumber && !wa) return null;
   return (
     <div className="fixed bottom-5 right-5 z-50 flex flex-col gap-3">
@@ -142,7 +143,7 @@ function FloatingButtons({ meta, hero }: { meta: StorefrontMeta; hero?: Hero }) 
         </a>
       )}
       {wa && (
-        <a href={`https://wa.me/${wa}`} target="_blank" rel="noopener" aria-label="WhatsApp"
+        <a href={wa} target="_blank" rel="noopener" aria-label="WhatsApp"
            className="w-12 h-12 rounded-full bg-[#25D366] hover:brightness-95 text-white shadow-lg ring-4 ring-[#25D366]/20 flex items-center justify-center transition">
           <MessageCircle className="h-5 w-5" />
         </a>

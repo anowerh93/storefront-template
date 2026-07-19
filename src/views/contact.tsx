@@ -159,7 +159,7 @@ export function ContactPage({ meta }: { meta: StorefrontMeta | null }) {
       </main>
 
       <Footer meta={meta} />
-      <MessengerCTA href={meta.messenger?.url ?? null} />
+      <MessengerCTA href={meta.messenger?.url ?? null} whatsapp={meta.whatsapp} />
     </>
   );
 }

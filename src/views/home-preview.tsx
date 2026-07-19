@@ -193,7 +193,7 @@ export function HomePreview({ meta, products, categories }: Props) {
       </main>
 
       <Footer meta={meta} categories={categories} />
-      {meta.messenger?.url && <MessengerCTA href={meta.messenger.url} />}
+      <MessengerCTA href={meta.messenger?.url ?? null} whatsapp={meta.whatsapp} />
     </>
   );
 }

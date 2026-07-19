@@ -215,5 +215,9 @@ const schemas: Record<string, unknown>[] =
   </main>
 
   {meta && <Footer meta={meta} categories={isServiceSite ? [] : categories} />}
-  {meta?.messenger?.url && <MessengerCTA client:visible href={meta.messenger.url} />}
+  {/* Render when EITHER channel exists — a WhatsApp-only tenant (no connected
+      FB page) must still get the floating button. Neither → skip the island. */}
+  {(meta?.messenger?.url || meta?.whatsapp) && (
+    <MessengerCTA client:visible href={meta?.messenger?.url ?? null} whatsapp={meta?.whatsapp ?? null} />
+  )}
 </Base>
