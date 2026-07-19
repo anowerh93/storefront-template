@@ -231,7 +231,7 @@ export function OrderStatusPage({
           customer: {
             name: order.customer_name ?? null,
             phone: stash.phone ?? null,
-            email: stash.email ?? null,
+            email: stash.email ?? order.customer_email ?? null,
             address: order.address ?? null,
             shippingMethod:
               meta?.shipping?.zones?.find((z) => z.code === order.shipping_zone)?.label

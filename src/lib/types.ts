@@ -674,6 +674,7 @@ export type OrderResponse = {
   // From GET /orders/{number}:
   placed_at?: string;
   customer_name?: string;
+  customer_email?: string | null;
   address?: string;
   shipping_zone?: string | null;
   // Post-placement, customer-facing status milestones (oldest-first). Placement

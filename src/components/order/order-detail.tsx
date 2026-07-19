@@ -137,7 +137,7 @@ export function OrderDetail({
         <Card title="Order Details">
           <Row label="Order Number" value={<span className="font-bold text-slate-900">{order.order_number}</span>} />
           <Row label="Status" value={<Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>} />
-          <Row label="Payment Method" value="Cash on Delivery" />
+          <Row label="Payment Method" value={order.payment_method === 'online' ? 'Online Payment' : 'Cash on Delivery'} />
           {zoneLabel && <Row label="Shipping Method" value={zoneLabel} />}
           {placedDate && <Row label="Order Date" value={placedDate} />}
           <Row label="Total" value={<span className="font-bold text-slate-900">{formatBDT(order.total, { currency })}</span>} />
@@ -146,6 +146,7 @@ export function OrderDetail({
         <Card title="Customer Details">
           {order.customer_name && <Row label="Name" value={order.customer_name} multiline />}
           {maskedPhone && <Row label="Phone" value={<span className="tabular-nums">{maskedPhone}</span>} />}
+          {order.customer_email && <Row label="Email" value={order.customer_email} multiline />}
           {order.address && <Row label="Address" value={order.address} multiline />}
         </Card>
       </div>
