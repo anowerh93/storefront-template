@@ -597,7 +597,7 @@ const BENEFIT_TONES: Record<string, { bg: string; tile: string; featured: string
   purple:  { bg: 'bg-purple-50', tile: 'bg-purple-100 text-purple-700', featured: 'bg-purple-700' },
   slate:   { bg: 'bg-slate-50',  tile: 'bg-slate-100 text-slate-700',   featured: 'bg-slate-700' },
 };
-type BenefitItem = { icon?: string; tone?: string; title?: string; body?: string };
+type BenefitItem = { icon?: string; tone?: string; title?: string; body?: string; featured?: boolean; featured_width?: string };
 // Back-compat: legacy benefits were plain strings → render as a title-only card.
 function normBenefit(b: string | BenefitItem): BenefitItem {
   return typeof b === 'string' ? { icon: 'sparkles', tone: 'emerald', title: b, body: '' } : (b || {});
@@ -607,18 +607,21 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
     .map(normBenefit)
     .filter((b) => (b.title || '').trim() !== '' || (b.body || '').trim() !== '');
   if (!items.length) return null;
-  const lastIdx = items.length - 1;
   return (
     <section>
       {config.title && <RT as="h2" className="mb-6 text-center text-2xl font-extrabold text-slate-900 sm:text-3xl" html={config.title} />}
       <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((b, i) => {
-          const featured = i === lastIdx && items.length > 1;
+          // Featured is OPT-IN per card (builder checkbox) — nothing is
+          // featured by default. Width choice only matters on the lg 3-col
+          // grid: 'two_thirds' spans 2 columns, 'full' the whole row (sm's
+          // 2-col grid makes either a full row).
+          const featured = !!b.featured;
+          const span = b.featured_width === 'two_thirds' ? 'sm:col-span-2 lg:col-span-2' : 'sm:col-span-2 lg:col-span-3';
           const tone = BENEFIT_TONES[b.tone || 'emerald'] ?? BENEFIT_TONES.emerald;
-          // Featured = wide dark card, icon on the left (mirrors the reference).
           if (featured) {
             return (
-              <div key={i} className={`flex items-center gap-5 rounded-2xl ${tone.featured} p-6 text-white shadow-sm sm:col-span-2 lg:col-span-2`}>
+              <div key={i} className={`flex items-center gap-5 rounded-2xl ${tone.featured} p-6 text-white shadow-sm ${span}`}>
                 <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
                   <BadgeIcon name={b.icon || 'sparkles'} className="h-7 w-7 text-white" />
                 </div>
