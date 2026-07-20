@@ -585,14 +585,17 @@ function ReviewScreenshots({ images }: { images: string[] }) {
   );
 }
 
-// Benefit tile palette — soft tinted card + a darker icon-tile, keyed by `tone`.
-const BENEFIT_TONES: Record<string, { bg: string; tile: string }> = {
-  amber:   { bg: 'bg-amber-50',  tile: 'bg-amber-100 text-amber-700' },
-  emerald: { bg: 'bg-brand-50',  tile: 'bg-brand-100 text-brand-700' },
-  rose:    { bg: 'bg-rose-50',   tile: 'bg-rose-100 text-rose-600' },
-  sky:     { bg: 'bg-sky-50',    tile: 'bg-sky-100 text-sky-700' },
-  purple:  { bg: 'bg-purple-50', tile: 'bg-purple-100 text-purple-700' },
-  slate:   { bg: 'bg-slate-50',  tile: 'bg-slate-100 text-slate-700' },
+// Benefit tile palette — soft tinted card + a darker icon-tile, keyed by
+// `tone`. `featured` is the DARK background the wide last card uses (white
+// text on all of them): the tone select applies there too — emerald (the
+// default) keeps the tenant-brand dark, so existing funnels look unchanged.
+const BENEFIT_TONES: Record<string, { bg: string; tile: string; featured: string }> = {
+  amber:   { bg: 'bg-amber-50',  tile: 'bg-amber-100 text-amber-700',   featured: 'bg-amber-700' },
+  emerald: { bg: 'bg-brand-50',  tile: 'bg-brand-100 text-brand-700',   featured: 'bg-brand-700' },
+  rose:    { bg: 'bg-rose-50',   tile: 'bg-rose-100 text-rose-600',     featured: 'bg-rose-700' },
+  sky:     { bg: 'bg-sky-50',    tile: 'bg-sky-100 text-sky-700',       featured: 'bg-sky-700' },
+  purple:  { bg: 'bg-purple-50', tile: 'bg-purple-100 text-purple-700', featured: 'bg-purple-700' },
+  slate:   { bg: 'bg-slate-50',  tile: 'bg-slate-100 text-slate-700',   featured: 'bg-slate-700' },
 };
 type BenefitItem = { icon?: string; tone?: string; title?: string; body?: string };
 // Back-compat: legacy benefits were plain strings → render as a title-only card.
@@ -615,7 +618,7 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
           // Featured = wide dark card, icon on the left (mirrors the reference).
           if (featured) {
             return (
-              <div key={i} className="flex items-center gap-5 rounded-2xl bg-brand-700 p-6 text-white shadow-sm sm:col-span-2 lg:col-span-2">
+              <div key={i} className={`flex items-center gap-5 rounded-2xl ${tone.featured} p-6 text-white shadow-sm sm:col-span-2 lg:col-span-2`}>
                 <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
                   <BadgeIcon name={b.icon || 'sparkles'} className="h-7 w-7 text-white" />
                 </div>
