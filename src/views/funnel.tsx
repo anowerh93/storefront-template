@@ -626,13 +626,19 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
               </div>
             );
           }
+          // Same icon-beside-text row as the featured card (tenant request:
+          // the stacked icon-above-title version read as a broken line).
+          // items-start, not center: with a multi-line body the icon should
+          // hang with the TITLE line, not float mid-card.
           return (
-            <div key={i} className={`rounded-2xl ${tone.bg} p-6 ring-1 ring-black/5`}>
-              <div className={`mb-4 inline-flex h-12 w-12 items-center justify-center rounded-2xl ${tone.tile}`}>
+            <div key={i} className={`flex items-start gap-4 rounded-2xl ${tone.bg} p-6 ring-1 ring-black/5`}>
+              <div className={`inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl ${tone.tile}`}>
                 <BadgeIcon name={b.icon || 'sparkles'} className="h-6 w-6" />
               </div>
-              {b.title && <RT as="h3" className="font-bold leading-snug text-slate-900" html={b.title} />}
-              {b.body && <RT as="p" className="mt-1 text-sm text-slate-600" html={b.body} />}
+              <div className="min-w-0">
+                {b.title && <RT as="h3" className="font-bold leading-snug text-slate-900" html={b.title} />}
+                {b.body && <RT as="p" className="mt-1 text-sm text-slate-600" html={b.body} />}
+              </div>
             </div>
           );
         })}
