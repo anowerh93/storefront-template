@@ -613,20 +613,39 @@ function Benefits({ config }: { config: FunnelBlockConfig['benefits'] }) {
       <div className="mx-auto grid max-w-5xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {items.map((b, i) => {
           // Featured is OPT-IN per card (builder checkbox) — nothing is
-          // featured by default. Width choice only matters on the lg 3-col
-          // grid: 'two_thirds' spans 2 columns, 'full' the whole row (sm's
-          // 2-col grid makes either a full row).
+          // featured by default. A featured card is dark-highlighted at
+          // NORMAL card width unless a width was explicitly chosen:
+          // 'two_thirds' spans 2 of the lg 3 columns, 'full' the whole row
+          // (sm's 2-col grid makes either wide option a full row).
           const featured = !!b.featured;
-          const span = b.featured_width === 'two_thirds' ? 'sm:col-span-2 lg:col-span-2' : 'sm:col-span-2 lg:col-span-3';
+          const wide =
+            b.featured_width === 'two_thirds' ? 'sm:col-span-2 lg:col-span-2'
+            : b.featured_width === 'full' ? 'sm:col-span-2 lg:col-span-3'
+            : null;
           const tone = BENEFIT_TONES[b.tone || 'emerald'] ?? BENEFIT_TONES.emerald;
-          if (featured) {
+          if (featured && wide) {
             return (
-              <div key={i} className={`flex items-center gap-5 rounded-2xl ${tone.featured} p-6 text-white shadow-sm ${span}`}>
+              <div key={i} className={`flex items-center gap-5 rounded-2xl ${tone.featured} p-6 text-white shadow-sm ${wide}`}>
                 <div className="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-white/15">
                   <BadgeIcon name={b.icon || 'sparkles'} className="h-7 w-7 text-white" />
                 </div>
                 <div>
                   {b.title && <RT as="h3" className="text-lg font-bold leading-snug" html={b.title} />}
+                  {b.body && <RT as="p" className="mt-1 text-sm text-white/85" html={b.body} />}
+                </div>
+              </div>
+            );
+          }
+          // Normal-width featured: same size/structure as a regular card,
+          // just dark-highlighted.
+          if (featured) {
+            return (
+              <div key={i} className={`flex items-start gap-4 rounded-2xl ${tone.featured} p-6 text-white shadow-sm`}>
+                <div className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-white/15">
+                  <BadgeIcon name={b.icon || 'sparkles'} className="h-6 w-6 text-white" />
+                </div>
+                <div className="min-w-0">
+                  {b.title && <RT as="h3" className="font-bold leading-snug" html={b.title} />}
                   {b.body && <RT as="p" className="mt-1 text-sm text-white/85" html={b.body} />}
                 </div>
               </div>
