@@ -16,6 +16,7 @@ import { submitOrder } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
 import { pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
+import { MessengerCTA } from '../components/layout/messenger-cta';
 import { CertSlider } from '../components/ui/cert-slider';
 import { cdnBlurThumb, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { Input } from '../components/ui/input';
@@ -175,6 +176,10 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       </main>
       <SlimFooter meta={meta} />
       <StickyCta label={config.hero.cta_label || 'Order Now'} btn={btn} />
+      {/* WhatsApp-ONLY on funnels (tenant request: every landing gets it by
+          default). No Messenger pill here — ad landings stay single-focus.
+          aboveMobileBar lifts it clear of the sticky Order-Now bar. */}
+      <MessengerCTA href={null} whatsapp={meta.whatsapp} aboveMobileBar />
     </div>
   );
 }

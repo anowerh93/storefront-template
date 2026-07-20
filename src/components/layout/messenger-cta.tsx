@@ -1,7 +1,6 @@
 'use client';
 
 import { MessageCircle } from 'lucide-react';
-import { motion } from 'framer-motion';
 import { waHref } from '../../lib/wa';
 
 /**
@@ -11,6 +10,12 @@ import { waHref } from '../../lib/wa';
  * tenant hasn't set is simply absent, and the component renders nothing when
  * neither exists. Strong conversion lever in the BD market where shoppers
  * expect to negotiate / ask questions before buying.
+ *
+ * Deliberately NO entrance animation: the old framer-motion version started
+ * at opacity 0 and animated in — when the animation didn't run (observed:
+ * pill stuck at opacity 0 / translateY(20) after full hydration) the button
+ * was permanently INVISIBLE. A conversion CTA must never depend on JS
+ * animation for visibility, so it now simply renders.
  *
  * Kept under the MessengerCTA name (11 call sites) even though it now covers
  * both channels.
@@ -25,43 +30,51 @@ function WhatsAppIcon({ className }: { className?: string }) {
   );
 }
 
-export function MessengerCTA({ href, whatsapp = null }: { href: string | null; whatsapp?: string | null }) {
+export function MessengerCTA({
+  href,
+  whatsapp = null,
+  aboveMobileBar = false,
+}: {
+  href: string | null;
+  whatsapp?: string | null;
+  /** Funnel pages have a full-width sticky Order-Now bar (mobile only, ~72px)
+      at bottom-0 — lift the stack above it there; desktop is unaffected. */
+  aboveMobileBar?: boolean;
+}) {
   const wa = waHref(whatsapp);
   if (!href && !wa) return null;
 
   return (
-    <div className="fixed bottom-5 right-5 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6">
+    <div
+      className={`fixed right-5 z-40 flex flex-col items-end gap-3 sm:bottom-6 sm:right-6 ${
+        aboveMobileBar ? 'bottom-[84px]' : 'bottom-5'
+      }`}
+    >
       {wa && (
-        <motion.a
+        <a
           href={wa}
           target="_blank"
           rel="noopener"
           className="flex items-center gap-2 px-4 py-3 rounded-full bg-[#25D366] text-white
                      shadow-lg hover:bg-[#1DA851] transition-colors"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.2, type: 'spring', stiffness: 200, damping: 20 }}
           aria-label="Chat with us on WhatsApp"
         >
           <WhatsAppIcon className="h-5 w-5" />
           <span className="text-sm font-semibold hidden sm:inline">WhatsApp</span>
-        </motion.a>
+        </a>
       )}
       {href && (
-        <motion.a
+        <a
           href={href}
           target="_blank"
           rel="noopener"
           className="flex items-center gap-2 px-4 py-3 rounded-full bg-[#0084FF] text-white
                      shadow-lg hover:bg-[#0073E0] transition-colors"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 1.35, type: 'spring', stiffness: 200, damping: 20 }}
           aria-label="Chat with us on Messenger"
         >
           <MessageCircle className="h-5 w-5" />
           <span className="text-sm font-semibold hidden sm:inline">Chat with us</span>
-        </motion.a>
+        </a>
       )}
     </div>
   );
