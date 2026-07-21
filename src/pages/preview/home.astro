@@ -27,7 +27,7 @@ const [meta, productsRes, categories] = await Promise.all([
 const products = productsRes.data ?? [];
 ---
 
-<Base title="Homepage preview" noindex={true} meta={meta}>
+<Base title="Homepage preview" noindex={true} meta={meta} tracking={false}>
   {meta
     ? <HomePreview client:load meta={meta} products={products} categories={categories} />
     : (

@@ -653,9 +653,16 @@ export type OrderResponse = {
   // From POST /orders:
   message?: string;
   duplicate?: boolean;
-  /** Server CAPI Purchase dedup key — pass as fbq eventID so Meta collapses
-      the browser + server pair instead of double-counting. */
+  /** Server CAPI Purchase dedup key (`Purchase_{tenant}_{order}`) — pass as
+      fbq eventID AND as the dataLayer `event_id` so Meta collapses the
+      browser + server + GTM-tag fires into one. On BOTH the create response
+      and the GET lookups, so the order-status page always has it. */
   meta_event_id?: string | null;
+  /** From GET /orders — server truth: some browser already pushed (or, for
+      COD, the checkout owns) this order's GA4 purchase. The order-status
+      fallback push is gated on this being false, then consumes it via
+      markPurchaseTracked(). */
+  purchase_tracked?: boolean;
   // Present when the order was placed with payment_method 'online' (also on a
   // `duplicate` replay of an order still awaiting its payment — the same
   // gateway session is renewed, never a second payable one). Redirect the

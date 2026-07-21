@@ -34,9 +34,17 @@ export interface Props {
    * falls back to fetching here.
    */
   meta?: StorefrontMeta | null;
+  /**
+   * Set false on non-shopper surfaces (the dashboard builder's /preview/*
+   * iframes) to suppress the GTM + Meta Pixel loaders entirely — every
+   * builder reload was otherwise pumping real PageViews into the tenant's
+   * pixel and firing their GTM all-pages tags with the merchant's own
+   * editing traffic.
+   */
+  tracking?: boolean;
 }
 
-const { title, description, ogImage, noindex, schema = [], bengaliFont = false } = Astro.props;
+const { title, description, ogImage, noindex, schema = [], bengaliFont = false, tracking = true } = Astro.props;
 
 // Tenant metadata: prefer the page's already-fetched copy; fetch only when
 // the page didn't pass one (e.g. 404.astro). If the fallback fails (API
@@ -68,8 +76,8 @@ const finalDescription = description
 const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
 
 const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
-const pixelId = meta?.pixel?.id ?? null;
-const gtmId = meta?.gtm?.id ?? null;
+const pixelId = tracking ? (meta?.pixel?.id ?? null) : null;
+const gtmId = tracking ? (meta?.gtm?.id ?? null) : null;
 
 // Inline tracking loaders, built here and emitted via set:html. IMPORTANT:
 // writing a script body as a {`...`} JSX expression does NOT work — Astro
@@ -82,8 +90,12 @@ const gtmId = meta?.gtm?.id ?? null;
 const gtmSnippet = gtmId
   ? `(function(w,d,s,l,i){w[l]=w[l]||[];w[l].push({'gtm.start':new Date().getTime(),event:'gtm.js'});var f=d.getElementsByTagName(s)[0],j=d.createElement(s),dl=l!='dataLayer'?'&l='+l:'';j.async=true;j.src='https://www.googletagmanager.com/gtm.js?id='+i+dl;f.parentNode.insertBefore(j,f);})(window,document,'script','dataLayer',${JSON.stringify(gtmId)});`
   : null;
+// trackSingle (not the global `track`): the global form broadcasts to every
+// initialized pixel — if the tenant's GTM container also inits a Meta pixel,
+// our PageView (and every lib/pixel.ts event, which reads __rbPixelId) would
+// land on both. trackSingle pins each fire to OUR configured pixel.
 const pixelSnippet = pixelId
-  ? `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');fbq('init',${JSON.stringify(pixelId)});fbq('track','PageView');`
+  ? `!function(f,b,e,v,n,t,s){if(f.fbq)return;n=f.fbq=function(){n.callMethod?n.callMethod.apply(n,arguments):n.queue.push(arguments)};if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';n.queue=[];t=b.createElement(e);t.async=!0;t.src=v;s=b.getElementsByTagName(e)[0];s.parentNode.insertBefore(t,s)}(window,document,'script','https://connect.facebook.net/en_US/fbevents.js');window.__rbPixelId=${JSON.stringify(pixelId)};fbq('init',${JSON.stringify(pixelId)});fbq('trackSingle',${JSON.stringify(pixelId)},'PageView');`
   : null;
 const siteName = meta?.name ?? '';
 const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;

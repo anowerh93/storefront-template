@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Check, Loader2, X } from 'lucide-react';
-import { lookupOrder, getToken, getMyOrder, ApiError, UnauthenticatedError } from '../lib/api';
+import { lookupOrder, getToken, getMyOrder, markPurchaseTracked, ApiError, UnauthenticatedError } from '../lib/api';
 import { pixel } from '../lib/pixel';
 import { useCart } from '../stores/cart';
 import { Header } from '../components/layout/header';
@@ -170,18 +170,27 @@ export function OrderStatusPage({
 
   // ── Purchase pixel for ONLINE orders ──
   // Fired HERE (payment confirmed), never at checkout submit, so abandoned
-  // gateway sessions are not counted as sales. Gates besides paymentPaid:
-  //  - the checkout's `pay-track` sessionStorage stash must exist — it only
-  //    does in the buyer's own tab returning from the gateway, so a revisit
-  //    from another browser/device (or a shared order link) pushes nothing;
-  //  - a localStorage once-flag stops same-tab refreshes re-pushing.
+  // gateway sessions are not counted as sales. Exactly-once is layered:
+  //  1. SERVER latch (order.purchase_tracked, consumed via
+  //     markPurchaseTracked) — cross-device truth. COD orders arrive
+  //     pre-stamped (their purchase fired at checkout), so this effect can
+  //     never re-push them even though it only runs for paid ONLINE orders.
+  //  2. localStorage once-flag — same-browser fast path (poll re-runs,
+  //     refreshes, the fire-and-forget latch consume still in flight).
+  //  3. The checkout's `pay-track` sessionStorage stash — now an ENRICHER,
+  //     not the gate: it carries phone/email + item_id rows the lookup API
+  //     doesn't return. The push no longer REQUIRES it, because sessionStorage
+  //     continuity routinely breaks on real BD payments (bKash app-switch
+  //     returning in the system browser, "Open in Chrome", closed tab + late
+  //     IPN) — those paid orders used to zero-fire GA4 forever.
   // The stash is DELETED after the push (and on a failed payment): it holds
-  // plaintext phone/email, sessionStorage survives reopen-closed-tab restore
-  // on shared machines, and consuming it also hard-stops any re-push.
-  // Meta side: when the stash carries the server CAPI event id the fbq
-  // Purchase fires WITH it (Meta collapses the browser+server pair and gains
-  // _fbp/_fbc match signal); without the id it stays GA4-only — an unpaired
-  // browser fire would double-count against CAPI.
+  // plaintext phone/email, and sessionStorage survives reopen-closed-tab
+  // restore on shared machines.
+  // Meta side: the fbq Purchase always carries the server-deterministic
+  // event id (order.meta_event_id from the lookup, else the stash copy) so
+  // Meta collapses it with the CAPI fire; if no id is available on some
+  // path, the fire stays GA4-only — an unpaired browser fbq would
+  // double-count against CAPI.
   // Like every hook in this component it MUST stay above the early returns —
   // a conditional hook count unmounts the island (blank page, July 2026).
   useEffect(() => {
@@ -204,49 +213,75 @@ export function OrderStatusPage({
       const raw = sessionStorage.getItem(stashKey);
       if (raw) stash = JSON.parse(raw) as PayTrackStash;
     } catch {
-      /* storage blocked / corrupt stash → treat as a revisit, push nothing */
+      /* storage blocked / corrupt stash → the server-truth path below decides */
     }
-    if (!stash) return;
-    try {
-      const k = `replybd:purchase-pushed:${orderNumber}`;
-      if (!localStorage.getItem(k)) {
-        // Prefer the checkout's stashed item rows (item_id identity consistent
-        // with view_item/add_to_cart/COD purchase); the lookup API returns
-        // product NAMES only, so the fallback rows are name-only (GA4 accepts
-        // either key).
-        const stashedItems = Array.isArray(stash.items) && stash.items.length > 0 ? stash.items : null;
-        const items = stashedItems ?? (order.items ?? []).map((i) => ({
-          item_name: i.variant ? `${i.product_name} (${i.variant})` : i.product_name,
-          price: i.unit_price,
-          quantity: i.quantity,
-        }));
-        pixel.purchase({
-          orderNumber,
-          value: order.total,
-          numItems: items.reduce((n, i) => n + i.quantity, 0),
-          currency: order.currency,
-          contentIds: (stashedItems ?? []).map((i) => i.item_id).filter((id): id is string => Boolean(id)),
-          items,
-          ...(stash.metaEventId ? { metaEventId: stash.metaEventId } : { ga4Only: true }),
-          customer: {
-            name: order.customer_name ?? null,
-            phone: stash.phone ?? null,
-            email: stash.email ?? order.customer_email ?? null,
-            address: order.address ?? null,
-            shippingMethod:
-              meta?.shipping?.zones?.find((z) => z.code === order.shipping_zone)?.label
-                ?? order.shipping_zone
-                ?? null,
-          },
-        });
-        localStorage.setItem(k, '1');
-      }
-    } catch {
-      /* localStorage blocked — the stash removal below still stops re-pushes */
+    // Server latch closed → some browser already pushed this order (or it's
+    // COD-owned). Nothing to do beyond dropping the PII stash.
+    if (order.purchase_tracked) {
+      try { sessionStorage.removeItem(stashKey); } catch { /* storage blocked */ }
+      return;
     }
-    // Consumed (or already pushed) — always drop the plaintext-PII stash.
+    // The stash-less fallback needs the server's explicit go-ahead
+    // (purchase_tracked === false). `undefined` means an OLD API without the
+    // latch fields (storefront deployed before the myapp pull+migration) —
+    // treating that as "not tracked" would re-push on every cross-device
+    // visit for the whole skew window, so the stash stays the gate there.
+    const serverSaysUntracked = order.purchase_tracked === false;
+    if (!stash && !serverSaysUntracked) return;
+    // Same-browser once-flag. Read DEFENSIVELY (a throwing localStorage must
+    // not skip the push — the server latch is the real cross-visit guard).
+    const flagKey = `replybd:purchase-pushed:${orderNumber}`;
+    let pushedHere = false;
+    try { pushedHere = !!localStorage.getItem(flagKey); } catch { /* treat as not pushed */ }
+    if (!pushedHere) {
+      // Prefer the checkout's stashed item rows (item_id identity consistent
+      // with view_item/add_to_cart/COD purchase); the lookup API returns
+      // product NAMES only, so the fallback rows are name-only (GA4 accepts
+      // either key).
+      const stashedItems = stash && Array.isArray(stash.items) && stash.items.length > 0 ? stash.items : null;
+      const items = stashedItems ?? (order.items ?? []).map((i) => ({
+        item_name: i.variant ? `${i.product_name} (${i.variant})` : i.product_name,
+        price: i.unit_price,
+        quantity: i.quantity,
+      }));
+      const eventId = order.meta_event_id ?? stash?.metaEventId ?? null;
+      pixel.purchase({
+        orderNumber,
+        value: order.total,
+        numItems: items.reduce((n, i) => n + i.quantity, 0),
+        currency: order.currency,
+        contentIds: (stashedItems ?? []).map((i) => i.item_id).filter((id): id is string => Boolean(id)),
+        items,
+        // Server-deterministic id on every path — pairs the fbq fire with
+        // CAPI (and any event_id-mapped GTM Meta tag). No id → GA4-only.
+        ...(eventId ? { metaEventId: eventId } : { ga4Only: true }),
+        customer: {
+          name: order.customer_name ?? null,
+          phone: stash?.phone ?? null,
+          email: stash?.email ?? order.customer_email ?? null,
+          address: order.address ?? null,
+          shippingMethod:
+            meta?.shipping?.zones?.find((z) => z.code === order.shipping_zone)?.label
+              ?? order.shipping_zone
+              ?? null,
+        },
+      });
+      try { localStorage.setItem(flagKey, '1'); } catch { /* server latch still guards */ }
+      // Consume the server latch (fire-and-forget, never throws). Also mark
+      // the in-memory order so poll-driven effect re-runs in THIS tab gate
+      // on layer 1 even before a refetch reflects it.
+      order.purchase_tracked = true;
+      void markPurchaseTracked(orderNumber, phoneKey);
+    } else if (serverSaysUntracked) {
+      // We pushed earlier but the latch consume evidently never landed (it's
+      // best-effort) — retry it, else every OTHER device sees an open latch
+      // forever and re-pushes. Idempotent server-side.
+      order.purchase_tracked = true;
+      void markPurchaseTracked(orderNumber, phoneKey);
+    }
+    // Pushed (now or earlier) — always drop the plaintext-PII stash.
     try { sessionStorage.removeItem(stashKey); } catch { /* storage blocked */ }
-  }, [paymentPaid, paymentFailed, orderNumber, order, meta]);
+  }, [paymentPaid, paymentFailed, orderNumber, order, meta, phoneKey]);
 
   useEffect(() => {
     if (!awaitingPayment || pollsExhausted) return;

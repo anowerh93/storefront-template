@@ -4,10 +4,10 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
-import { submitOrder, setToken } from '../lib/api';
+import { orderIdempotencyKey, submitOrder, setToken } from '../lib/api';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
-import { pixel } from '../lib/pixel';
+import { mintEventId, pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { Input } from '../components/ui/input';
@@ -102,6 +102,15 @@ export function CheckoutPage({
   const [expressQty, setExpressQty] = useState(Math.max(1, initialQty || 1));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Synchronous re-entrancy guard: `disabled={submitting}` alone can't stop a
+  // rapid double-tap — react-hook-form's async zod validation resolves in a
+  // microtask, so two taps both reach onSubmit before setSubmitting(true)
+  // re-renders the button. A ref is checked/set synchronously at entry.
+  const inflight = useRef(false);
+  // Mount part of the Idempotency-Key (see orderIdempotencyKey): the two
+  // racing submits above (and a bfcache resubmit of the unchanged cart)
+  // then collapse to the SAME order server-side — one order, one Purchase.
+  const idemKey = useRef(mintEventId());
   const [createAccount, setCreateAccount] = useState(false);
   // Online payment is offered only when the tenant has a connected gateway
   // (meta advertises it). The shopper never picks WHICH gateway — the server
@@ -118,7 +127,10 @@ export function CheckoutPage({
   // second payable one.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
-      if (e.persisted) setSubmitting(false);
+      if (e.persisted) {
+        inflight.current = false;
+        setSubmitting(false);
+      }
     };
     window.addEventListener('pageshow', onPageShow);
     return () => window.removeEventListener('pageshow', onPageShow);
@@ -257,6 +269,8 @@ export function CheckoutPage({
 
   async function onSubmit(values: FormData) {
     if (lines.length === 0) return;
+    if (inflight.current) return;
+    inflight.current = true;
     setSubmitting(true);
     setError(null);
     // GA4 items for the dataLayer half of the tracking calls (GTM tenants).
@@ -295,7 +309,10 @@ export function CheckoutPage({
         // Only sent when the tenant offers it AND the shopper picked it —
         // otherwise the server defaults to COD (legacy behavior unchanged).
         ...(canPayOnline && payMethod === 'online' ? { payment_method: 'online' as const } : {}),
-      });
+      }, orderIdempotencyKey(idemKey.current, {
+        customer_phone: values.customer_phone,
+        items: lines.map((l) => ({ product_id: l.product_id, variant_index: l.variant_index, quantity: l.quantity })),
+      }));
       // Account provisioned alongside the order → auto-login by storing the
       // token. If the phone already had an account (account_exists), no token
       // comes back — pass a flag so the success page nudges them to log in.
@@ -363,6 +380,7 @@ export function CheckoutPage({
       if (wasOnline) {
         if (order.status === 'awaiting_payment') {
           setError('We could not start the online payment. Please try again, or choose Cash on Delivery.');
+          inflight.current = false;
           setSubmitting(false);
           return;
         }
@@ -374,32 +392,45 @@ export function CheckoutPage({
         return;
       }
 
-      // duplicate:true = the 90s-dedup window replayed an EXISTING order
-      // (bfcache back + resubmit) — firing purchase again would double-count.
-      if (!order.duplicate) {
-        pixel.purchase({
-          orderNumber: order.order_number,
-          value: order.total,
-          numItems,
-          currency: order.currency,
-          contentIds: lines.map((l) => l.product_id.toString()),
-          items: ga4Items,
-          metaEventId: order.meta_event_id ?? null,
-          // Customer block for GTM (form state is still in scope here) — the
-          // marketer maps customer.first_name/…/shipping_method on this event.
-          customer: {
-            name: values.customer_name,
-            phone: values.customer_phone,
-            email: values.customer_email || null,
-            address: values.customer_address,
-            shippingMethod: zone?.label ?? null,
-          },
-        });
-      }
-      // Cart-mode order succeeded → empty the cart so the badge clears.
-      if (!isExpress) clearCart();
       const acctFlag = order.account_exists && !order.customer?.token ? '&account_exists=1' : '';
-      window.location.href = `/order/${order.order_number}?placed=1&phone=${last4}${acctFlag}`;
+      const dest = `/order/${order.order_number}?placed=1&phone=${last4}${acctFlag}`;
+      // duplicate:true = the 90s-dedup window (or the Idempotency-Key)
+      // replayed an EXISTING order (bfcache back + resubmit, double-tap) —
+      // firing purchase again would double-count.
+      if (order.duplicate) {
+        if (!isExpress) clearCart();
+        window.location.href = dest;
+        return;
+      }
+      pixel.purchase({
+        orderNumber: order.order_number,
+        value: order.total,
+        numItems,
+        currency: order.currency,
+        contentIds: lines.map((l) => l.product_id.toString()),
+        items: ga4Items,
+        metaEventId: order.meta_event_id ?? null,
+        // Customer block for GTM (form state is still in scope here) — the
+        // marketer maps customer.first_name/…/shipping_method on this event.
+        customer: {
+          name: values.customer_name,
+          phone: values.customer_phone,
+          email: values.customer_email || null,
+          address: values.customer_address,
+          shippingMethod: zone?.label ?? null,
+        },
+        // Deferred redirect: dataLayer.push only ENQUEUES — GTM tags fire
+        // async, and non-beacon transports (custom-HTML Meta tags, older GA)
+        // are cancelled by an immediate navigation, zero-firing the purchase
+        // on exactly the slow Android WebViews our ad traffic lives in.
+        // onFlushed runs after the container processed the message (or a
+        // ≤700ms cap) — imperceptible, and tracking can never hold the
+        // shopper hostage.
+        onFlushed: () => { window.location.href = dest; },
+      });
+      // Cart-mode order succeeded → empty the cart so the badge clears
+      // (synchronous — runs before the deferred navigation fires).
+      if (!isExpress) clearCart();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
       // 422 password_required (create_account set without a password) — the
@@ -410,6 +441,7 @@ export function CheckoutPage({
       } else {
         setError(msg);
       }
+      inflight.current = false;
       setSubmitting(false);
     }
   }

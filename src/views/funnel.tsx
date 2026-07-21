@@ -12,9 +12,9 @@ import {
   Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
-import { submitOrder } from '../lib/api';
+import { orderIdempotencyKey, submitOrder } from '../lib/api';
 import { formatBDT, discountPct } from '../lib/format';
-import { pixel } from '../lib/pixel';
+import { mintEventId, pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { CertSlider } from '../components/ui/cert-slider';
@@ -855,7 +855,28 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // (network error, out-of-stock) re-runs onSubmit on retry and would
   // otherwise re-push the event each click.
   const beganCheckout = useRef(false);
+  // Synchronous re-entrancy guard + per-mount Idempotency-Key part — same
+  // rationale as checkout.tsx: `disabled={submitting}` can't stop a rapid
+  // double-tap (async zod validation), and the key collapses racing/replayed
+  // submits to ONE order server-side (one order, one Purchase).
+  const inflight = useRef(false);
+  const idemKey = useRef(mintEventId());
   const inStock = variant ? variant.in_stock : product.in_stock;
+
+  // Coming BACK from the order page restores this island from bfcache with
+  // submitting=true baked in — the order button would be stuck on "Placing
+  // order…" forever. Same fix as checkout.tsx. A restored-page resubmit of
+  // the same funnel order collapses server-side via the Idempotency-Key.
+  useEffect(() => {
+    const onPageShow = (e: PageTransitionEvent) => {
+      if (e.persisted) {
+        inflight.current = false;
+        setSubmitting(false);
+      }
+    };
+    window.addEventListener('pageshow', onPageShow);
+    return () => window.removeEventListener('pageshow', onPageShow);
+  }, []);
 
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
@@ -865,6 +886,8 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const total = subtotal + shippingFee;
 
   async function onSubmit(values: FormData) {
+    if (inflight.current) return;
+    inflight.current = true;
     setSubmitting(true);
     setError(null);
     // GA4 item for the dataLayer half of the tracking calls (GTM tenants) —
@@ -888,31 +911,41 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         utm_medium:     sp?.get('utm_medium') || undefined,
         utm_campaign:   sp?.get('utm_campaign') || undefined,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
-      });
-      // duplicate:true = the 90s-dedup window replayed an existing order —
-      // don't double-count the purchase.
-      if (!orderRes.duplicate) {
-        pixel.purchase({
-          orderNumber: orderRes.order_number,
-          value: orderRes.total,
-          numItems: qty,
-          currency: orderRes.currency,
-          contentIds: [product.id.toString()],
-          items: ga4Items,
-          metaEventId: orderRes.meta_event_id ?? null,
-          // Customer block for GTM — funnels collect no email, so that key is
-          // simply absent from the push.
-          customer: {
-            name: values.customer_name,
-            phone: values.customer_phone,
-            address: values.customer_address,
-            shippingMethod: zone?.label ?? null,
-          },
-        });
+      }, orderIdempotencyKey(idemKey.current, {
+        customer_phone: values.customer_phone,
+        items: [{ product_id: product.id, variant_index: variant ? variant.index : null, quantity: qty }],
+      }));
+      const dest = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
+      // duplicate:true = the dedup window / Idempotency-Key replayed an
+      // existing order — don't double-count the purchase.
+      if (orderRes.duplicate) {
+        window.location.href = dest;
+        return;
       }
-      window.location.href = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
+      pixel.purchase({
+        orderNumber: orderRes.order_number,
+        value: orderRes.total,
+        numItems: qty,
+        currency: orderRes.currency,
+        contentIds: [product.id.toString()],
+        items: ga4Items,
+        metaEventId: orderRes.meta_event_id ?? null,
+        // Customer block for GTM — funnels collect no email, so that key is
+        // simply absent from the push.
+        customer: {
+          name: values.customer_name,
+          phone: values.customer_phone,
+          address: values.customer_address,
+          shippingMethod: zone?.label ?? null,
+        },
+        // Deferred redirect — same rationale as checkout.tsx: an immediate
+        // navigation cancels non-beacon GTM tag requests, zero-firing the
+        // purchase on slow WebViews. Capped ≤700ms inside pushGa4.
+        onFlushed: () => { window.location.href = dest; },
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
+      inflight.current = false;
       setSubmitting(false);
     }
   }

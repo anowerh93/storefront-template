@@ -326,6 +326,39 @@ export function lookupOrder(orderNumber: string, phoneLast4: string) {
   });
 }
 
+/**
+ * Consume the server-side purchase-tracking latch after the order-status page
+ * pushed the GA4 purchase — so no other device/visit ever pushes it again.
+ * Guest calls verify with the phone last-4 (same guard as lookupOrder);
+ * with a customer token and no phone the authed twin is used instead.
+ * Fire-and-forget by design: never throws (a failed consume only risks the
+ * cross-device localStorage flag being the sole guard, which was the status
+ * quo before the latch existed).
+ */
+export async function markPurchaseTracked(orderNumber: string, phoneLast4?: string): Promise<void> {
+  try {
+    if (phoneLast4) {
+      await fetch(buildUrl(`/orders/${encodeURIComponent(orderNumber)}/purchase-tracked`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+        body: JSON.stringify({ phone: phoneLast4 }),
+        cache: 'no-store',
+      });
+      return;
+    }
+    const token = getToken();
+    if (!token) return;
+    await fetch(buildUrl(`/customer/orders/${encodeURIComponent(orderNumber)}/purchase-tracked`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json', Authorization: `Bearer ${token}` },
+      body: JSON.stringify({}),
+      cache: 'no-store',
+    });
+  } catch {
+    /* best-effort — see doc block */
+  }
+}
+
 // ──────────────────────────────────────────────────────────────
 // Live-search autosuggest (browser-side)
 // ──────────────────────────────────────────────────────────────
@@ -356,17 +389,56 @@ export async function suggestProducts(q: string, signal?: AbortSignal): Promise<
 // ──────────────────────────────────────────────────────────────
 
 /**
+ * Compose the checkout's Idempotency-Key: a PER-BROWSER stable seed + a hash
+ * of the submitted content (phone + lines). The server treats the header as
+ * the full dedup identity (it REPLACES the content fingerprint), so the seed
+ * must be shared across tabs — a per-mount seed would let two tabs with the
+ * same cart create two real orders. With the browser-stable seed:
+ * double-tap, bfcache resubmit, and a second tab all produce the SAME key
+ * for the same cart (→ one order, one Purchase, matching the old
+ * fingerprint semantics), while an EDITED cart changes the content part and
+ * rightly creates a new order. An intentional identical reorder works after
+ * the server's 90s window — also unchanged. `mountFallback` covers blocked
+ * localStorage (private mode): per-mount is the best identity available.
+ */
+export function orderIdempotencyKey(
+  mountFallback: string,
+  input: { customer_phone: string; items: { product_id: number; variant_index: number | null; quantity: number }[] },
+): string {
+  let seed: string | null = null;
+  try {
+    seed = localStorage.getItem('replybd:idem-seed');
+    if (!seed) {
+      seed = mountFallback;
+      localStorage.setItem('replybd:idem-seed', seed);
+    }
+  } catch {
+    seed = mountFallback;
+  }
+  const s = input.customer_phone + '|' + JSON.stringify(input.items);
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return seed + '-' + (h >>> 0).toString(36);
+}
+
+/**
  * Submit a checkout. Called from the browser, so uses `cache: 'no-store'`
  * and reads the API base from `import.meta.env.PUBLIC_*` (Vite inlines
  * these at build time, same way Next.js inlined `NEXT_PUBLIC_*`).
+ *
+ * `idempotencyKey` (see orderIdempotencyKey) rides as the server's
+ * `Idempotency-Key` header: concurrent double-taps and bfcache resubmits
+ * collapse to ONE order server-side even beyond the fingerprint window —
+ * which is what keeps the Purchase event count at exactly one per real order.
  */
-export async function submitOrder(input: CreateOrderInput): Promise<OrderResponse> {
+export async function submitOrder(input: CreateOrderInput, idempotencyKey?: string): Promise<OrderResponse> {
   const url = buildUrl('/orders');
   const res = await fetch(url, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Accept: 'application/json',
+      ...(idempotencyKey ? { 'Idempotency-Key': idempotencyKey } : {}),
       ...(input.cf_turnstile_response ? { 'cf-turnstile-response': input.cf_turnstile_response } : {}),
     },
     body: JSON.stringify(input),
