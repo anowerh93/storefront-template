@@ -13,6 +13,7 @@
 import '../styles.css';
 import { getStorefront } from '../lib/api';
 import { brandCssVars } from '../lib/theme';
+import { isMirrorHost, MIRROR_HOST_SUFFIXES } from '../lib/mirror';
 import type { StorefrontMeta } from '../lib/types';
 
 export interface Props {
@@ -106,10 +107,37 @@ const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;
 // Pathname only (query stripped); skipped on noindex pages — a canonical
 // on a page that says "don't index me" is a mixed signal.
 const canonicalBase = (meta?.public_url ?? '').replace(/\/+$/, '');
+
+// Mirror hosts ({slug}.shop.reply.bd / *.pages.dev while a custom domain is
+// live) get a hard noindex: canonicals alone did not stop Google indexing
+// the subdomain mirror next to the real domain. SSR pages detect it here
+// (Astro.url is the live request); prerendered pages (home/about) render at
+// build time with a localhost URL — isMirrorHost() returns false there, and
+// the inline runtime check below covers them in the browser instead.
+const mirror = isMirrorHost(Astro.url.hostname, meta?.public_url);
+if (mirror) {
+  try {
+    Astro.response.headers.set('X-Robots-Tag', 'noindex, nofollow');
+  } catch { /* prerendered context — the meta tag / runtime check covers it */ }
+}
+
 const canonical =
-  canonicalBase && !noindex && !meta?.seo?.discourage
+  canonicalBase && !noindex && !meta?.seo?.discourage && !mirror
     ? canonicalBase + (Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, ''))
     : null;
+
+// Runtime mirror check for PRERENDERED pages: the static HTML is byte-equal
+// on every host, so the noindex decision must happen in the browser (Google
+// renders JS and honors an injected robots meta). No-ops on the canonical
+// host and on SSR pages (the server already emitted the tag → querySelector
+// guard). Kept dependency-free and inline so it runs before render finishes.
+// STRUCTURAL: it only ever fires on known platform-mirror suffixes
+// (MIRROR_HOST_SUFFIXES) — the baked canonical host goes stale the moment a
+// tenant's domain setup changes, and a bare "host ≠ baked canonical" would
+// noindex their freshly-verified REAL domain until the healing redeploy.
+const mirrorRuntimeCheck = canonicalBase
+  ? `(function(){try{var n=function(h){return (h||'').toLowerCase().replace(/\\.$/,'').replace(/^www\\./,'')};var p=n(new URL(${JSON.stringify(canonicalBase)}).hostname);var r=n(location.hostname);if(!p||!r||r===p)return;if(!${JSON.stringify(MIRROR_HOST_SUFFIXES)}.some(function(s){return r.length>s.length&&r.slice(-s.length)===s}))return;if(document.querySelector('meta[name="robots"]'))return;var m=document.createElement('meta');m.name='robots';m.content='noindex, nofollow';document.head.appendChild(m);var c=document.querySelector('link[rel="canonical"]');if(c)c.remove();}catch(e){}})();`
+  : null;
 
 // JSON-LD: escape `<` so user-authored content (review bodies, FAQ answers)
 // can never break out of the script tag.
@@ -123,10 +151,12 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{finalTitle}</title>
     {finalDescription && <meta name="description" content={finalDescription} />}
-    {/* noindex: per-page (funnels) OR the tenant's WordPress-style
-        "discourage search engines" toggle (build/demo mode). */}
-    {(noindex || meta?.seo?.discourage) && <meta name="robots" content="noindex,nofollow" />}
+    {/* noindex: per-page (funnels), the tenant's WordPress-style "discourage
+        search engines" toggle (build/demo mode), OR a mirror host serving a
+        site whose canonical home is a custom domain. */}
+    {(noindex || meta?.seo?.discourage || mirror) && <meta name="robots" content="noindex,nofollow" />}
     {canonical && <link rel="canonical" href={canonical} />}
+    {mirrorRuntimeCheck && <script is:inline set:html={mirrorRuntimeCheck} />}
 
     {/* Search-engine ownership verification (Google Search Console / Bing).
         Rendered even in discourage mode — tenants verify BEFORE launch. */}

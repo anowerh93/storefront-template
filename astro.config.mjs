@@ -26,6 +26,11 @@ export default defineConfig({
   ],
   vite: {
     plugins: [tailwindcss()],
+    // DEV ONLY: accept any Host header so host-dependent behavior (the
+    // mirror-host noindex in Base.astro) can be exercised locally with
+    // `curl -H "Host: {slug}.shop.reply.bd" http://127.0.0.1:4321/…`.
+    // Ignored by `astro build` — production runs on Cloudflare, not Vite.
+    server: { allowedHosts: true },
     // Astro's CF adapter targets the workerd runtime which doesn't have a
     // node: module surface. These aliases mute the warnings on packages that
     // import them defensively (lucide-react does this).

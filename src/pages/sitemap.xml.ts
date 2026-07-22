@@ -1,5 +1,6 @@
 import type { APIRoute } from 'astro';
-import { getSitemap, type SitemapPage } from '../lib/api';
+import { getSitemap, getStorefront, type SitemapPage } from '../lib/api';
+import { isMirrorHost } from '../lib/mirror';
 
 /**
  * Per-tenant sitemap.xml — SSR (like robots.txt.ts) so it always reflects
@@ -27,8 +28,19 @@ export const GET: APIRoute = async ({ url }) => {
   // payloads; entries simply omit the block.
   let pages: SitemapPage[] = [];
   try {
-    const data = await getSitemap();
-    pages = data?.pages ?? [];
+    // MIRROR hosts ({slug}.shop.reply.bd / *.pages.dev while a custom domain
+    // is live) serve an EMPTY urlset: every page there is noindex, and
+    // Google's same-host rule forbids listing the canonical domain's URLs in
+    // a sitemap fetched from a different host. Subdomain-only tenants are
+    // unaffected — their host IS public_url. The meta fetch deliberately has
+    // NO inner catch: if it fails we can't rule out being a mirror, so fall
+    // through to the outer catch's empty urlset (fail-closed) instead of
+    // serving a full mirror-origin URL list off a warm /sitemap cache entry.
+    const meta = await getStorefront();
+    if (!isMirrorHost(url.hostname, meta?.public_url)) {
+      const data = await getSitemap();
+      pages = data?.pages ?? [];
+    }
   } catch {
     // API unreachable — serve an empty urlset rather than a 500; crawlers
     // treat a broken sitemap as a site-quality signal.
