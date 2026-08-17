@@ -74,7 +74,9 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
                   className="flex items-start gap-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                    {l.image_url && <FitImage src={l.image_url} alt={l.name} />}
+                    {/* sizes: fixed 80px thumb — the 100vw default made phones
+                        fetch the 1024w variant for this box. */}
+                    {l.image_url && <FitImage src={l.image_url} alt={l.name} sizes="80px" />}
                   </div>
 
                   <div className="min-w-0 flex-1">

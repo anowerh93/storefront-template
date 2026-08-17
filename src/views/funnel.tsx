@@ -18,7 +18,7 @@ import { mintEventId, pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { CertSlider } from '../components/ui/cert-slider';
-import { cdnBlurThumb, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
+import { cdnBlurThumb, cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -151,6 +151,13 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
     }
   };
 
+  // The FIRST visible section (normally the hero) must never render hidden:
+  // Reveal SSRs its children at opacity-0 until the island hydrates + the
+  // IntersectionObserver fires, which makes LCP wait for the FULL JS bundle —
+  // that alone cost ~35 PageSpeed points on funnels. Below-fold sections keep
+  // the scroll-in animation (they're off-screen at first paint anyway).
+  let firstVisibleSection = true;
+
   return (
     <div className={fontClass}>
       {/* No site header/nav — a funnel is a standalone landing page that opens
@@ -159,6 +166,8 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         {order.map((key: string) => {
           const node = renderBlock(key);
           if (!node) return null;
+          const isFirst = firstVisibleSection;
+          firstVisibleSection = false;
           const bg = (config as unknown as Record<string, SectionBgFields>)[key];
           // Every section with a background spans the full viewport width on
           // wide screens (edge-to-edge band, teachek-style); the split hero
@@ -168,7 +177,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
           // SectionBg owns the per-section vertical spacing now (it pads inside
           // the band, so "Top: None" makes the hero flush — no outer wrapper).
           return (
-            <Reveal key={key} enabled={config.animate !== false}>
+            <Reveal key={key} enabled={config.animate !== false && !isFirst}>
               <SectionBg bg={bg} bleed={bleed}>{node}</SectionBg>
             </Reveal>
           );
@@ -332,7 +341,10 @@ function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; blee
     has = true;
   } else if (t === 'image' && bg!.bg_image_url) {
     style = {
-      backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(bg!.bg_image_url)})`,
+      // cdnImage: CSS backgrounds bypass srcset, so without this the RAW
+      // (up to 1920px) original downloads. 1600w covers a full-bleed band on
+      // desktop; cdnImage passes through untouched when resizing is off.
+      backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(cdnImage(bg!.bg_image_url, 1600))})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
     };
@@ -384,7 +396,8 @@ function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; pro
     : slides.length === 1
       ? (
         <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
-          <FitImage src={slides[0]} alt={product.name} eager sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
+          {/* fetchPriority: this IS the LCP image of the ad landing page. */}
+          <FitImage src={slides[0]} alt={product.name} eager fetchPriority="high" sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
         </div>
       )
       : null;
@@ -434,9 +447,17 @@ function Hero({ config, product, btn }: { config: FunnelBlockConfig['hero']; pro
   );
 }
 
-/* Auto-fading hero image slider (client island, so JS is fine). */
+/* Auto-fading hero image slider (client island, so JS is fine).
+   Slides 2..n are stacked absolutely INSIDE the visible hero box, so
+   loading="lazy" never defers them (they intersect the viewport at load) —
+   every slide used to download during the LCP window. Fix: SSR/first-paint
+   renders ONLY slide 1 (the LCP); the rest mount after hydration, off the
+   critical path. Non-JS ad traffic simply sees slide 1 — the slider needs JS
+   to advance anyway. */
 function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
   const [i, setI] = useState(0);
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => setHydrated(true), []);
   useEffect(() => {
     if (images.length <= 1) return;
     const t = setInterval(() => setI((p) => (p + 1) % images.length), 3500);
@@ -445,8 +466,11 @@ function HeroSlider({ images, alt }: { images: string[]; alt: string }) {
   return (
     <div className="relative aspect-[4/3] overflow-hidden rounded-2xl bg-slate-100 ring-1 ring-slate-200">
       {images.map((src, idx) => (
-        <img key={idx} src={src} srcSet={cdnSrcSet(src, DETAIL_WIDTHS)} sizes={cdnSrcSet(src, DETAIL_WIDTHS) ? DETAIL_SIZES : undefined} alt={alt} loading={idx === 0 ? 'eager' : 'lazy'}
-             className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${idx === i ? 'opacity-100' : 'opacity-0'}`} />
+        (idx === 0 || hydrated) ? (
+          <img key={idx} src={src} srcSet={cdnSrcSet(src, DETAIL_WIDTHS)} sizes={cdnSrcSet(src, DETAIL_WIDTHS) ? DETAIL_SIZES : undefined} alt={alt}
+               loading={idx === 0 ? 'eager' : 'lazy'} decoding="async" fetchPriority={idx === 0 ? 'high' : undefined}
+               className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-700 ${idx === i ? 'opacity-100' : 'opacity-0'}`} />
+        ) : null
       ))}
       <div className="absolute inset-x-0 bottom-3 flex justify-center gap-1.5">
         {images.map((_, idx) => (
@@ -533,7 +557,9 @@ function ReviewScreenshots({ images }: { images: string[] }) {
     return (
       <div className="mx-auto max-w-xs">
         <div className="relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-xl ring-1 ring-slate-200">
-          <img src={cdnBlurThumb(images[0])} aria-hidden="true" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
+          {/* lazy: decorative blur layer, below the fold — an eager <img> also
+              makes React 19's SSR emit a head preload competing with the hero. */}
+          <img src={cdnBlurThumb(images[0])} aria-hidden="true" loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl" />
           <img src={images[0]} srcSet={cdnSrcSet(images[0])} sizes={cdnSrcSet(images[0]) ? '(min-width: 640px) 420px, 90vw' : undefined} alt="Customer review" loading="lazy" className="relative z-[1] h-full w-full object-contain" />
         </div>
       </div>
@@ -563,7 +589,7 @@ function ReviewScreenshots({ images }: { images: string[] }) {
                   so nothing is cropped regardless of the upload's dimensions. */}
               <div className="cf-card relative aspect-[4/5] overflow-hidden rounded-2xl bg-slate-100 shadow-2xl ring-1 ring-slate-200 will-change-transform"
                    style={{ transformOrigin: 'center center' }}>
-                <img src={cdnBlurThumb(src)} aria-hidden="true" draggable={false} className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
+                <img src={cdnBlurThumb(src)} aria-hidden="true" draggable={false} loading="lazy" decoding="async" className="pointer-events-none absolute inset-0 h-full w-full scale-110 select-none object-cover opacity-50 blur-2xl" />
                 <img src={src} srcSet={cdnSrcSet(src)} sizes={cdnSrcSet(src) ? '(min-width: 640px) 300px, 45vw' : undefined} alt={`Customer review ${i + 1}`} loading="lazy" draggable={false} className="relative z-[1] h-full w-full select-none object-contain" />
                 <div className="cf-shade pointer-events-none absolute inset-0 z-[2] bg-slate-900" style={{ opacity: 0 }} />
               </div>

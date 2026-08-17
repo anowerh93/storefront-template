@@ -147,7 +147,8 @@ function ProductGallery({ product, activeImage }: { product: ProductDetail; acti
         </div>
       )}
       <div className="relative aspect-square flex-1 overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200">
-        <FitImage src={urls[active]} alt={product.name} eager sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
+        {/* fetchPriority: the PDP's LCP image, same as the funnel hero. */}
+        <FitImage src={urls[active]} alt={product.name} eager fetchPriority="high" sizes={DETAIL_SIZES} widths={DETAIL_WIDTHS} />
       </div>
     </div>
   );

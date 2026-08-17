@@ -568,7 +568,8 @@ export function CheckoutPage({
                   {lines.map((l) => (
                     <li key={`${l.product_id}:${l.variant_index ?? '-'}`} className="flex items-start gap-3 py-4">
                       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                        {l.image_url && <FitImage src={l.image_url} alt={l.name} />}
+                        {/* sizes: fixed 64px thumb — see cart.tsx. */}
+                        {l.image_url && <FitImage src={l.image_url} alt={l.name} sizes="64px" />}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-slate-900 line-clamp-2">{l.name}</p>

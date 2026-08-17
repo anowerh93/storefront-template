@@ -129,9 +129,13 @@ function CertCard({ item, index = 0 }: { item: CertSlide; index?: number }) {
   return (
     <figure>
       <div className="relative aspect-[3/4] overflow-hidden rounded-2xl bg-slate-100 shadow-lg ring-1 ring-slate-200">
+        {/* lazy: decorative blur layer — an eager <img> also makes React 19's
+            SSR emit a head preload competing with the page's LCP image. */}
         <img
           src={cdnBlurThumb(item.url)}
           aria-hidden="true"
+          loading="lazy"
+          decoding="async"
           className="pointer-events-none absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
         />
         <img

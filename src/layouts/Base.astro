@@ -13,6 +13,7 @@
 import '../styles.css';
 import { getStorefront } from '../lib/api';
 import { brandCssVars } from '../lib/theme';
+import { CDN_HOST } from '../lib/img';
 import { isMirrorHost, MIRROR_HOST_SUFFIXES } from '../lib/mirror';
 import type { StorefrontMeta } from '../lib/types';
 
@@ -177,6 +178,11 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
     <meta name="twitter:card" content={finalOgImage ? 'summary_large_image' : 'summary'} />
 
     {favicon && <link rel="icon" href={favicon} />}
+
+    {/* Warm the image-CDN connection early — the LCP hero lives on this host,
+        and without a preconnect the browser pays DNS+TCP+TLS for it only after
+        HTML parse. No crossorigin: plain <img> fetches are non-CORS. */}
+    <link rel="preconnect" href={`https://${CDN_HOST}`} />
 
     {/* Inter font, loaded ASYNC so first paint isn't blocked. A plain
         stylesheet <link> blocks rendering until Google's CSS arrives —

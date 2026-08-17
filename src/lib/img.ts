@@ -27,7 +27,7 @@
 // PUBLIC_IMAGE_TRANSFORMS=0 (direct build env).
 const RAW = ((import.meta.env.PUBLIC_IMAGE_RESIZE ?? import.meta.env.PUBLIC_IMAGE_TRANSFORMS) ?? '') as string;
 const ENABLED = RAW === '1' || (RAW !== '0' && !import.meta.env.DEV);
-const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undefined) || 'cdn.reply.bd';
+export const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undefined) || 'cdn.reply.bd';
 
 /** Default srcset width ladder for fluid images (FitImage etc.). */
 export const DEFAULT_WIDTHS = [320, 640, 1024] as const;
@@ -41,9 +41,12 @@ export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
  *  right column on desktop — MUST mirror hero-grid's tile wrapper
  *  (grid-cols-1 sm:grid-cols-2 lg:grid-cols-1) or phones fetch half-size. */
 export const TILE_SIZES = '(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw';
-/** Funnel + PDP main image — the LCP of ad landing pages. */
+/** Funnel + PDP main image — the LCP of ad landing pages.
+ *  The middle band caps at 672px because the centred funnel hero is
+ *  max-w-2xl — a bare 100vw made ~1000px tablets fetch the 1200w
+ *  candidate for a 672px box. */
 export const DETAIL_WIDTHS = [480, 828, 1200] as const;
-export const DETAIL_SIZES = '(min-width: 1024px) 600px, 100vw';
+export const DETAIL_SIZES = '(min-width: 1024px) 600px, (min-width: 672px) 672px, 100vw';
 
 /** Is this a URL the CDN can transform (right host, not already transformed)? */
 function transformable(url: string): URL | null {
