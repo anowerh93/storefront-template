@@ -692,7 +692,15 @@ export function CheckoutPage({
                         name="payment_method"
                         value="online"
                         checked={payMethod === 'online'}
-                        onChange={() => setPayMethod('online')}
+                        onChange={() => {
+                          setPayMethod('online');
+                          // The advance box unmounts for online payment — a
+                          // half-typed last-4 left behind would block submit
+                          // on a field the shopper can no longer see (the
+                          // hidden-required-field bug class, see onInvalid).
+                          form.setValue('advance_sender_last4', '');
+                          form.clearErrors('advance_sender_last4');
+                        }}
                         className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-brand-600 focus:ring-brand-500"
                       />
                       <span className="flex items-start gap-3">
