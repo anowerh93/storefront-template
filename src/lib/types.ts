@@ -81,6 +81,20 @@ export type StorefrontMeta = {
     free_shipping_threshold: number | null;
     zones: ShippingZone[];
   };
+  /** Checkout form extras — tenant-opt-in জেলা/থানা fields. Optional for
+   *  cached payloads that predate the field (treat absent as disabled). */
+  checkout?: { district_enabled: boolean };
+  /** Manual bKash/Nagad/Rocket advance policy — null/absent when inactive.
+   *  The numbers are rendered VERBATIM (never re-typed or reformatted); the
+   *  authoritative amount is stamped server-side at order create, these
+   *  charge/threshold/extra values only drive the checkout display. */
+  advance_payment?: {
+    delivery_charge: number;
+    threshold: number | null;
+    extra_amount: number;
+    numbers: { bkash?: string; nagad?: string; rocket?: string };
+    note: string | null;
+  } | null;
   seo: {
     title: string | null;
     description: string | null;
@@ -616,6 +630,12 @@ export type CreateOrderInput = {
   customer_email?: string | null;
   address: string;
   customer_city?: string | null;
+  /** থানা (sub-district) — sent only when meta.checkout.district_enabled. */
+  thana?: string | null;
+  /** Advance flow: last 4 digits of the wallet number the customer sent —
+   *  or will send — money from. Optional; Bengali numerals fine (the server
+   *  normalizes, and reduces a pasted full number to its last 4). */
+  advance_sender_last4?: string | null;
   shipping_zone?: string;       // 'inside_city' | 'outside_city'
   notes?: string;
   // Multi-product cart. The API also still accepts the legacy flat
@@ -650,6 +670,10 @@ export type OrderResponse = {
   shipping_fee: number;
   total: number;
   currency: string;
+  /** Server-STAMPED advance for this order (COD + active policy only; null/
+   *  absent otherwise). `due` is already 0 when the money had arrived before
+   *  the order and the ledger auto-matched at creation. */
+  advance?: { expected: number; due: number } | null;
   // From POST /orders:
   message?: string;
   duplicate?: boolean;

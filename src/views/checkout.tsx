@@ -10,6 +10,7 @@ import { formatBDT } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
+import { AdvancePaymentBox, DistrictThanaFields, advanceAmountFor } from '../components/order/checkout-extras';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -50,6 +51,15 @@ function makeCheckoutSchema(requireZone: boolean) {
     // ''), so the API's `nullable|email` rule treats it as absent rather than a
     // malformed email that would 422 and silently block Place Order.
     customer_email:   z.string().trim().email('Enter a valid email address').optional().or(z.literal('')),
+    // Tenant-opt-in জেলা/থানা — free text (the datalist only suggests).
+    customer_city:    z.string().max(120).optional(),
+    thana:            z.string().max(120).optional(),
+    // Advance flow sender last-4 — optional; when filled it must carry at
+    // least 4 digits (Bengali numerals count; the server keeps the last 4).
+    advance_sender_last4: z.string().max(32).optional().refine(
+      (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
+      'কমপক্ষে ৪টি ডিজিট দিন',
+    ),
     shipping_zone:    z.string().optional(),
     notes:            z.string().max(500).optional(),
     // Phase 1 opt-in account creation. Password is only required (min 6) when
@@ -197,6 +207,27 @@ export function CheckoutPage({
     });
   }, [hydrated, lines.length]);
 
+  // Whether the advance box is actually on screen: COD + an active policy
+  // whose computed amount for THIS subtotal is > 0. A policy with a zero
+  // delivery charge + a threshold-only extra makes the box appear and vanish
+  // as the cart subtotal crosses the threshold (qty steppers, line removal) —
+  // so this is derived, not just `meta.advance_payment != null`. Computed
+  // from `lines` (available pre-early-return) so the clear-effect below can
+  // sit above the hook-count guard, same discipline as the GA4 effect.
+  const advancePolicy = payMethod === 'cod' ? meta?.advance_payment ?? null : null;
+  const advanceSubtotalLive = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
+  const advanceVisible = !!(advancePolicy && advanceAmountFor(advancePolicy, advanceSubtotalLive) > 0);
+  // When the box leaves the screen (payment switch, or the subtotal drops back
+  // under the threshold), drop any half-typed last-4 so a stale value in a
+  // now-hidden field can't fail the ≥4-digit rule and dead-end Place Order —
+  // the hidden-required-field bug class this file already guards for payMethod.
+  useEffect(() => {
+    if (!advanceVisible) {
+      form.setValue('advance_sender_last4', '');
+      form.clearErrors('advance_sender_last4');
+    }
+  }, [advanceVisible]);
+
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
   // out" — NOT cart mode (which would surface the shopper's persisted cart for
@@ -251,6 +282,15 @@ export function CheckoutPage({
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
+  // Advance applies to COD only, and only when the policy owes something for
+  // THIS subtotal (advanceVisible, computed above) — a zero-amount policy row
+  // must not render the box or promise an advance in the COD copy.
+  const advance = advanceVisible ? advancePolicy : null;
+  // Whether a COD order at this subtotal carries an advance — used for the COD
+  // OPTION copy, which describes Cash-on-Delivery regardless of which method is
+  // currently selected (so it must not gate on payMethod like `advance` does).
+  const codHasAdvance = !!(meta.advance_payment && advanceAmountFor(meta.advance_payment, subtotal) > 0);
+  const districtEnabled = !!meta.checkout?.district_enabled;
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
     ? 0
@@ -296,6 +336,10 @@ export function CheckoutPage({
         customer_phone: values.customer_phone,
         customer_email: values.customer_email || undefined,
         address:        values.customer_address,
+        customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
+        thana:          districtEnabled ? values.thana || undefined : undefined,
+        // Only when the advance box was actually on screen (COD + policy).
+        advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
         items: lines.map((l) => ({
@@ -458,6 +502,9 @@ export function CheckoutPage({
       customer_address: 'delivery address',
       customer_phone:   'phone number',
       customer_email:   'email address',
+      customer_city:    'জেলা',
+      thana:            'থানা',
+      advance_sender_last4: 'অগ্রিম পেমেন্টের শেষ ৪ ডিজিট',
       shipping_zone:    'delivery area',
       password:         'password',
       notes:            'order notes',
@@ -501,6 +548,13 @@ export function CheckoutPage({
                   <Textarea id="co-address" placeholder="House/road, area, district…" {...form.register('customer_address')} className="mt-1.5" />
                   {form.formState.errors.customer_address && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_address.message}</p>}
                 </div>
+                {districtEnabled && (
+                  <DistrictThanaFields
+                    idPrefix="co"
+                    districtField={form.register('customer_city')}
+                    thanaField={form.register('thana')}
+                  />
+                )}
                 <div>
                   <Label htmlFor="co-phone">Phone <span className="text-rose-500">*</span></Label>
                   <Input id="co-phone" placeholder="01XXXXXXXXX" inputMode="tel" {...form.register('customer_phone')} className="mt-1.5" />
@@ -650,7 +704,11 @@ export function CheckoutPage({
                         <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
                         <span>
                           <span className="block text-sm font-semibold text-slate-900">Cash on Delivery</span>
-                          <span className="block text-xs text-slate-500">Pay when your order arrives. No upfront payment needed.</span>
+                          <span className="block text-xs text-slate-500">
+                            {codHasAdvance
+                              ? 'অগ্রিম পাঠিয়ে কনফার্ম — বাকি টাকা ডেলিভারিতে।'
+                              : 'Pay when your order arrives. No upfront payment needed.'}
+                          </span>
                         </span>
                       </span>
                     </label>
@@ -660,7 +718,15 @@ export function CheckoutPage({
                         name="payment_method"
                         value="online"
                         checked={payMethod === 'online'}
-                        onChange={() => setPayMethod('online')}
+                        onChange={() => {
+                          setPayMethod('online');
+                          // The advance box unmounts for online payment — a
+                          // half-typed last-4 left behind would block submit
+                          // on a field the shopper can no longer see (the
+                          // hidden-required-field bug class, see onInvalid).
+                          form.setValue('advance_sender_last4', '');
+                          form.clearErrors('advance_sender_last4');
+                        }}
                         className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-brand-600 focus:ring-brand-500"
                       />
                       <span className="flex items-start gap-3">
@@ -677,8 +743,25 @@ export function CheckoutPage({
                     <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
                     <div>
                       <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
-                      <p className="text-xs text-brand-700">Pay when your order arrives. No upfront payment needed.</p>
+                      <p className="text-xs text-brand-700">
+                        {codHasAdvance
+                          ? 'অগ্রিম পাঠিয়ে অর্ডার কনফার্ম করুন — বাকি টাকা ডেলিভারিতে দেবেন।'
+                          : 'Pay when your order arrives. No upfront payment needed.'}
+                      </p>
                     </div>
+                  </div>
+                )}
+
+                {advance && (
+                  <div className="mt-4">
+                    <AdvancePaymentBox
+                      idPrefix="co"
+                      advance={advance}
+                      subtotal={subtotal}
+                      currency={currency}
+                      last4Field={form.register('advance_sender_last4')}
+                      last4Error={form.formState.errors.advance_sender_last4?.message}
+                    />
                   </div>
                 )}
 
