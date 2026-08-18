@@ -24,7 +24,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Button } from '../components/ui/button';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { AdvancePaymentBox, DistrictThanaFields } from '../components/order/checkout-extras';
+import { AdvancePaymentBox, DistrictThanaFields, advanceAmountFor } from '../components/order/checkout-extras';
 
 /**
  * Ad funnel landing page (/{slug}). Renders the tenant's block config in
@@ -64,7 +64,7 @@ function makeOrderSchema(requireZone: boolean) {
     customer_city:    z.string().max(120).optional(),
     thana:            z.string().max(120).optional(),
     // Advance sender last-4 — optional; ≥4 digits when filled (Bengali ok).
-    advance_sender_last4: z.string().max(14).optional().refine(
+    advance_sender_last4: z.string().max(32).optional().refine(
       (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
       'কমপক্ষে ৪টি ডিজিট দিন',
     ),
@@ -919,10 +919,24 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled ? 0 : (threshold && subtotal >= threshold ? 0 : (zone?.fee ?? 0));
   const total = subtotal + shippingFee;
-  // Funnels are COD-only, so an active advance policy always applies here.
+  // Funnels are COD-only, so an active policy applies — but only when it owes
+  // something for THIS subtotal. A zero-charge, threshold-only policy makes the
+  // box appear/vanish as the qty stepper crosses the threshold; gate on the
+  // computed amount so the box (and the last-4 requirement) tracks that.
   // Absent on old cached payloads → box simply hidden.
-  const advance = meta.advance_payment ?? null;
+  const advancePolicy = meta.advance_payment ?? null;
+  const advance = advancePolicy && advanceAmountFor(advancePolicy, subtotal) > 0 ? advancePolicy : null;
   const districtEnabled = !!meta.checkout?.district_enabled;
+
+  // When the advance box leaves the screen (qty drops back under the threshold),
+  // drop any half-typed last-4 so a stale value in a now-hidden field can't fail
+  // the ≥4-digit rule and dead-end the order button (hidden-required-field class).
+  useEffect(() => {
+    if (!advance) {
+      form.setValue('advance_sender_last4', '');
+      form.clearErrors('advance_sender_last4');
+    }
+  }, [!advance]);
 
   async function onSubmit(values: FormData) {
     if (inflight.current) return;

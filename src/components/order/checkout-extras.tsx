@@ -116,10 +116,15 @@ export function AdvancePaymentBox({
           আপনি যে নম্বর থেকে টাকা পাঠিয়েছেন বা পাঠাবেন, তার শেষের ৪ ডিজিট{' '}
           <span className="font-normal text-amber-700">(ঐচ্ছিক)</span>
         </Label>
+        {/* Cap matches the server's max:32, NOT 4: shoppers routinely paste a
+            full number despite the label, and the server keeps its last 4. A
+            tighter cap would clip a spaced/hyphenated international number to
+            the WRONG last 4 (e.g. "+880 1712-345678" → "…3456"), stranding
+            auto-verify. */}
         <Input
           id={`${idPrefix}-adv-last4`}
           inputMode="numeric"
-          maxLength={14}
+          maxLength={32}
           placeholder="যেমন: ৪৬৭১"
           autoComplete="off"
           {...last4Field}

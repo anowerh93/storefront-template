@@ -10,7 +10,7 @@ import { formatBDT } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
-import { AdvancePaymentBox, DistrictThanaFields } from '../components/order/checkout-extras';
+import { AdvancePaymentBox, DistrictThanaFields, advanceAmountFor } from '../components/order/checkout-extras';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -56,7 +56,7 @@ function makeCheckoutSchema(requireZone: boolean) {
     thana:            z.string().max(120).optional(),
     // Advance flow sender last-4 — optional; when filled it must carry at
     // least 4 digits (Bengali numerals count; the server keeps the last 4).
-    advance_sender_last4: z.string().max(14).optional().refine(
+    advance_sender_last4: z.string().max(32).optional().refine(
       (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
       'কমপক্ষে ৪টি ডিজিট দিন',
     ),
@@ -207,6 +207,27 @@ export function CheckoutPage({
     });
   }, [hydrated, lines.length]);
 
+  // Whether the advance box is actually on screen: COD + an active policy
+  // whose computed amount for THIS subtotal is > 0. A policy with a zero
+  // delivery charge + a threshold-only extra makes the box appear and vanish
+  // as the cart subtotal crosses the threshold (qty steppers, line removal) —
+  // so this is derived, not just `meta.advance_payment != null`. Computed
+  // from `lines` (available pre-early-return) so the clear-effect below can
+  // sit above the hook-count guard, same discipline as the GA4 effect.
+  const advancePolicy = payMethod === 'cod' ? meta?.advance_payment ?? null : null;
+  const advanceSubtotalLive = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
+  const advanceVisible = !!(advancePolicy && advanceAmountFor(advancePolicy, advanceSubtotalLive) > 0);
+  // When the box leaves the screen (payment switch, or the subtotal drops back
+  // under the threshold), drop any half-typed last-4 so a stale value in a
+  // now-hidden field can't fail the ≥4-digit rule and dead-end Place Order —
+  // the hidden-required-field bug class this file already guards for payMethod.
+  useEffect(() => {
+    if (!advanceVisible) {
+      form.setValue('advance_sender_last4', '');
+      form.clearErrors('advance_sender_last4');
+    }
+  }, [advanceVisible]);
+
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
   // out" — NOT cart mode (which would surface the shopper's persisted cart for
@@ -261,9 +282,14 @@ export function CheckoutPage({
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
-  // Advance policy applies to COD only — an online payment collects the full
-  // total at the gateway. Absent on old cached payloads → simply hidden.
-  const advance = payMethod === 'cod' ? meta.advance_payment ?? null : null;
+  // Advance applies to COD only, and only when the policy owes something for
+  // THIS subtotal (advanceVisible, computed above) — a zero-amount policy row
+  // must not render the box or promise an advance in the COD copy.
+  const advance = advanceVisible ? advancePolicy : null;
+  // Whether a COD order at this subtotal carries an advance — used for the COD
+  // OPTION copy, which describes Cash-on-Delivery regardless of which method is
+  // currently selected (so it must not gate on payMethod like `advance` does).
+  const codHasAdvance = !!(meta.advance_payment && advanceAmountFor(meta.advance_payment, subtotal) > 0);
   const districtEnabled = !!meta.checkout?.district_enabled;
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
@@ -679,7 +705,7 @@ export function CheckoutPage({
                         <span>
                           <span className="block text-sm font-semibold text-slate-900">Cash on Delivery</span>
                           <span className="block text-xs text-slate-500">
-                            {meta.advance_payment
+                            {codHasAdvance
                               ? 'অগ্রিম পাঠিয়ে কনফার্ম — বাকি টাকা ডেলিভারিতে।'
                               : 'Pay when your order arrives. No upfront payment needed.'}
                           </span>
@@ -718,7 +744,7 @@ export function CheckoutPage({
                     <div>
                       <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
                       <p className="text-xs text-brand-700">
-                        {advance
+                        {codHasAdvance
                           ? 'অগ্রিম পাঠিয়ে অর্ডার কনফার্ম করুন — বাকি টাকা ডেলিভারিতে দেবেন।'
                           : 'Pay when your order arrives. No upfront payment needed.'}
                       </p>
