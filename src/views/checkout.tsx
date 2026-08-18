@@ -10,6 +10,7 @@ import { formatBDT } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
+import { AdvancePaymentBox, DistrictThanaFields } from '../components/order/checkout-extras';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -50,6 +51,15 @@ function makeCheckoutSchema(requireZone: boolean) {
     // ''), so the API's `nullable|email` rule treats it as absent rather than a
     // malformed email that would 422 and silently block Place Order.
     customer_email:   z.string().trim().email('Enter a valid email address').optional().or(z.literal('')),
+    // Tenant-opt-in জেলা/থানা — free text (the datalist only suggests).
+    customer_city:    z.string().max(120).optional(),
+    thana:            z.string().max(120).optional(),
+    // Advance flow sender last-4 — optional; when filled it must carry at
+    // least 4 digits (Bengali numerals count; the server keeps the last 4).
+    advance_sender_last4: z.string().max(14).optional().refine(
+      (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
+      'কমপক্ষে ৪টি ডিজিট দিন',
+    ),
     shipping_zone:    z.string().optional(),
     notes:            z.string().max(500).optional(),
     // Phase 1 opt-in account creation. Password is only required (min 6) when
@@ -251,6 +261,10 @@ export function CheckoutPage({
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
+  // Advance policy applies to COD only — an online payment collects the full
+  // total at the gateway. Absent on old cached payloads → simply hidden.
+  const advance = payMethod === 'cod' ? meta.advance_payment ?? null : null;
+  const districtEnabled = !!meta.checkout?.district_enabled;
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
     ? 0
@@ -296,6 +310,10 @@ export function CheckoutPage({
         customer_phone: values.customer_phone,
         customer_email: values.customer_email || undefined,
         address:        values.customer_address,
+        customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
+        thana:          districtEnabled ? values.thana || undefined : undefined,
+        // Only when the advance box was actually on screen (COD + policy).
+        advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
         items: lines.map((l) => ({
@@ -458,6 +476,9 @@ export function CheckoutPage({
       customer_address: 'delivery address',
       customer_phone:   'phone number',
       customer_email:   'email address',
+      customer_city:    'জেলা',
+      thana:            'থানা',
+      advance_sender_last4: 'অগ্রিম পেমেন্টের শেষ ৪ ডিজিট',
       shipping_zone:    'delivery area',
       password:         'password',
       notes:            'order notes',
@@ -501,6 +522,13 @@ export function CheckoutPage({
                   <Textarea id="co-address" placeholder="House/road, area, district…" {...form.register('customer_address')} className="mt-1.5" />
                   {form.formState.errors.customer_address && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_address.message}</p>}
                 </div>
+                {districtEnabled && (
+                  <DistrictThanaFields
+                    idPrefix="co"
+                    districtField={form.register('customer_city')}
+                    thanaField={form.register('thana')}
+                  />
+                )}
                 <div>
                   <Label htmlFor="co-phone">Phone <span className="text-rose-500">*</span></Label>
                   <Input id="co-phone" placeholder="01XXXXXXXXX" inputMode="tel" {...form.register('customer_phone')} className="mt-1.5" />
@@ -650,7 +678,11 @@ export function CheckoutPage({
                         <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
                         <span>
                           <span className="block text-sm font-semibold text-slate-900">Cash on Delivery</span>
-                          <span className="block text-xs text-slate-500">Pay when your order arrives. No upfront payment needed.</span>
+                          <span className="block text-xs text-slate-500">
+                            {meta.advance_payment
+                              ? 'অগ্রিম পাঠিয়ে কনফার্ম — বাকি টাকা ডেলিভারিতে।'
+                              : 'Pay when your order arrives. No upfront payment needed.'}
+                          </span>
                         </span>
                       </span>
                     </label>
@@ -677,8 +709,25 @@ export function CheckoutPage({
                     <Truck className="mt-0.5 h-5 w-5 shrink-0 text-brand-700" />
                     <div>
                       <p className="text-sm font-semibold text-brand-900">Cash on Delivery</p>
-                      <p className="text-xs text-brand-700">Pay when your order arrives. No upfront payment needed.</p>
+                      <p className="text-xs text-brand-700">
+                        {advance
+                          ? 'অগ্রিম পাঠিয়ে অর্ডার কনফার্ম করুন — বাকি টাকা ডেলিভারিতে দেবেন।'
+                          : 'Pay when your order arrives. No upfront payment needed.'}
+                      </p>
                     </div>
+                  </div>
+                )}
+
+                {advance && (
+                  <div className="mt-4">
+                    <AdvancePaymentBox
+                      idPrefix="co"
+                      advance={advance}
+                      subtotal={subtotal}
+                      currency={currency}
+                      last4Field={form.register('advance_sender_last4')}
+                      last4Error={form.formState.errors.advance_sender_last4?.message}
+                    />
                   </div>
                 )}
 

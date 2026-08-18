@@ -24,6 +24,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Button } from '../components/ui/button';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
+import { AdvancePaymentBox, DistrictThanaFields } from '../components/order/checkout-extras';
 
 /**
  * Ad funnel landing page (/{slug}). Renders the tenant's block config in
@@ -59,6 +60,14 @@ function makeOrderSchema(requireZone: boolean) {
     customer_name:    z.string().min(2, 'Please enter your full name'),
     customer_address: z.string().min(10, 'Please enter your full delivery address'),
     customer_phone:   z.string().regex(/^(\+?88)?01[3-9]\d{8}$/, 'Enter a valid Bangladeshi mobile number'),
+    // Tenant-opt-in জেলা/থানা — free text (the datalist only suggests).
+    customer_city:    z.string().max(120).optional(),
+    thana:            z.string().max(120).optional(),
+    // Advance sender last-4 — optional; ≥4 digits when filled (Bengali ok).
+    advance_sender_last4: z.string().max(14).optional().refine(
+      (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
+      'কমপক্ষে ৪টি ডিজিট দিন',
+    ),
     shipping_zone:    z.string().optional(),
     notes:            z.string().max(500).optional(),
   }).superRefine((val, ctx) => {
@@ -910,6 +919,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled ? 0 : (threshold && subtotal >= threshold ? 0 : (zone?.fee ?? 0));
   const total = subtotal + shippingFee;
+  // Funnels are COD-only, so an active advance policy always applies here.
+  // Absent on old cached payloads → box simply hidden.
+  const advance = meta.advance_payment ?? null;
+  const districtEnabled = !!meta.checkout?.district_enabled;
 
   async function onSubmit(values: FormData) {
     if (inflight.current) return;
@@ -929,6 +942,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         customer_name:  values.customer_name,
         customer_phone: values.customer_phone,
         address:        values.customer_address,
+        customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
+        thana:          districtEnabled ? values.thana || undefined : undefined,
+        advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
         // Funnels are single-product by design — a 1-element items[] cart.
@@ -985,6 +1001,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       customer_name:    'full name',
       customer_address: 'delivery address',
       customer_phone:   'phone number',
+      customer_city:    'জেলা',
+      thana:            'থানা',
+      advance_sender_last4: 'অগ্রিম পেমেন্টের শেষ ৪ ডিজিট',
       shipping_zone:    'delivery area',
       notes:            'order notes',
     };
@@ -1053,6 +1072,13 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           <Textarea id="f-address" placeholder="House/road, area, district…" {...form.register('customer_address')} className="mt-1.5" />
           {form.formState.errors.customer_address && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_address.message}</p>}
         </div>
+        {districtEnabled && (
+          <DistrictThanaFields
+            idPrefix="f"
+            districtField={form.register('customer_city')}
+            thanaField={form.register('thana')}
+          />
+        )}
         <div>
           <Label htmlFor="f-notes">Order Notes <span className="font-normal text-slate-400">(optional)</span></Label>
           <Textarea id="f-notes" placeholder="Special notes for delivery, etc." {...form.register('notes')} className="mt-1.5" />
@@ -1081,6 +1107,17 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /></button>
           </div>
         </div>
+
+        {advance && (
+          <AdvancePaymentBox
+            idPrefix="f"
+            advance={advance}
+            subtotal={subtotal}
+            currency={product.currency}
+            last4Field={form.register('advance_sender_last4')}
+            last4Error={form.formState.errors.advance_sender_last4?.message}
+          />
+        )}
 
         <div className="space-y-1.5 text-sm">
           <div className="flex justify-between text-slate-600"><span>Subtotal</span><span>{formatBDT(subtotal, { currency: product.currency })}</span></div>
