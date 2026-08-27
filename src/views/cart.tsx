@@ -70,7 +70,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
             <ul className="space-y-3">
               {items.map((l) => (
                 <li
-                  key={`${l.product_id}:${l.variant_index ?? '-'}`}
+                  key={`${l.product_id}:${l.variant_index ?? '-'}:${l.variant_choice?.size ?? '-'}`}
                   className="flex items-start gap-4 rounded-2xl bg-white p-4 ring-1 ring-slate-200"
                 >
                   <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
@@ -90,7 +90,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
                       <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
                         <button
                           type="button"
-                          onClick={() => setQty(l.product_id, l.variant_index, l.quantity - 1)}
+                          onClick={() => setQty(l.product_id, l.variant_index, l.quantity - 1, l.variant_choice)}
                           disabled={l.quantity <= 1}
                           aria-label="Decrease quantity"
                           className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
@@ -100,7 +100,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
                         <span className="w-8 text-center text-sm font-semibold tabular-nums">{l.quantity}</span>
                         <button
                           type="button"
-                          onClick={() => setQty(l.product_id, l.variant_index, l.quantity + 1)}
+                          onClick={() => setQty(l.product_id, l.variant_index, l.quantity + 1, l.variant_choice)}
                           disabled={l.quantity >= lineCeiling(l.max_stock)}
                           aria-label="Increase quantity"
                           className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"
@@ -110,7 +110,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
                       </div>
                       <button
                         type="button"
-                        onClick={() => removeFromCart(l.product_id, l.variant_index)}
+                        onClick={() => removeFromCart(l.product_id, l.variant_index, l.variant_choice)}
                         className="inline-flex items-center gap-1 text-xs font-medium text-slate-500 hover:text-rose-600"
                       >
                         <Trash2 className="h-3.5 w-3.5" /> Remove

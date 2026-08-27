@@ -617,10 +617,15 @@ export type Category = {
 // ──────────────────────────────────────────────────────────────
 
 /** One product line of an order (Phase 2 cart). variant_index is the API's
- *  positional variant identity; null/omitted for variant-less products. */
+ *  positional variant identity; null/omitted for variant-less products.
+ *  `variant` is the shopper's specific choice WITHIN that row — a row whose
+ *  size is a comma list ("M, L, XL") gets a size sub-picker on the PDP and
+ *  the ONE chosen member rides here so the order records "L", not the range.
+ *  Omitted entirely when no choice was made (legacy payload, unchanged). */
 export type OrderItemInput = {
   product_id: number;
   variant_index?: number | null;
+  variant?: { size?: string | null } | null;
   quantity: number;
 };
 

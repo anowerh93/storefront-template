@@ -9,6 +9,7 @@ import { FitImage } from '../components/ui/fit-image';
 import { cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
+import { sizeOptions, lineLabel } from '../lib/variants';
 import { pixel } from '../lib/pixel';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
@@ -170,6 +171,13 @@ function BuyBox({
   const [added, setAdded] = useState(false);
   const addToCart = useCart((s) => s.addToCart);
   const selected = product.variants.find((v) => v.index === variantIdx) ?? null;
+  // A row whose size is a comma list ("M, L, XL" — one row per colour) needs
+  // a second step: the ONE size the customer wants. Without it the order
+  // records the whole range and the owner has to guess what to pack.
+  const sizeOpts = sizeOptions(selected?.size);
+  const [sizeChoice, setSizeChoice] = useState<string | null>(null);
+  useEffect(() => setSizeChoice(null), [variantIdx]);
+  const sizeMissing = sizeOpts.length > 0 && !sizeChoice;
   const unitPrice = selected?.price ?? product.price;
   const inStock = selected ? selected.in_stock : product.in_stock;
   // Qty ceiling: the selected variant's stock, or the parent stock for
@@ -196,7 +204,8 @@ function BuyBox({
         name: product.name,
         image_url: selected?.image_url ?? product.image_url ?? product.gallery_urls?.[0] ?? null,
         variant_index: selected ? selected.index : null,
-        variant_label: selected ? selected.label : null,
+        variant_choice: sizeOpts.length > 0 && sizeChoice ? { size: sizeChoice } : null,
+        variant_label: selected ? lineLabel(selected, sizeOpts.length > 0 ? sizeChoice : null) : null,
         unit_price: unitPrice,
         max_stock: maxStock,
         currency: product.currency,
@@ -207,7 +216,7 @@ function BuyBox({
   }
 
   function handleAddToCart() {
-    if (!inStock) return;
+    if (!inStock || sizeMissing) return;
     addSelectionToCart();
     setAdded(true);
     setTimeout(() => setAdded(false), 1800);
@@ -220,7 +229,7 @@ function BuyBox({
   // express ?p&v&q link that HID the shopper's other cart lines — buyers who
   // stacked a cart and then hit Order Now lost their combined order.
   function handleOrderNow() {
-    if (!inStock) return;
+    if (!inStock || sizeMissing) return;
     addSelectionToCart();
     window.location.href = '/checkout';
   }
@@ -308,6 +317,28 @@ function BuyBox({
         </div>
       )}
 
+      {/* Size sub-picker: the selected row carries a size RANGE ("M, L, XL" —
+          one row per colour), so the ONE size must be chosen here or the
+          order can't record it. */}
+      {sizeOpts.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-sm font-medium text-slate-700">Choose size</p>
+          <div className="flex flex-wrap gap-2">
+            {sizeOpts.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => setSizeChoice(s)}
+                className={`min-w-[3rem] rounded-xl border px-4 py-2 text-sm font-medium transition ${sizeChoice === s ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-slate-400'}`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+          {sizeMissing && <p className="text-xs text-slate-500">Please select a size to order.</p>}
+        </div>
+      )}
+
       {/* Quantity + Add to Cart + Order Now */}
       {inStock ? (
         <div className="space-y-3">
@@ -343,7 +374,8 @@ function BuyBox({
             <button
               type="button"
               onClick={handleAddToCart}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white px-6 py-3.5 text-base font-bold text-slate-900 transition hover:bg-slate-50"
+              disabled={sizeMissing}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl border-2 border-slate-900 bg-white px-6 py-3.5 text-base font-bold text-slate-900 transition hover:bg-slate-50 ${sizeMissing ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               {added ? <Check className="h-5 w-5 text-emerald-600" /> : <ShoppingCart className="h-5 w-5" />}
               {added ? 'Added to cart' : 'Add to Cart'}
@@ -351,7 +383,8 @@ function BuyBox({
             <button
               type="button"
               onClick={handleOrderNow}
-              className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800"
+              disabled={sizeMissing}
+              className={`flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-6 py-3.5 text-base font-bold text-white shadow-sm transition hover:bg-slate-800 ${sizeMissing ? 'cursor-not-allowed opacity-50' : ''}`}
             >
               <ShoppingBag className="h-5 w-5" /> Order Now
             </button>
