@@ -171,6 +171,8 @@ export function CheckoutPage({
       name:          product.name,
       image_url:     product.gallery_urls?.[0] ?? product.image_url ?? null,
       variant_index: variant ? variant.index : null,
+      // Legacy ?p&v&q deep links carry no size choice — degraded (range) line.
+      variant_choice: null,
       variant_label: variant ? variant.label : null,
       unit_price:    variant?.price ?? product.price,
       quantity:      expressQty,
@@ -304,7 +306,7 @@ export function CheckoutPage({
   function changeQty(line: CartLine, next: number) {
     const clamped = Math.min(Math.max(1, next), lineCeiling(line.max_stock));
     if (isExpress) setExpressQty(clamped);
-    else setCartQty(line.product_id, line.variant_index, clamped);
+    else setCartQty(line.product_id, line.variant_index, clamped, line.variant_choice);
   }
 
   async function onSubmit(values: FormData) {
@@ -345,6 +347,10 @@ export function CheckoutPage({
         items: lines.map((l) => ({
           product_id:    l.product_id,
           variant_index: l.variant_index,
+          // The ONE size chosen on the PDP for a size-range row — the order
+          // records "L", never the whole "M, L, XL" list. Omitted when no
+          // choice exists (legacy line / no range), keeping the old payload.
+          ...(l.variant_choice?.size ? { variant: { size: l.variant_choice.size } } : {}),
           quantity:      l.quantity,
         })),
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
@@ -355,7 +361,14 @@ export function CheckoutPage({
         ...(canPayOnline && payMethod === 'online' ? { payment_method: 'online' as const } : {}),
       }, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
-        items: lines.map((l) => ({ product_id: l.product_id, variant_index: l.variant_index, quantity: l.quantity })),
+        // The size choice is part of the intent: ordering M after L within
+        // the dedup window must mint a new key, not replay the L order.
+        items: lines.map((l) => ({
+          product_id: l.product_id,
+          variant_index: l.variant_index,
+          ...(l.variant_choice?.size ? { variant: { size: l.variant_choice.size } } : {}),
+          quantity: l.quantity,
+        })),
       }));
       // Account provisioned alongside the order → auto-login by storing the
       // token. If the phone already had an account (account_exists), no token
@@ -620,7 +633,7 @@ export function CheckoutPage({
                 {/* Product lines */}
                 <ul className="divide-y divide-slate-100">
                   {lines.map((l) => (
-                    <li key={`${l.product_id}:${l.variant_index ?? '-'}`} className="flex items-start gap-3 py-4">
+                    <li key={`${l.product_id}:${l.variant_index ?? '-'}:${l.variant_choice?.size ?? '-'}`} className="flex items-start gap-3 py-4">
                       <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                         {/* sizes: fixed 64px thumb — see cart.tsx. */}
                         {l.image_url && <FitImage src={l.image_url} alt={l.name} sizes="64px" />}
@@ -632,7 +645,7 @@ export function CheckoutPage({
                         {!isExpress && (
                           <button
                             type="button"
-                            onClick={() => removeCartLine(l.product_id, l.variant_index)}
+                            onClick={() => removeCartLine(l.product_id, l.variant_index, l.variant_choice)}
                             className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-rose-600"
                           >
                             <Trash2 className="h-3 w-3" /> Remove

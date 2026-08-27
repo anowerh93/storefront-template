@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder } from '../lib/api';
+import { sizeOptions } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
@@ -884,6 +885,12 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const form = useForm<FormData>({ resolver: zodResolver(schema), defaultValues: { shipping_zone: zones[0]?.code ?? '' } });
 
   const variant = (variantIdx != null ? product.variants.find((v) => v.index === variantIdx) : null) ?? null;
+  // A row whose size is a comma list ("M, L, XL" — one row per colour) needs
+  // the ONE size chosen, or the order records the whole range.
+  const sizeOpts = sizeOptions(variant?.size);
+  const [sizeChoice, setSizeChoice] = useState<string | null>(null);
+  useEffect(() => setSizeChoice(null), [variantIdx]);
+  const sizeMissing = sizeOpts.length > 0 && !sizeChoice;
   const unitPrice = variant?.price ?? product.price;
 
   // One begin_checkout/InitiateCheckout per funnel visit — a failed submit
@@ -939,6 +946,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   }, [!advance]);
 
   async function onSubmit(values: FormData) {
+    if (sizeMissing) return; // the button is disabled — belt and braces
     if (inflight.current) return;
     inflight.current = true;
     setSubmitting(true);
@@ -962,14 +970,26 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         shipping_zone:  values.shipping_zone || undefined,
         notes:          values.notes,
         // Funnels are single-product by design — a 1-element items[] cart.
-        items: [{ product_id: product.id, variant_index: variant ? variant.index : null, quantity: qty }],
+        // `variant.size` = the ONE size chosen for a size-range row, so the
+        // order records "L", never the whole "M, L, XL" list.
+        items: [{
+          product_id: product.id,
+          variant_index: variant ? variant.index : null,
+          ...(sizeChoice ? { variant: { size: sizeChoice } } : {}),
+          quantity: qty,
+        }],
         utm_source:     sp?.get('utm_source') || undefined,
         utm_medium:     sp?.get('utm_medium') || undefined,
         utm_campaign:   sp?.get('utm_campaign') || undefined,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
       }, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
-        items: [{ product_id: product.id, variant_index: variant ? variant.index : null, quantity: qty }],
+        items: [{
+          product_id: product.id,
+          variant_index: variant ? variant.index : null,
+          ...(sizeChoice ? { variant: { size: sizeChoice } } : {}),
+          quantity: qty,
+        }],
       }));
       const dest = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
       // duplicate:true = the dedup window / Idempotency-Key replayed an
@@ -1071,6 +1091,28 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           </div>
         )}
 
+        {/* Size sub-picker: the selected row carries a size RANGE ("M, L, XL"
+            — one row per colour), so the ONE size must be chosen here or the
+            order can't record it. */}
+        {sizeOpts.length > 0 && (
+          <div>
+            <Label>Choose size</Label>
+            <div className="mt-1.5 flex flex-wrap gap-2">
+              {sizeOpts.map((s) => (
+                <button
+                  key={s}
+                  type="button"
+                  onClick={() => setSizeChoice(s)}
+                  className={`min-w-[3rem] rounded-xl border px-4 py-2 text-sm font-semibold transition ${sizeChoice === s ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-slate-300 text-slate-700 hover:border-slate-400'}`}
+                >
+                  {s}
+                </button>
+              ))}
+            </div>
+            {sizeMissing && <p className="mt-1.5 text-xs text-slate-500">Please select a size to order.</p>}
+          </div>
+        )}
+
         <div>
           <Label htmlFor="f-name">Full Name <span className="text-rose-500">*</span></Label>
           <Input id="f-name" placeholder="Your name" {...form.register('customer_name')} className="mt-1.5" />
@@ -1147,7 +1189,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           </div>
         </div>
 
-        <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting}>
+        <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
           <ShoppingBag className="h-4 w-4" />
           {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : <RT html={config.button_label || 'Confirm Order'} />}
         </Button>

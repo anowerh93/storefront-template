@@ -403,7 +403,7 @@ export async function suggestProducts(q: string, signal?: AbortSignal): Promise<
  */
 export function orderIdempotencyKey(
   mountFallback: string,
-  input: { customer_phone: string; items: { product_id: number; variant_index: number | null; quantity: number }[] },
+  input: { customer_phone: string; items: { product_id: number; variant_index: number | null; variant?: { size?: string | null } | null; quantity: number }[] },
 ): string {
   let seed: string | null = null;
   try {

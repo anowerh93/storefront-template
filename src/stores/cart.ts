@@ -27,6 +27,11 @@ export type CartLine = {
   image_url: string | null;
   /** Positional variant identity (matches the API's variant_index); null = no variant. */
   variant_index: number | null;
+  /** The shopper's specific choice WITHIN the row (size sub-picker for
+   *  "M, L, XL" rows) — part of the line identity: two sizes of one row are
+   *  different physical items. null/undefined = no choice (legacy lines from
+   *  a persisted cart predating this field rehydrate as undefined). */
+  variant_choice?: { size: string } | null;
   variant_label: string | null;
   unit_price: number;
   quantity: number;
@@ -40,10 +45,10 @@ export type AddCartInput = Omit<CartLine, 'quantity'>;
 
 interface CartState {
   items: CartLine[];
-  /** Add a line, or bump an existing (product_id, variant_index) line's quantity. */
+  /** Add a line, or bump an existing (product_id, variant_index, choice) line's quantity. */
   addToCart: (line: AddCartInput, qty?: number) => void;
-  removeFromCart: (productId: number, variantIndex: number | null) => void;
-  setQty: (productId: number, variantIndex: number | null, qty: number) => void;
+  removeFromCart: (productId: number, variantIndex: number | null, choice?: CartLine['variant_choice']) => void;
+  setQty: (productId: number, variantIndex: number | null, qty: number, choice?: CartLine['variant_choice']) => void;
   clear: () => void;
 }
 
@@ -56,9 +61,20 @@ export const MAX_LINE_QTY = 20;
 export const lineCeiling = (maxStock: number | null): number =>
   maxStock != null && maxStock > 0 ? Math.min(maxStock, MAX_LINE_QTY) : MAX_LINE_QTY;
 
-/** A cart line is identified by the (product_id, variant_index) pair. */
-const sameLine = (l: CartLine, productId: number, variantIndex: number | null): boolean =>
-  l.product_id === productId && (l.variant_index ?? null) === (variantIndex ?? null);
+/** Normalized identity of a line's size choice ('' = no choice). */
+export const choiceKey = (c: CartLine['variant_choice']): string =>
+  c?.size?.trim().toLowerCase() ?? '';
+
+/** A cart line is identified by (product_id, variant_index, size choice). */
+const sameLine = (
+  l: CartLine,
+  productId: number,
+  variantIndex: number | null,
+  choice: CartLine['variant_choice'],
+): boolean =>
+  l.product_id === productId &&
+  (l.variant_index ?? null) === (variantIndex ?? null) &&
+  choiceKey(l.variant_choice) === choiceKey(choice);
 
 /** Clamp to >= 1 and <= the per-line ceiling (stock and the 20-unit cap). */
 const clampQty = (qty: number, max: number | null): number =>
@@ -83,11 +99,11 @@ export const useCart = create<CartState>()(
 
       addToCart: (line, qty = 1) =>
         set((state) => {
-          const exists = state.items.some((l) => sameLine(l, line.product_id, line.variant_index));
+          const exists = state.items.some((l) => sameLine(l, line.product_id, line.variant_index, line.variant_choice));
           if (exists) {
             return {
               items: state.items.map((l) =>
-                sameLine(l, line.product_id, line.variant_index)
+                sameLine(l, line.product_id, line.variant_index, line.variant_choice)
                   ? { ...l, ...line, quantity: clampQty(l.quantity + qty, line.max_stock) }
                   : l,
               ),
@@ -96,15 +112,15 @@ export const useCart = create<CartState>()(
           return { items: [...state.items, { ...line, quantity: clampQty(qty, line.max_stock) }] };
         }),
 
-      removeFromCart: (productId, variantIndex) =>
+      removeFromCart: (productId, variantIndex, choice = null) =>
         set((state) => ({
-          items: state.items.filter((l) => !sameLine(l, productId, variantIndex)),
+          items: state.items.filter((l) => !sameLine(l, productId, variantIndex, choice)),
         })),
 
-      setQty: (productId, variantIndex, qty) =>
+      setQty: (productId, variantIndex, qty, choice = null) =>
         set((state) => ({
           items: state.items.map((l) =>
-            sameLine(l, productId, variantIndex) ? { ...l, quantity: clampQty(qty, l.max_stock) } : l,
+            sameLine(l, productId, variantIndex, choice) ? { ...l, quantity: clampQty(qty, l.max_stock) } : l,
           ),
         })),
 
