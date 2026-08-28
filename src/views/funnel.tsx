@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder } from '../lib/api';
-import { sizeOptions } from '../lib/variants';
+import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
 import { FitImage } from '../components/ui/fit-image';
@@ -888,6 +888,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // A row whose size is a comma list ("M, L, XL" — one row per colour) needs
   // the ONE size chosen, or the order records the whole range.
   const sizeOpts = sizeOptions(variant?.size);
+  // Picker captions: the row's real axis ("Maroon"), never the combined
+  // "Color: Maroon · Size: M, L, XL" label — the size range is the separate
+  // "Choose size" chips' job.
+  const optionCaptions = optionNames(product.variants);
   const [sizeChoice, setSizeChoice] = useState<string | null>(null);
   useEffect(() => setSizeChoice(null), [variantIdx]);
   const sizeMissing = sizeOpts.length > 0 && !sizeChoice;
@@ -1060,7 +1064,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           <div>
             <Label>{product.variants.length > 1 ? 'Choose your pack' : 'Option'}</Label>
             <div className="mt-1.5 grid gap-2">
-              {product.variants.map((v) => {
+              {product.variants.map((v, i) => {
                 const vp = v.price ?? product.price;
                 const vc = v.compare_at_price ?? product.compare_at_price;
                 const off = discountPct(vp, vc);
@@ -1072,7 +1076,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
                       <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-brand-500' : 'border-slate-300'}`}>
                         {selected && <span className="h-2 w-2 rounded-full bg-brand-500" />}
                       </span>
-                      <span className="text-sm font-semibold text-slate-900">{v.label}</span>
+                      <span className="text-sm font-semibold text-slate-900">{optionCaptions[i]}</span>
                     </span>
                     <span className="shrink-0 text-right">
                       <span className="block">

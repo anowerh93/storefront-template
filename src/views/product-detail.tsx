@@ -9,7 +9,7 @@ import { FitImage } from '../components/ui/fit-image';
 import { cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
-import { sizeOptions, lineLabel } from '../lib/variants';
+import { sizeOptions, lineLabel, optionNames } from '../lib/variants';
 import { pixel } from '../lib/pixel';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 
@@ -178,6 +178,10 @@ function BuyBox({
   const [sizeChoice, setSizeChoice] = useState<string | null>(null);
   useEffect(() => setSizeChoice(null), [variantIdx]);
   const sizeMissing = sizeOpts.length > 0 && !sizeChoice;
+  // Picker button captions ("Maroon", not the combined label) + whether the
+  // effective price differs across rows (only then does it join the caption).
+  const optionCaptions = optionNames(product.variants);
+  const priceVaries = new Set(product.variants.map((v) => v.price ?? product.price)).size > 1;
   const unitPrice = selected?.price ?? product.price;
   const inStock = selected ? selected.in_stock : product.in_stock;
   // Qty ceiling: the selected variant's stock, or the parent stock for
@@ -297,20 +301,42 @@ function BuyBox({
         </p>
       </div>
 
-      {/* Variant picker (only if the product has variants) */}
+      {/* Variant picker (only if the product has variants). Each button
+          carries the row's REAL axis only — "Maroon", with its swatch photo —
+          never the combined "Color: Maroon · Size: M, L, XL" label: the size
+          range belongs to the separate "Choose size" chips below, and the
+          crammed label wrapped on phones and pushed Add-to-Cart below the
+          fold. Price joins the caption only when it differs across rows. */}
       {product.variants.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">Choose option</p>
+          <p className="text-sm font-medium text-slate-700">
+            {product.variants.every((v) => !!v.color?.trim()) ? 'Choose colour' : 'Choose option'}
+          </p>
           <div className="flex flex-wrap gap-2">
-            {product.variants.map((v) => (
+            {product.variants.map((v, i) => (
               <button
                 key={v.index}
                 type="button"
                 disabled={!v.in_stock}
                 onClick={() => setVariantIdx(v.index)}
-                className={`rounded-xl border px-4 py-2 text-sm font-medium transition ${variantIdx === v.index ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-slate-400'} ${!v.in_stock ? 'cursor-not-allowed opacity-40' : ''}`}
+                className={`flex items-center gap-2 rounded-xl border px-3 py-2 text-sm font-medium transition ${variantIdx === v.index ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-slate-300 text-slate-700 hover:border-slate-400'} ${!v.in_stock ? 'cursor-not-allowed opacity-40' : ''}`}
               >
-                {v.label}
+                {v.image_url && (
+                  <img
+                    src={cdnImage(v.image_url, 96)}
+                    alt=""
+                    loading="lazy"
+                    className="h-8 w-8 shrink-0 rounded-lg object-cover"
+                  />
+                )}
+                <span className="text-left">
+                  {optionCaptions[i]}
+                  {priceVaries && (
+                    <span className="block text-xs font-normal text-slate-500">
+                      {formatBDT(v.price ?? product.price, { currency: product.currency })}
+                    </span>
+                  )}
+                </span>
               </button>
             ))}
           </div>
