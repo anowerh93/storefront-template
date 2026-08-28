@@ -42,7 +42,11 @@ export function formatBDT(
 /** Compute discount % from list+sale price. Returns null if no discount. */
 export function discountPct(salePrice: number, listPrice: number | null): number | null {
   if (!listPrice || listPrice <= salePrice) return null;
-  return Math.round(((listPrice - salePrice) / listPrice) * 100);
+  const pct = Math.round(((listPrice - salePrice) / listPrice) * 100);
+  // A sub-0.5% discount rounds to 0: never show "Save 0%" — and every call
+  // site guards with `{discount && …}`, where a numeric 0 renders as a
+  // literal "0" text node in JSX instead of nothing.
+  return pct > 0 ? pct : null;
 }
 
 /** "2 hours ago", "yesterday", etc. — used for review timestamps. */
