@@ -187,13 +187,15 @@ function BuyBox({
   // Qty ceiling: the selected variant's stock, or the parent stock for
   // simple products (null = untracked → no ceiling).
   const maxStock = selected ? selected.stock : (product.stock ?? null);
-  // Discount follows the SELECTED variant: its own compare-at ("Was") wins, so
-  // picking a variant shows THAT variant's strike-through + Save%. Fall back to
-  // the product-level compare-at only when the variant doesn't override the
-  // price — never strike a variant's own price against an unrelated base was.
-  const compareAt =
-    selected?.compare_at_price ??
-    ((selected?.price ?? null) === null ? product.compare_at_price : null);
+  // Discount follows the SELECTED variant: its own compare-at ("Was") wins;
+  // otherwise fall back to the product-level compare-at. Merchants typically
+  // type the same price into every variant row and set the "was" price only
+  // on the product — suppressing the fallback whenever the variant carried a
+  // price made the strike-through vanish on exactly those products. The
+  // `compareAt > unitPrice` guard at render still hides the nonsense case (a
+  // variant priced at/above the base "was" never shows it), and the funnel's
+  // pack picker has always used this same per-variant fallback.
+  const compareAt = selected?.compare_at_price ?? product.compare_at_price;
   const discount = discountPct(unitPrice, compareAt);
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
