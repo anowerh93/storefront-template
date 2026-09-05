@@ -44,6 +44,7 @@ import type {
   CustomerAuthResponse,
   ForgotPasswordInput,
   FunnelData,
+  HomepageConfig,
   LoginCustomerInput,
   OrderResponse,
   Paginated,
@@ -58,6 +59,7 @@ import type {
   SuggestProduct,
   TeamMember,
 } from './types';
+import { homepageProductIds } from './home-data';
 
 const API_BASE = (import.meta.env.PUBLIC_API_BASE ?? '').replace(/\/$/, '');
 export const STOREFRONT_SLUG = import.meta.env.PUBLIC_STOREFRONT_SLUG ?? '';
@@ -175,6 +177,11 @@ export function getProducts(opts: {
   search?: string;
   category?: string;
   sort?: ProductSort;
+  /**
+   * Exact-id lookup. Bypasses the list's per_page cap (server bounds it to
+   * 100 ids, one page) and keeps the same public-visibility filter.
+   */
+  ids?: number[];
 } = {}) {
   return apiFetch<Paginated<ProductCard>>('/products', {
     params: {
@@ -183,10 +190,46 @@ export function getProducts(opts: {
       search: opts.search,
       category: opts.category,
       sort: opts.sort,
+      ids: opts.ids?.length ? opts.ids.join(',') : undefined,
     },
     tags: ['products', 'home'],
     unwrap: false,
   });
+}
+
+/**
+ * Guarantee every product the homepage config references is present in
+ * `products`, fetching by id whatever the general list is missing.
+ *
+ * The general /products list is newest-first and CAPPED by the API (60), so
+ * on a bigger catalog an older product the merchant picked for a section
+ * silently failed to resolve and vanished from it — and a missing Deals of
+ * the Day spotlight was then SUBSTITUTED by a mini card (live 2026-09-06:
+ * the dashboard said Sukkari, the site showed Bertini). Zero extra requests
+ * for a small shop; one small by-id request for a big one. Fail-soft, and
+ * tolerant of an API deploy that doesn't know `ids` yet — it then answers
+ * with its first page, which we already hold, so nothing is added (never
+ * worse than today).
+ */
+export async function ensureHomepageProducts(
+  home: HomepageConfig | null,
+  products: ProductCard[],
+): Promise<ProductCard[]> {
+  const have = new Set(products.map((p) => p.id));
+  const missing = homepageProductIds(home).filter((id) => !have.has(id));
+  if (missing.length === 0) return products;
+
+  let fetched: ProductCard[] = [];
+  try {
+    fetched = (await getProducts({ ids: missing })).data ?? [];
+  } catch {
+    return products; // fail-soft: render with what we have
+  }
+  // Only ADD what was actually missing — this is what makes an old API that
+  // ignores `ids` (answering with its first page) a no-op, not a duplicate.
+  const wanted = new Set(missing);
+  const added = fetched.filter((p) => wanted.has(p.id) && !have.has(p.id));
+  return added.length ? [...products, ...added] : products;
 }
 
 export function getProduct(slug: string) {
