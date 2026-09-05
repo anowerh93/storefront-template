@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Star } from 'lucide-react';
 import type { ProductCard } from '../../lib/types';
+import { dealsLayout } from '../../lib/home-data';
 import { formatBDT, discountPct } from '../../lib/format';
 import { cdnImage, cdnSrcSet } from '../../lib/img';
 
@@ -16,24 +17,43 @@ import { cdnImage, cdnSrcSet } from '../../lib/img';
 export function DealsOfDay({
   products,
   spotlight,
+  spotlightConfigured = false,
   title = 'Deals of the Day',
 }: {
   /** Mini cards around the centre spotlight (up to 6). */
   products: ProductCard[];
   /** Centre spotlight tile. If null and products is empty, the whole section returns null. */
   spotlight: ProductCard | null;
+  /**
+   * True when the merchant explicitly CHOSE a spotlight product. If that
+   * choice then fails to resolve (hidden / deleted / not fetched), we must
+   * NOT quietly promote a mini card into the centre — that shows a DIFFERENT
+   * product as the deal of the day with a countdown, while the dashboard
+   * still says the merchant's pick (live incident 2026-09-06). Promotion is
+   * only a default for a section where no spotlight was chosen at all.
+   */
+  spotlightConfigured?: boolean;
   title?: string;
 }) {
-  // Need at least the spotlight or one mini card to show anything.
-  // If we have a spotlight + 0 mini cards, still render with the spotlight
-  // alone. If only mini cards (no spotlight), promote the first mini.
-  let featured: ProductCard | null = spotlight;
-  let rest: ProductCard[] = products;
-  if (!featured && products.length > 0) {
-    featured = products[0];
-    rest = products.slice(1);
+  // Centre vs. minis is decided by the pure dealsLayout() (home-data.ts):
+  // a spotlight the merchant CHOSE but that can't be shown is never
+  // substituted with a mini; promoting the first mini is only the default
+  // when no spotlight was chosen at all.
+  const { featured, rest } = dealsLayout(spotlight, products, spotlightConfigured);
+  if (!featured && rest.length === 0) return null;
+
+  if (!featured) {
+    // The merchant's chosen spotlight can't be shown: render their mini
+    // picks honestly, with no substitute centrepiece and no countdown.
+    return (
+      <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-10">
+        <h2 className="text-xl sm:text-2xl font-bold text-slate-900 mb-4">{title}</h2>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          {rest.slice(0, 6).map((p) => <MiniDealCard key={p.id} product={p} />)}
+        </div>
+      </section>
+    );
   }
-  if (!featured) return null;
 
   const left = rest.slice(0, 3);
   const right = rest.slice(3, 6);

@@ -14,7 +14,7 @@
  * use (the carousel + dropdown, not the entire Next.js runtime).
  */
 import Base from '../layouts/Base.astro';
-import { getStorefront, getProducts, getCategories } from '../lib/api';
+import { getStorefront, getProducts, getCategories, ensureHomepageProducts } from '../lib/api';
 import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
 import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
@@ -57,8 +57,13 @@ if (!meta) {
 // simply unused (service tenants have none).
 const isServiceSite = meta?.business_type === 'service' && !!meta?.service_home;
 
-const all = productsRes.data ?? [];
 const home = meta?.homepage ?? null;
+// Every product the config references must actually be fetched, no matter
+// how big the catalog: the general list above is capped by the API (60,
+// newest-first), so an older pick used to silently fail to resolve — and a
+// missing deals spotlight was then substituted by a mini card. This adds
+// only the ids the general list is missing (see ensureHomepageProducts).
+const all = await ensureHomepageProducts(home, productsRes.data ?? []);
 
 // ID-resolution (config product_ids → full ProductCard objects) lives in the
 // shared helper so the dashboard live-preview island renders identically.
@@ -70,6 +75,7 @@ const {
   dealsProducts,
   promoRowItems,
   dealsSpotlight,
+  dealsSpotlightConfigured,
   homepageCategories,
   sectionOrder,
 } = resolveHomeData(home, all, categories);
@@ -187,6 +193,7 @@ const schemas: Record<string, unknown>[] =
                 client:visible
                 products={dealsProducts}
                 spotlight={dealsSpotlight}
+                spotlightConfigured={dealsSpotlightConfigured}
                 title={home.deals_of_day.title}
               />
             : null;

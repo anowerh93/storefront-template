@@ -18,9 +18,10 @@
  * below is duplicated from index.astro — keep the two in sync when a block is
  * added/removed (mirrors the note in src/lib/home-data.ts).
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { StorefrontMeta, ProductCard, Category, HomepageConfig } from '../lib/types';
-import { resolveHomeData } from '../lib/home-data';
+import { resolveHomeData, homepageProductIds } from '../lib/home-data';
+import { getProducts } from '../lib/api';
 import {
   PREVIEW_READY,
   isPreviewConfigMessage,
@@ -92,6 +93,51 @@ export function HomePreview({ meta, products, categories }: Props) {
     return () => window.removeEventListener('message', onMessage);
   }, []);
 
+  // The SAVED config's picks were fetched server-side (preview/home.astro),
+  // but a pick the merchant makes in the builder BEFORE saving can still sit
+  // beyond the API's list cap (60, newest-first) and so be absent from
+  // `products`. Fetch any id the pushed config references that we don't hold
+  // yet, so the preview shows the merchant's new spotlight instead of
+  // reporting it missing. Additive + fail-soft: a failed fetch leaves the
+  // pool as-is (and un-marks the ids so a later push retries); a late
+  // response merges by id, so it can never show a wrong product. Each id is
+  // in flight at most once, so an unresolvable (hidden) pick never loops.
+  // The builder pushes a config on every keystroke, so after a failure we
+  // hold off for a moment rather than hit a failing API once per push.
+  const [extraProducts, setExtraProducts] = useState<ProductCard[]>([]);
+  const inFlight = useRef<Set<number>>(new Set());
+  const failedAt = useRef(0);
+  const RETRY_COOLDOWN_MS = 10_000;
+
+  useEffect(() => {
+    const have = new Set([...products, ...extraProducts].map((p) => p.id));
+    const missing = homepageProductIds(home).filter(
+      (id) => !have.has(id) && !inFlight.current.has(id),
+    );
+    if (missing.length === 0) return;
+    if (Date.now() - failedAt.current < RETRY_COOLDOWN_MS) return;
+    missing.forEach((id) => inFlight.current.add(id));
+
+    getProducts({ ids: missing })
+      .then((res) => {
+        const wanted = new Set(missing);
+        const added = (res.data ?? []).filter((p) => wanted.has(p.id));
+        if (added.length) {
+          setExtraProducts((prev) => {
+            const seen = new Set(prev.map((p) => p.id));
+            return [...prev, ...added.filter((p) => !seen.has(p.id))];
+          });
+        }
+      })
+      .catch(() => {
+        // fail-soft — let a later config push try these again (after the cooldown)
+        failedAt.current = Date.now();
+        missing.forEach((id) => inFlight.current.delete(id));
+      });
+  }, [home, products, extraProducts]);
+
+  const pool = extraProducts.length ? [...products, ...extraProducts] : products;
+
   const {
     heroProducts,
     featureProducts,
@@ -100,9 +146,10 @@ export function HomePreview({ meta, products, categories }: Props) {
     dealsProducts,
     promoRowItems,
     dealsSpotlight,
+    dealsSpotlightConfigured,
     homepageCategories,
     sectionOrder,
-  } = resolveHomeData(home, products, categories);
+  } = resolveHomeData(home, pool, categories);
 
   return (
     <>
@@ -175,6 +222,7 @@ export function HomePreview({ meta, products, categories }: Props) {
                     key={key}
                     products={dealsProducts}
                     spotlight={dealsSpotlight}
+                    spotlightConfigured={dealsSpotlightConfigured}
                     title={home.deals_of_day.title}
                   />
                 : null;

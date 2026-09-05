@@ -15,7 +15,7 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getStorefront, getProducts, getCategories } from '../../lib/api';
+import { getStorefront, getProducts, getCategories, ensureHomepageProducts } from '../../lib/api';
 import { HomePreview } from '../../views/home-preview';
 
 const [meta, productsRes, categories] = await Promise.all([
@@ -24,7 +24,12 @@ const [meta, productsRes, categories] = await Promise.all([
   getCategories().catch(() => []),
 ]);
 
-const products = productsRes.data ?? [];
+// Same guarantee as the live homepage (index.astro): the general list is
+// capped by the API, so the SAVED config's picks are fetched by id too —
+// else the preview's first paint would drop them exactly like the live page
+// did. Picks made in the builder before saving are fetched client-side by
+// the island (see HomePreview).
+const products = await ensureHomepageProducts(meta?.homepage ?? null, productsRes.data ?? []);
 ---
 
 <Base title="Homepage preview" noindex={true} meta={meta} tracking={false}>
