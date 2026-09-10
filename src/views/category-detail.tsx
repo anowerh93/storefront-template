@@ -43,8 +43,16 @@ export function CategoryDetailPage({
   if (!res || !meta) return <NotFoundPage />;
 
   const sort = (searchParams?.sort ?? 'newest') as ProductSort;
-  const page = parseInt(searchParams?.page ?? '1', 10);
   const { category, products } = res;
+
+  // Pagination — native <a> links (a fresh page load per the MPA note above,
+  // works without JS). The API paginates at 20/page; without these links every
+  // product past the first page was unreachable even though the count showed
+  // the full total (live report 2026-09).
+  const lastPage = products.meta.last_page ?? 1;
+  const curPage = Math.min(Math.max(1, products.meta.current_page ?? parseInt(searchParams?.page ?? '1', 10)), lastPage);
+  // Keep the active sort across page links; a default 'newest' stays out of the URL.
+  const pageHref = (p: number) => `/categories/${category.slug}?page=${p}${sort !== 'newest' ? `&sort=${sort}` : ''}`;
 
   return (
     <>
@@ -84,7 +92,30 @@ export function CategoryDetailPage({
             </div>
           </div>
         ) : (
-          <ProductGrid products={products.data} />
+          <>
+            <ProductGrid products={products.data} />
+            {lastPage > 1 && (
+              <nav className="mt-10 flex items-center justify-center gap-3" aria-label="Pagination">
+                {curPage > 1 ? (
+                  <a href={pageHref(curPage - 1)} rel="prev"
+                     className="px-4 py-2 rounded-lg ring-1 ring-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    ← Prev
+                  </a>
+                ) : (
+                  <span className="px-4 py-2 rounded-lg ring-1 ring-slate-200 text-sm font-medium text-slate-300 select-none">← Prev</span>
+                )}
+                <span className="text-sm text-slate-500">Page {curPage} of {lastPage}</span>
+                {curPage < lastPage ? (
+                  <a href={pageHref(curPage + 1)} rel="next"
+                     className="px-4 py-2 rounded-lg ring-1 ring-slate-300 text-sm font-medium text-slate-700 hover:bg-slate-50">
+                    Next →
+                  </a>
+                ) : (
+                  <span className="px-4 py-2 rounded-lg ring-1 ring-slate-200 text-sm font-medium text-slate-300 select-none">Next →</span>
+                )}
+              </nav>
+            )}
+          </>
         )}
       </main>
       <Footer meta={meta} />
