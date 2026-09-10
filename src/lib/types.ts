@@ -579,6 +579,9 @@ export type FunnelBlockConfig = {
   video?: { visible: boolean; title: string; youtube_id?: string | null };
   faq: { visible: boolean; items: { q: string; a: string }[] };
   trust_badges: { visible: boolean; items: { icon: string; title: string }[] };
+  /** Cross-sell row of hand-picked products. Config holds the heading + ids;
+   *  the resolved cards ride on FunnelData.related_products. */
+  related_products?: { visible: boolean; heading: string; product_ids?: number[] };
 };
 
 export type FunnelData = {
@@ -587,6 +590,9 @@ export type FunnelData = {
   goal: string;
   config: FunnelBlockConfig;
   product: FunnelProduct;
+  /** Resolved cards for the related_products block, in the merchant's picked
+   *  order. Absent on payloads cached before this block existed. */
+  related_products?: ProductCard[];
 };
 
 export type Paginated<T> = {

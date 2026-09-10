@@ -11,7 +11,7 @@ import {
   Leaf, Zap, Brain, Flame, Droplet, Smile, Activity,
   Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
-import type { FunnelData, FunnelBlockConfig, FunnelProduct, StorefrontMeta } from '../lib/types';
+import type { FunnelData, FunnelBlockConfig, FunnelProduct, ProductCard, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder } from '../lib/api';
 import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
@@ -156,6 +156,13 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
         return config.faq.visible && config.faq.items.length ? <Faq config={config.faq} /> : null;
       case 'trust_badges':
         return config.trust_badges.visible && config.trust_badges.items.length ? <TrustBadges items={config.trust_badges.items} /> : null;
+      case 'related_products': {
+        // Optional chain: payloads cached before this block existed lack the key.
+        // The resolved cards ride on the top-level payload, not in config.
+        const rp = config.related_products;
+        const cards = funnel.related_products ?? [];
+        return rp?.visible && cards.length ? <RelatedProducts heading={rp.heading} products={cards} btn={btn} /> : null;
+      }
       default:
         return null;
     }
@@ -868,6 +875,57 @@ function TrustBadges({ items }: { items: { icon: string; title: string }[] }) {
           <RT className="text-xs font-medium text-slate-700" html={b.title} />
         </div>
       ))}
+    </section>
+  );
+}
+
+// Cross-sell row at the bottom of the funnel: the merchant's hand-picked
+// products (resolved server-side, in pick order). Each card links to that
+// product's own storefront page — the funnel stays single-focus above.
+function RelatedProducts({ heading, products, btn }: { heading: string; products: ProductCard[]; btn: BtnTheme }) {
+  return (
+    <section>
+      <RT as="h2" className="mb-4 text-center text-xl font-bold text-slate-900 sm:text-2xl" html={heading || 'You may also like'} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 sm:gap-4 lg:grid-cols-4">
+        {products.slice(0, 8).map((p) => {
+          const off = discountPct(p.price, p.compare_at_price);
+          return (
+            <a
+              key={p.id}
+              href={`/products/${p.slug}`}
+              className="group flex flex-col overflow-hidden rounded-2xl bg-white ring-1 ring-slate-200 transition hover:shadow-lg hover:ring-brand-300"
+            >
+              <div className="relative aspect-square overflow-hidden bg-slate-50">
+                {p.image_url ? (
+                  <img
+                    src={cdnImage(p.image_url, 400)}
+                    srcSet={cdnSrcSet(p.image_url)}
+                    sizes="(min-width: 1024px) 260px, 45vw"
+                    alt={p.name}
+                    loading="lazy"
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                  />
+                ) : null}
+                {off ? (
+                  <span className="absolute left-2 top-2 rounded-full bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white">-{off}%</span>
+                ) : null}
+              </div>
+              <div className="flex flex-1 flex-col p-3">
+                <h3 className="line-clamp-2 text-sm font-semibold text-slate-900">{p.name}</h3>
+                <div className="mt-1 flex items-baseline gap-1.5">
+                  <span className="text-base font-bold text-slate-900">{formatBDT(p.price, { currency: p.currency })}</span>
+                  {p.compare_at_price && p.compare_at_price > p.price ? (
+                    <span className="text-xs text-slate-400 line-through">{formatBDT(p.compare_at_price, { currency: p.currency })}</span>
+                  ) : null}
+                </div>
+                <span className={ctaClass('mt-3 block rounded-xl py-2 text-center text-sm font-bold', btn)} style={ctaStyle(btn)}>
+                  Buy now
+                </span>
+              </div>
+            </a>
+          );
+        })}
+      </div>
     </section>
   );
 }
