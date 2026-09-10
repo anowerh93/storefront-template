@@ -91,7 +91,11 @@ export function ProductDetailPage({
    the gallery's photo — so the selected variant is owned HERE (only mounted
    when the product exists, so hooks stay above any early return). */
 function ProductBuySection({ product, meta }: { product: ProductDetail; meta: StorefrontMeta }) {
-  const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
+  // Open on the merchant's pre-selected "default pack" (e.g. 3KG) when one is
+  // flagged; otherwise fall back to the first variant (old products, none set).
+  const [variantIdx, setVariantIdx] = useState<number | null>(
+    (product.variants.find((v) => v.is_default) ?? product.variants[0])?.index ?? null,
+  );
   const selectedVariant = product.variants.find((v) => v.index === variantIdx) ?? null;
 
   return (

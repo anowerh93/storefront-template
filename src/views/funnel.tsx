@@ -875,7 +875,11 @@ function TrustBadges({ items }: { items: { icon: string; title: string }[] }) {
 /* ── Order form (COD) — reuses the checkout schema + submitOrder ──────── */
 function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta; btn: BtnTheme }) {
   const [qty, setQty] = useState(1);
-  const [variantIdx, setVariantIdx] = useState<number | null>(product.variants[0]?.index ?? null);
+  // Open on the merchant's pre-selected "default pack" (e.g. 3KG) when one is
+  // flagged; otherwise fall back to the first variant (old products, none set).
+  const [variantIdx, setVariantIdx] = useState<number | null>(
+    (product.variants.find((v) => v.is_default) ?? product.variants[0])?.index ?? null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

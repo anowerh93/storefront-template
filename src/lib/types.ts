@@ -471,6 +471,9 @@ export type ProductVariant = {
   compare_at_price: number | null;
   stock: number | null;
   in_stock: boolean;
+  // Pre-selected "default pack" — the order forms open on this variant instead
+  // of the first. At most one variant is flagged; none flagged = use the first.
+  is_default: boolean;
   image_url: string | null;
 };
 
