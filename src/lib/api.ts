@@ -34,6 +34,7 @@
  */
 
 import type {
+  AbandonedCartInput,
   AccountOrderSummary,
   BlogPostCard,
   BlogPostDetail,
@@ -507,6 +508,29 @@ export async function submitOrder(input: CreateOrderInput, idempotencyKey?: stri
     throw new Error('Sorry, your order could not be placed. Please try again in a minute.');
   }
   return (json.data ?? json) as OrderResponse;
+}
+
+// ──────────────────────────────────────────────────────────────
+// Abandoned Cart Recovery (POST /storefronts/{slug}/abandoned-carts)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Beacon the shopper's PARTIAL checkout so the shop can call them if they
+ * leave without ordering. Fire-and-forget from lib/abandoned.ts — the caller
+ * swallows errors. `keepalive` lets the page-leave flush outlive the
+ * navigation (a plain fetch is cancelled by it); the body is tiny, far under
+ * the 64KB keepalive cap. No Turnstile: there's no token at blur time — the
+ * API relies on honeypot + throttle + a valid-phone gate instead.
+ */
+export async function captureAbandonedCart(input: AbandonedCartInput, keepalive = false): Promise<void> {
+  const res = await fetch(buildUrl('/abandoned-carts'), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(input),
+    cache: 'no-store',
+    keepalive,
+  });
+  if (!res.ok) throw new Error(`abandoned_cart_${res.status}`);
 }
 
 // ──────────────────────────────────────────────────────────────

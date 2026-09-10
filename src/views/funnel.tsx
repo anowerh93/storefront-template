@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, ProductCard, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder } from '../lib/api';
+import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
@@ -1011,6 +1012,42 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     }
   }, [!advance]);
 
+  // ── Abandoned Cart Recovery (same contract as checkout.tsx) ──
+  // A valid phone starts the beacon; pack / size / qty changes re-send it;
+  // page-leave flushes it. Funnels are single-product → a 1-line cart.
+  const abandoned = useAbandonedCapture(() => {
+    const v = form.getValues();
+    const phone = (v.customer_phone ?? '').trim();
+    if (!BD_PHONE_RE.test(phone)) return null;
+    const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    return {
+      cart_key: getCartKey(),
+      source: 'funnel',
+      customer_phone: phone,
+      customer_name: v.customer_name?.trim() || undefined,
+      address: v.customer_address?.trim() || undefined,
+      customer_city: districtEnabled ? v.customer_city?.trim() || undefined : undefined,
+      thana: districtEnabled ? v.thana?.trim() || undefined : undefined,
+      items: [{
+        product_id: product.id,
+        variant_index: variant ? variant.index : null,
+        ...(sizeChoice ? { variant: { size: sizeChoice } } : {}),
+        quantity: qty,
+      }],
+      utm_source: sp?.get('utm_source') || undefined,
+      utm_medium: sp?.get('utm_medium') || undefined,
+      utm_campaign: sp?.get('utm_campaign') || undefined,
+      funnel_url: typeof window !== 'undefined' ? window.location.href : undefined,
+    };
+  });
+  useEffect(() => {
+    const sub = form.watch(() => abandoned.touch());
+    return () => sub.unsubscribe();
+  }, [form, abandoned.touch]);
+  useEffect(() => {
+    abandoned.touch();
+  }, [variantIdx, qty, sizeChoice, abandoned.touch]);
+
   async function onSubmit(values: FormData) {
     if (sizeMissing) return; // the button is disabled — belt and braces
     if (inflight.current) return;
@@ -1048,6 +1085,8 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         utm_medium:     sp?.get('utm_medium') || undefined,
         utm_campaign:   sp?.get('utm_campaign') || undefined,
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+        // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
+        cart_key:       getCartKey(),
       }, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
         items: [{
@@ -1057,6 +1096,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           quantity: qty,
         }],
       }));
+      // Order exists — stop further beacons (the redirect's page-leave flush
+      // would resurrect the just-recovered row) and rotate the cart key.
+      abandoned.markOrdered();
       const dest = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
       // duplicate:true = the dedup window / Idempotency-Key replayed an
       // existing order — don't double-count the purchase.
