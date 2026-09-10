@@ -638,6 +638,28 @@ export type OrderItemInput = {
   quantity: number;
 };
 
+/**
+ * Abandoned Cart Recovery — the PARTIAL checkout beaconed to
+ * POST /storefronts/{slug}/abandoned-carts once a valid phone is typed
+ * (lib/abandoned.ts). Mirrors StorefrontAbandonedCartController's rules:
+ * phone + ≥1 item are required, everything else is whatever's filled so far.
+ */
+export type AbandonedCartInput = {
+  cart_key: string;
+  source: 'checkout' | 'funnel';
+  customer_phone: string;
+  customer_name?: string;
+  customer_email?: string;
+  address?: string;
+  customer_city?: string;
+  thana?: string;
+  items: OrderItemInput[];
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
+  funnel_url?: string;
+};
+
 export type CreateOrderInput = {
   customer_name: string;
   customer_phone: string;
@@ -660,6 +682,10 @@ export type CreateOrderInput = {
   utm_medium?: string;
   utm_campaign?: string;
   funnel_url?: string;
+  /** Abandoned Cart Recovery: the browser's anonymous cart key (lib/abandoned).
+   *  Lets the API flip the matching call-list row to "recovered" precisely;
+   *  the phone is the fallback matcher when it's absent. */
+  cart_key?: string;
   // Cloudflare Turnstile token from the widget
   cf_turnstile_response?: string;
   // Phase 1 customer accounts (opt-in at checkout): when create_account is set

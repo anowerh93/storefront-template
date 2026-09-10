@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
 import type { ProductDetail, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder, setToken } from '../lib/api';
+import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
@@ -230,6 +231,44 @@ export function CheckoutPage({
     }
   }, [advanceVisible]);
 
+  // ── Abandoned Cart Recovery ──
+  // Once a valid phone is typed, beacon the partial form + cart (debounced on
+  // every change, flushed on page-leave) so the shop can call the shopper if
+  // they never place the order. Hooks — so they sit ABOVE the early returns
+  // below, same discipline as the GA4 effect. `lines` re-derives per render;
+  // the signature keeps the cart effect keyed on real changes only.
+  const districtOn = !!meta?.checkout?.district_enabled;
+  const abandoned = useAbandonedCapture(() => {
+    const v = form.getValues();
+    const phone = (v.customer_phone ?? '').trim();
+    if (!BD_PHONE_RE.test(phone) || lines.length === 0) return null;
+    return {
+      cart_key: getCartKey(),
+      source: 'checkout',
+      customer_phone: phone,
+      customer_name: v.customer_name?.trim() || undefined,
+      customer_email: v.customer_email?.trim() || undefined,
+      address: v.customer_address?.trim() || undefined,
+      customer_city: districtOn ? v.customer_city?.trim() || undefined : undefined,
+      thana: districtOn ? v.thana?.trim() || undefined : undefined,
+      items: lines.map((l) => ({
+        product_id: l.product_id,
+        variant_index: l.variant_index,
+        ...(l.variant_choice?.size ? { variant: { size: l.variant_choice.size } } : {}),
+        quantity: l.quantity,
+      })),
+      funnel_url: typeof window !== 'undefined' ? window.location.href : undefined,
+    };
+  });
+  useEffect(() => {
+    const sub = form.watch(() => abandoned.touch());
+    return () => sub.unsubscribe();
+  }, [form, abandoned.touch]);
+  const linesSig = lines.map((l) => `${l.product_id}:${l.variant_index ?? '-'}:${l.variant_choice?.size ?? ''}:${l.quantity}`).join('|');
+  useEffect(() => {
+    abandoned.touch();
+  }, [linesSig, abandoned.touch]);
+
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
   // out" — NOT cart mode (which would surface the shopper's persisted cart for
@@ -354,6 +393,8 @@ export function CheckoutPage({
           quantity:      l.quantity,
         })),
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+        // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
+        cart_key:       getCartKey(),
         // Only sent when the box is ticked → guest checkout is unchanged otherwise.
         ...(values.create_account ? { create_account: true, password: values.password } : {}),
         // Only sent when the tenant offers it AND the shopper picked it —
@@ -376,6 +417,10 @@ export function CheckoutPage({
       if (order.customer?.token) {
         setToken(order.customer.token);
       }
+      // The order exists — stop every further abandoned-cart beacon (the
+      // page-leave flush on the redirect below would otherwise resurrect the
+      // just-recovered row) and rotate the key for the next checkout.
+      abandoned.markOrdered();
       const last4 = values.customer_phone.slice(-4);
       const wasOnline = canPayOnline && payMethod === 'online';
 
