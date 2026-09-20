@@ -81,6 +81,12 @@ const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = tracking ? (meta?.pixel?.id ?? null) : null;
 const gtmId = tracking ? (meta?.gtm?.id ?? null) : null;
 
+// Tenant custom code (dashboard → SEO → Search Settings) — same `tracking`
+// gate as gtm/pixel, so the dashboard builder's /preview/* iframes never
+// execute tenant scripts with the merchant's own editing traffic.
+const customHead = tracking ? (meta?.custom_code?.head ?? null) : null;
+const customBody = tracking ? (meta?.custom_code?.body ?? null) : null;
+
 // Inline tracking loaders, built here and emitted via set:html. IMPORTANT:
 // writing a script body as a {`...`} JSX expression does NOT work — Astro
 // treats <script> children as literal text, so the braces/backticks shipped
@@ -244,6 +250,14 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
 
     {/* Page-specific head extras (e.g. the homepage's LCP image preload). */}
     <slot name="head" />
+
+    {/* Tenant custom head code — emitted VERBATIM as the last thing in
+        <head>. The merchant pastes complete tags (a Stape GTM custom
+        loader, verification metas, chat widgets), so no <script> wrapper;
+        set:html is the only emit path that actually executes dynamic
+        markup (see the tracking-snippet comment above — a JSX template
+        literal ships braces as literal text). */}
+    {customHead && <Fragment set:html={customHead} />}
   </head>
   <body class="bg-white text-slate-900 overflow-x-clip">
     {/* GTM noscript pair — Google requires it immediately after <body>. */}
@@ -256,6 +270,12 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
           style="display:none;visibility:hidden"></iframe>
       </noscript>
     )}
+
+    {/* Tenant custom body code — right after the GTM noscript (or the very
+        first child of <body> when no GTM ID is saved): the classic home of
+        a custom loader's own noscript iframe. Verbatim, same tracking gate
+        as the head block. */}
+    {customBody && <Fragment set:html={customBody} />}
     <slot />
 
     <script>
