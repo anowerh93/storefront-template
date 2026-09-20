@@ -106,6 +106,11 @@ export type StorefrontMeta = {
   /** Google Tag Manager container id ("GTM-XXXXXXX") — null when unset.
       Optional so builds against an older API (no `gtm` key yet) still work. */
   gtm?: { id: string | null };
+  /** Tenant "custom code" — raw HTML/JS the merchant pasted in the dashboard,
+      emitted VERBATIM into <head> / right after <body> by Base.astro (Stape
+      GTM custom loaders, verification tags, chat widgets). Their code on
+      their own origin — never sanitised here. Optional for older-API builds. */
+  custom_code?: { head: string | null; body: string | null };
   /** Search-engine ownership codes (Google Search Console / Bing). */
   verification?: { google: string | null; bing: string | null };
   /** IndexNow key — served back at /indexnow-key.txt (public by design). */
