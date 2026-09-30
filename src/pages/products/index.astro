@@ -10,9 +10,10 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getStorefront, getProducts, getCategories, type ProductSort } from '../../lib/api';
+import { getStorefrontGated, getProducts, getCategories, type ProductSort } from '../../lib/api';
 import { ProductListPage } from '../../views/product-list';
-import type { StorefrontMeta, Category } from '../../lib/types';
+import ShopClosed from '../../components/layout/shop-closed.astro';
+import type { Category } from '../../lib/types';
 
 const sp = Astro.url.searchParams;
 const search   = sp.get('search')   ?? '';
@@ -20,29 +21,33 @@ const category = sp.get('category') ?? '';
 const page     = parseInt(sp.get('page') ?? '1', 10);
 const sort     = (sp.get('sort') ?? 'newest') as ProductSort;
 
-let meta: StorefrontMeta | null = null;
-let categories: Category[] = [];
-let productsRes = { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 24 } } as any;
-
-try {
-  [meta, productsRes, categories] = await Promise.all([
-    getStorefront(),
-    getProducts({ page, perPage: 24, search, category, sort }),
-    getCategories().catch(() => []),
-  ]);
-} catch (err) {
-  console.warn('[products/index.astro] fetch failed:', err);
-}
+// Each fetch fails soft on its own so one rejection can't discard the
+// others' results — the gate verdict (closed vs unreachable) must survive
+// the products call 402ing on the very same plan gate.
+const emptyPage = { data: [], meta: { total: 0, last_page: 1, current_page: 1, per_page: 24 } } as any;
+const [gate, productsRes, categories] = await Promise.all([
+  getStorefrontGated(),
+  getProducts({ page, perPage: 24, search, category, sort }).catch((err): typeof emptyPage => {
+    console.warn('[products/index.astro] products fetch failed:', err);
+    return emptyPage;
+  }),
+  getCategories().catch(() => [] as Category[]),
+]);
+const meta = gate.meta;
 
 const searchParams = { search, category, page: String(page), sort };
 ---
 
 <Base title="All products" meta={meta}>
-  <ProductListPage
-    client:load
-    searchParams={searchParams}
-    meta={meta}
-    productsRes={productsRes}
-    categories={categories}
-  />
+  {gate.closed ? (
+    <ShopClosed />
+  ) : (
+    <ProductListPage
+      client:load
+      searchParams={searchParams}
+      meta={meta}
+      productsRes={productsRes}
+      categories={categories}
+    />
+  )}
 </Base>

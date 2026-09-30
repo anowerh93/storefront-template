@@ -1,0 +1,23 @@
+---
+/**
+ * Honest "closed" page for a plan-gated tenant (API 402 storefront_disabled).
+ *
+ * Distinct on purpose from the "temporarily unavailable … try again in a
+ * minute" outage fallback: that copy told shoppers of a gated shop to keep
+ * retrying something that will never come back on its own. This is the
+ * durable state — the owner's package lapsed — so say so plainly, with a
+ * quiet renewal hint for the owner who lands on their own site.
+ */
+---
+
+<div class="mx-auto max-w-2xl px-4 py-16 text-center">
+  <h1 class="text-2xl font-bold text-slate-900">This shop is currently closed</h1>
+  <p class="mt-2 text-sm text-slate-500">
+    The online store is offline for now. Please check back later, or reach the
+    shop through its Facebook page.
+  </p>
+  <p class="mt-6 text-xs text-slate-400">
+    Shop owner? Renew your subscription from your dashboard to bring the site
+    back online.
+  </p>
+</div>

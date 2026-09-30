@@ -129,7 +129,12 @@ async function apiFetch<T>(
     // ApiError carries the HTTP status so callers can tell "doesn't exist"
     // (404) apart from "temporarily refused" (429 throttle, 5xx) — the payment
     // order-status page must never render a throttled lookup as "not found".
-    throw new ApiError(`API ${path} failed: ${res.status} ${res.statusText}`, res.status);
+    // The error code rides along when the body has one (best-effort): the
+    // plan gate answers 402 { error: 'storefront_disabled' } — a string,
+    // unlike the { error: { code } } envelope elsewhere — so accept both.
+    const body = await res.json().catch(() => null);
+    const code = typeof body?.error === 'string' ? body.error : body?.error?.code;
+    throw new ApiError(`API ${path} failed: ${res.status} ${res.statusText}`, res.status, code);
   }
   // Read as text so the same body can be parsed AND stored: the Laravel API
   // sends `Cache-Control: no-cache, private` (correct for direct browser
@@ -168,6 +173,22 @@ async function apiFetch<T>(
 
 export function getStorefront() {
   return apiFetch<StorefrontMeta>('', { tags: ['storefront', 'home'] });
+}
+
+/**
+ * getStorefront(), but a plan-gated tenant is told apart from an outage.
+ * The API answers 402 `storefront_disabled` when the tenant's plan doesn't
+ * include the storefront (expired/downgraded) — that's "the shop is closed",
+ * a durable state, not "try again in a minute". Callers render an honest
+ * closed page for it instead of the generic unreachable fallback.
+ */
+export type StorefrontGate = { meta: StorefrontMeta | null; closed: boolean };
+export async function getStorefrontGated(): Promise<StorefrontGate> {
+  try {
+    return { meta: await getStorefront(), closed: false };
+  } catch (err) {
+    return { meta: null, closed: err instanceof ApiError && err.status === 402 };
+  }
 }
 
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc';
