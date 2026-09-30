@@ -14,7 +14,8 @@
  * use (the carousel + dropdown, not the entire Next.js runtime).
  */
 import Base from '../layouts/Base.astro';
-import { getStorefront, getProducts, getCategories, ensureHomepageProducts } from '../lib/api';
+import { getStorefrontGated, getProducts, getCategories, ensureHomepageProducts } from '../lib/api';
+import ShopClosed from '../components/layout/shop-closed.astro';
 import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
 import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
@@ -37,17 +38,19 @@ import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES } from '../lib/img';
 // Build-time fetch — same shape as views/home.tsx's async function. Three
 // API calls in parallel since the homepage is the most-hit route; we want
 // the fastest possible build.
-const [meta, productsRes, categories] = await Promise.all([
-  getStorefront().catch(() => null),
+const [gate, productsRes, categories] = await Promise.all([
+  getStorefrontGated(),
   getProducts({ perPage: 100 }).catch(() => ({ data: [], meta: null })),
   getCategories().catch(() => []),
 ]);
+const meta = gate.meta;
 
+// Plan-gated tenant (402 storefront_disabled) → honest "closed" page below.
 // If the storefront API is completely unreachable, render a minimal
 // placeholder rather than crashing the build. This matches the original
 // Next.js code's behaviour (which logged a warning and rendered blank
 // pages) but logs more loudly so we notice.
-if (!meta) {
+if (!meta && !gate.closed) {
   console.error('[index.astro] getStorefront() returned null — tenant API unreachable. Rendering placeholder.');
 }
 
@@ -121,7 +124,7 @@ const schemas: Record<string, unknown>[] =
 {/* No title/description props: Base renders "Site title — Tagline" and the
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
-<Base schema={schemas} meta={meta}>
+<Base schema={schemas} meta={meta} noindex={gate.closed}>
   {lcpImage && <link slot="head" rel="preload" as="image" href={lcpSrcSet ? undefined : lcpImage} imagesrcset={lcpSrcSet} imagesizes={lcpSrcSet ? BANNER_SIZES : undefined} fetchpriority="high" />}
 
   {/* Service tenants: block-based service website with its own anchor-nav
@@ -210,8 +213,11 @@ const schemas: Record<string, unknown>[] =
       }
     })}
 
+    {/* Plan-gated tenant: durable state, honest copy — not a retry prompt */}
+    {!meta && gate.closed && <ShopClosed />}
+
     {/* Fallback when the API is unreachable or returned no homepage config */}
-    {!meta && (
+    {!meta && !gate.closed && (
       <div class="mx-auto max-w-2xl px-4 py-16 text-center">
         <h1 class="text-2xl font-bold text-slate-900">This shop is temporarily unavailable</h1>
         <p class="mt-2 text-sm text-slate-500">
