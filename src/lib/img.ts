@@ -61,11 +61,18 @@ function transformable(url: string): URL | null {
   }
 }
 
-/** Single resized URL, or the original when resizing is off / not applicable. */
+/** Single resized URL, or the original when resizing is off / not applicable.
+ *
+ *  onerror=redirect: when the edge REFUSES to transform (the account's
+ *  monthly Image Transformations quota ran out → 429 err=9422, Sep 2026
+ *  fleet-wide outage), Cloudflare 307s to the original R2 file instead of
+ *  serving a broken image. Works because the original lives on the same
+ *  zone (cdn.reply.bd) — a shopper then gets the full-size file, which is
+ *  slower but never blank. Costs nothing when transforms succeed. */
 export function cdnImage(url: string, width: number, quality = 85): string {
   const u = transformable(url);
   if (!u) return url;
-  return `https://${CDN_HOST}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=scale-down${u.pathname}${u.search}`;
+  return `https://${CDN_HOST}/cdn-cgi/image/width=${width},quality=${quality},format=auto,fit=scale-down,onerror=redirect${u.pathname}${u.search}`;
 }
 
 /** srcset covering the given widths, or undefined when resizing is off (the
