@@ -360,8 +360,9 @@ function SectionBg({ bg, bleed = false, children }: { bg?: SectionBgFields; blee
   } else if (t === 'image' && bg!.bg_image_url) {
     style = {
       // cdnImage: CSS backgrounds bypass srcset, so without this the RAW
-      // (up to 1920px) original downloads. 1600w covers a full-bleed band on
-      // desktop; cdnImage passes through untouched when resizing is off.
+      // (up to 1920px) original downloads. 1440w (the banner ladder's top,
+      // shared under the shape budget) covers a full-bleed band on desktop;
+      // cdnImage passes through untouched when resizing is off.
       backgroundImage: `linear-gradient(rgba(0,0,0,0.45), rgba(0,0,0,0.45)), url(${JSON.stringify(cdnImage(bg!.bg_image_url, 1440))})`,
       backgroundSize: 'cover',
       backgroundPosition: 'center',
