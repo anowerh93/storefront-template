@@ -124,7 +124,7 @@ const schemas: Record<string, unknown>[] =
 {/* No title/description props: Base renders "Site title — Tagline" and the
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
-<Base schema={schemas} meta={meta}>
+<Base schema={schemas} meta={meta} noindex={gate.closed}>
   {lcpImage && <link slot="head" rel="preload" as="image" href={lcpSrcSet ? undefined : lcpImage} imagesrcset={lcpSrcSet} imagesizes={lcpSrcSet ? BANNER_SIZES : undefined} fetchpriority="high" />}
 
   {/* Service tenants: block-based service website with its own anchor-nav

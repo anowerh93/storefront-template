@@ -38,7 +38,7 @@ const meta = gate.meta;
 const searchParams = { search, category, page: String(page), sort };
 ---
 
-<Base title="All products" meta={meta}>
+<Base title="All products" meta={meta} noindex={gate.closed}>
   {gate.closed ? (
     <ShopClosed />
   ) : (
