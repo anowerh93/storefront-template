@@ -7,22 +7,27 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getBlogPost, getStorefront, getCategories, resolvePath } from '../../lib/api';
+import { getBlogPost, getStorefrontGated, getCategories, resolvePath, type StorefrontGate } from '../../lib/api';
 import { articleSchema, breadcrumbSchema } from '../../lib/schema';
 import { BlogDetailPage } from '../../views/blog-detail-page';
-import type { BlogPostDetail, Category, StorefrontMeta } from '../../lib/types';
+import type { BlogPostDetail, Category } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
-const [post, meta, categories]: [BlogPostDetail | null, StorefrontMeta | null, Category[]] = await Promise.all([
+// Each fetch fails soft on its own — the post call 402s on the same plan
+// gate, and its rejection must not discard the gate verdict.
+const [post, gate, categories]: [BlogPostDetail | null, StorefrontGate, Category[]] = await Promise.all([
   getBlogPost(slug).catch((err) => { console.warn(`[blog/[slug]] getBlogPost(${slug}) failed:`, err); return null; }),
-  getStorefront().catch((err) => { console.warn('[blog/[slug]] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
   getCategories().catch(() => []),
 ]);
+const meta = gate.meta;
 
 // Slug renames leave a 301 behind — ask the redirect table before 404ing.
 // Local paths only; a poisoned to_path must never become an open redirect.
-if (!post) {
+// Skipped on a closed shop: the missing post is the plan gate 402ing, and
+// the honest render is Base's ShopClosed (200 + noindex), not a 404.
+if (!post && !gate.closed) {
   const redirect = await resolvePath(`/blog/${slug}`);
   if (redirect?.to?.startsWith('/')) {
     return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
@@ -50,7 +55,7 @@ const schemas = post && meta
   ogImage={post?.image_url ?? undefined}
   noindex={post?.seo?.noindex}
   schema={schemas}
-  meta={meta}
+  gate={gate}
 >
   <BlogDetailPage client:load meta={meta} post={post} categories={categories} />
 </Base>

@@ -6,20 +6,25 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getService, getStorefront } from '../../lib/api';
+import { getService, getStorefrontGated, type StorefrontGate } from '../../lib/api';
 import { breadcrumbSchema } from '../../lib/schema';
 import { ServiceDetailPage } from '../../views/service-detail-page';
-import type { ServiceDetail, StorefrontMeta } from '../../lib/types';
+import type { ServiceDetail } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
-const [service, meta]: [ServiceDetail | null, StorefrontMeta | null] = await Promise.all([
+// Each fetch fails soft on its own — the service call 402s on the same
+// plan gate, and its rejection must not discard the gate verdict.
+const [service, gate]: [ServiceDetail | null, StorefrontGate] = await Promise.all([
   getService(slug).catch((err) => { console.warn(`[services/[slug]] getService(${slug}) failed:`, err); return null; }),
-  getStorefront().catch((err) => { console.warn('[services/[slug]] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 
 // Real 404 status when the service doesn't exist (avoid soft-404s).
-if (!service) {
+// Closed shop: the missing service is the plan gate 402ing — the honest
+// render is Base's ShopClosed (200 + noindex), not a 404.
+if (!service && !gate.closed) {
   Astro.response.status = 404;
 }
 
@@ -41,7 +46,7 @@ const schemas = service
   ogImage={service?.image_url ?? undefined}
   noindex={service?.seo?.noindex}
   schema={schemas}
-  meta={meta}
+  gate={gate}
 >
   <ServiceDetailPage client:load service={service} meta={meta} />
 </Base>

@@ -15,7 +15,6 @@
  */
 import Base from '../layouts/Base.astro';
 import { getStorefrontGated, getProducts, getCategories, ensureHomepageProducts } from '../lib/api';
-import ShopClosed from '../components/layout/shop-closed.astro';
 import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
 import { resolveHomeData } from '../lib/home-data';
 import { Header } from '../components/layout/header';
@@ -124,7 +123,7 @@ const schemas: Record<string, unknown>[] =
 {/* No title/description props: Base renders "Site title — Tagline" and the
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
-<Base schema={schemas} meta={meta} noindex={gate.closed}>
+<Base schema={schemas} gate={gate}>
   {lcpImage && <link slot="head" rel="preload" as="image" href={lcpSrcSet ? undefined : lcpImage} imagesrcset={lcpSrcSet} imagesizes={lcpSrcSet ? BANNER_SIZES : undefined} fetchpriority="high" />}
 
   {/* Service tenants: block-based service website with its own anchor-nav
@@ -213,9 +212,8 @@ const schemas: Record<string, unknown>[] =
       }
     })}
 
-    {/* Plan-gated tenant: durable state, honest copy — not a retry prompt */}
-    {!meta && gate.closed && <ShopClosed />}
-
+    {/* Plan-gated tenant (gate.closed): Base renders ShopClosed in place of
+        this whole slot, so only the outage fallback is handled here. */}
     {/* Fallback when the API is unreachable or returned no homepage config */}
     {!meta && !gate.closed && (
       <div class="mx-auto max-w-2xl px-4 py-16 text-center">

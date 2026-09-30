@@ -11,7 +11,8 @@
  * props — this layout merges them on top of the storefront defaults.
  */
 import '../styles.css';
-import { getStorefront } from '../lib/api';
+import { getStorefrontGated, type StorefrontGate } from '../lib/api';
+import ShopClosed from '../components/layout/shop-closed.astro';
 import { brandCssVars } from '../lib/theme';
 import { CDN_HOST } from '../lib/img';
 import { isMirrorHost, MIRROR_HOST_SUFFIXES } from '../lib/mirror';
@@ -28,14 +29,26 @@ export interface Props {
   /** Load the Hind Siliguri Bengali webfont (opt-in; used by Bengali funnels). */
   bengaliFont?: boolean;
   /**
-   * Storefront metadata fetched by the page. Pages that already call
-   * getStorefront() MUST pass it through — on SSR routes a second fetch
-   * here costs a full extra round-trip to the Laravel origin per page
-   * view (this duplicate was the single biggest TTFB cost). Pass `null`
-   * to mean "I fetched and it failed" — only `undefined` (prop omitted)
-   * falls back to fetching here.
+   * Storefront metadata fetched by the page. Pages that already fetch it
+   * MUST pass it through — on SSR routes a second fetch here costs a full
+   * extra round-trip to the Laravel origin per page view (this duplicate
+   * was the single biggest TTFB cost). Pass `null` to mean "I fetched and
+   * it failed" — only `undefined` (prop omitted, and no `gate`) falls back
+   * to fetching here. Shopper-facing pages should pass `gate` instead
+   * (below) so the plan gate renders; `meta` remains for surfaces that
+   * deliberately bypass it (the builder's /preview/* iframes).
    */
   meta?: StorefrontMeta | null;
+  /**
+   * The whole getStorefrontGated() verdict — pass this INSTEAD of `meta`
+   * and Base owns the plan-gate rendering: on `closed` (API 402
+   * storefront_disabled) it renders the honest ShopClosed page in place of
+   * the page's own content (the slot), forces noindex and drops the
+   * canonical. Pages whose sibling data fetches can 402 on the very same
+   * gate must still fail those soft INDIVIDUALLY (see products/index.astro)
+   * so one rejection can't discard this verdict or 404 before we render.
+   */
+  gate?: StorefrontGate;
   /**
    * Set false on non-shopper surfaces (the dashboard builder's /preview/*
    * iframes) to suppress the GTM + Meta Pixel loaders entirely — every
@@ -48,26 +61,34 @@ export interface Props {
 
 const { title, description, ogImage, noindex, schema = [], bengaliFont = false, tracking = true } = Astro.props;
 
-// Tenant metadata: prefer the page's already-fetched copy; fetch only when
-// the page didn't pass one (e.g. 404.astro). If the fallback fails (API
-// down, slug mis-set), render a graceful skeleton rather than crashing.
+// Tenant metadata: prefer the page's already-fetched copy (`gate` wins over
+// `meta`); fetch only when the page passed neither (e.g. 404.astro). The
+// fallback fetch is gated too, so even a page that never fetches renders the
+// honest closed page on a plan-gated tenant; a plain failure (API down,
+// slug mis-set) still renders a graceful skeleton rather than crashing.
 let meta: StorefrontMeta | null = null;
-if (Astro.props.meta !== undefined) {
+let closed = false;
+if (Astro.props.gate) {
+  ({ meta, closed } = Astro.props.gate);
+} else if (Astro.props.meta !== undefined) {
   meta = Astro.props.meta;
 } else {
-  try {
-    meta = await getStorefront();
-  } catch (err) {
-    console.warn('[Base.astro] getStorefront() failed — rendering without tenant chrome:', err);
-  }
+  ({ meta, closed } = await getStorefrontGated());
 }
 
+// Plan-gated tenant: the page never appears in search (and gets no
+// canonical) — it's a dead-end state, not content.
+const hideFromSearch = noindex || closed;
+
 // Homepage (no page title): "Site title — Tagline", WordPress-style.
-// Inner pages: "Page — Site name".
+// Inner pages: "Page — Site name". Closed shop: one honest title everywhere
+// (meta is null on the gate, so the page's own title had no name to join).
 const homeTitle = meta?.seo.title ?? meta?.name ?? 'Storefront';
-const finalTitle = title
-  ? (meta ? `${title} — ${meta.name}` : title)
-  : (meta?.tagline ? `${homeTitle} — ${meta.tagline}` : homeTitle);
+const finalTitle = closed
+  ? 'Shop closed'
+  : title
+    ? (meta ? `${title} — ${meta.name}` : title)
+    : (meta?.tagline ? `${homeTitle} — ${meta.tagline}` : homeTitle);
 
 const finalDescription = description
   ?? meta?.seo.description
@@ -129,7 +150,7 @@ if (mirror) {
 }
 
 const canonical =
-  canonicalBase && !noindex && !meta?.seo?.discourage && !mirror
+  canonicalBase && !hideFromSearch && !meta?.seo?.discourage && !mirror
     ? canonicalBase + (Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, ''))
     : null;
 
@@ -158,10 +179,11 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{finalTitle}</title>
     {finalDescription && <meta name="description" content={finalDescription} />}
-    {/* noindex: per-page (funnels), the tenant's WordPress-style "discourage
-        search engines" toggle (build/demo mode), OR a mirror host serving a
-        site whose canonical home is a custom domain. */}
-    {(noindex || meta?.seo?.discourage || mirror) && <meta name="robots" content="noindex,nofollow" />}
+    {/* noindex: per-page (funnels), a plan-gated closed shop, the tenant's
+        WordPress-style "discourage search engines" toggle (build/demo mode),
+        OR a mirror host serving a site whose canonical home is a custom
+        domain. */}
+    {(hideFromSearch || meta?.seo?.discourage || mirror) && <meta name="robots" content="noindex,nofollow" />}
     {canonical && <link rel="canonical" href={canonical} />}
     {mirrorRuntimeCheck && <script is:inline set:html={mirrorRuntimeCheck} />}
 
@@ -276,7 +298,11 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
         a custom loader's own noscript iframe. Verbatim, same tracking gate
         as the head block. */}
     {customBody && <Fragment set:html={customBody} />}
-    <slot />
+    {/* Plan-gated tenant: the honest closed page REPLACES the page's own
+        content — durable state, not a retry prompt. Astro renders slots
+        lazily, so the page's islands/views never render on a closed shop
+        (their frontmatter fetches already ran; those fail soft per-page). */}
+    {closed ? <ShopClosed /> : <slot />}
 
     <script>
       // Footer WhatsApp newsletter — global delegated handler so it works

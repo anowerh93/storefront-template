@@ -4,18 +4,14 @@
  * in the header/footer without already having an order number in hand.
  */
 import Base from '../../layouts/Base.astro';
-import { getStorefront } from '../../lib/api';
+import { getStorefrontGated } from '../../lib/api';
 import { OrderLookupPage } from '../../views/order-lookup';
-import type { StorefrontMeta } from '../../lib/types';
 
-let meta: StorefrontMeta | null = null;
-try {
-  meta = await getStorefront();
-} catch (err) {
-  console.warn('[order/lookup.astro] getStorefront() failed:', err);
-}
+// Gated: a plan-gated tenant (402) renders Base's ShopClosed, not the form.
+const gate = await getStorefrontGated();
+const meta = gate.meta;
 ---
 
-<Base title="Track your order" meta={meta}>
+<Base title="Track your order" gate={gate}>
   <OrderLookupPage client:load meta={meta} />
 </Base>

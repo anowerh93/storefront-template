@@ -18,9 +18,8 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getStorefront } from '../../lib/api';
+import { getStorefrontGated } from '../../lib/api';
 import { OrderStatusPage } from '../../views/order-status';
-import type { StorefrontMeta } from '../../lib/types';
 
 const orderNumber = Astro.params.number ?? '';
 const phone = Astro.url.searchParams.get('phone') ?? undefined;
@@ -29,15 +28,13 @@ const placed = Astro.url.searchParams.get('placed') === '1';
 // (the order still succeeded) — the success screen nudges them to log in.
 const accountExists = Astro.url.searchParams.get('account_exists') === '1';
 
-let meta: StorefrontMeta | null = null;
-try {
-  meta = await getStorefront();
-} catch (err) {
-  console.warn('[order/[number].astro] getStorefront() failed:', err);
-}
+// Gated: a plan-gated tenant (402) renders Base's ShopClosed — the order
+// lookup API is behind the same gate, so the timeline couldn't load anyway.
+const gate = await getStorefrontGated();
+const meta = gate.meta;
 ---
 
-<Base title={`Order #${orderNumber}`} meta={meta} noindex={true}>
+<Base title={`Order #${orderNumber}`} gate={gate} noindex={true}>
   <OrderStatusPage
     client:load
     orderNumber={orderNumber}
