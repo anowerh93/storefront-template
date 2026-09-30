@@ -13,8 +13,9 @@ import { cdnBlurThumb, cdnSrcSet } from '../../lib/img';
  *
  * When PUBLIC_IMAGE_RESIZE is on (see lib/img.ts), the real image gets a
  * responsive srcset (edge-resized by Cloudflare — originals untouched,
- * fit=scale-down never upscales) and the blurred backdrop drops to a 64px
- * thumb (it renders behind blur-2xl; full resolution there is pure waste).
+ * fit=scale-down never upscales) and the blurred backdrop reuses the shared
+ * 192px thumb shape (it renders behind blur-2xl; full resolution there is
+ * pure waste, and a dedicated smaller shape would be a new billable unique).
  * When off, both helpers pass through and the markup is identical to before.
  */
 export function FitImage({

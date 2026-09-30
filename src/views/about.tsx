@@ -76,7 +76,7 @@ export function AboutPage({
                 <div key={i} className="rounded-2xl bg-white p-5 text-center ring-1 ring-slate-200 sm:p-6">
                   {m.image_url ? (
                     <img
-                      src={cdnImage(m.image_url, 240)}
+                      src={cdnImage(m.image_url, 192)}
                       alt={m.name}
                       loading="lazy"
                       className="mx-auto h-24 w-24 rounded-full object-cover ring-1 ring-slate-200"
