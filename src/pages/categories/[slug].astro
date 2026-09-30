@@ -9,10 +9,10 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getCategory, getStorefront, getCategories, resolvePath, type ProductSort } from '../../lib/api';
+import { getCategory, getStorefrontGated, getCategories, resolvePath, type ProductSort, type StorefrontGate } from '../../lib/api';
 import { breadcrumbSchema, collectionPageSchema } from '../../lib/schema';
 import { CategoryDetailPage } from '../../views/category-detail';
-import type { StorefrontMeta, Category, Paginated, ProductCard } from '../../lib/types';
+import type { Category, Paginated, ProductCard } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 const sp   = Astro.url.searchParams;
@@ -21,24 +21,26 @@ const page = parseInt(sp.get('page') ?? '1', 10);
 
 // All three fetches in PARALLEL — sequential awaits here cost extra origin
 // round-trips per page view (meta/categories are independent of the category).
-const [res, meta, categories]: [
+// Each fails soft on its own: getCategory 402s on the same plan gate, and
+// its rejection must not discard the gate verdict.
+const [res, gate, categories]: [
   { category: Category; products: Paginated<ProductCard> } | null,
-  StorefrontMeta | null,
+  StorefrontGate,
   Category[],
 ] = await Promise.all([
   getCategory(slug, { sort, page }).catch((err) => {
     console.warn(`[categories/[slug].astro] getCategory(${slug}) failed:`, err);
     return null;
   }),
-  getStorefront().catch((err) => {
-    console.warn('[categories/[slug].astro] getStorefront() failed:', err);
-    return null;
-  }),
+  getStorefrontGated(),
   getCategories().catch(() => []),
 ]);
+const meta = gate.meta;
 
 // Slug renames leave a 301 behind — same contract as products/[slug].astro.
-if (!res) {
+// Skipped on a closed shop: the missing category is the plan gate 402ing,
+// and the honest render is Base's ShopClosed (200 + noindex), not a 404.
+if (!res && !gate.closed) {
   const redirect = await resolvePath(`/categories/${slug}`);
   if (redirect?.to?.startsWith('/')) {
     return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
@@ -61,7 +63,7 @@ const schemas = res
   : [];
 ---
 
-<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas} meta={meta}>
+<Base title={res?.category?.name ?? 'Category'} noindex={res?.category?.noindex} schema={schemas} gate={gate}>
   <CategoryDetailPage
     client:load
     searchParams={{ sort, page: String(page) }}

@@ -8,20 +8,25 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getInfoPage, getStorefront, getCategories } from '../../lib/api';
+import { getInfoPage, getStorefrontGated, getCategories, type StorefrontGate } from '../../lib/api';
 import { breadcrumbSchema } from '../../lib/schema';
 import { InfoPageView } from '../../views/info-page';
-import type { InfoPageDetail, Category, StorefrontMeta } from '../../lib/types';
+import type { InfoPageDetail, Category } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
-const [page, meta, categories]: [InfoPageDetail | null, StorefrontMeta | null, Category[]] = await Promise.all([
+// Each fetch fails soft on its own — the page call 402s on the same plan
+// gate, and its rejection must not discard the gate verdict.
+const [page, gate, categories]: [InfoPageDetail | null, StorefrontGate, Category[]] = await Promise.all([
   getInfoPage(slug).catch((err) => { console.warn(`[pages/[slug]] getInfoPage(${slug}) failed:`, err); return null; }),
-  getStorefront().catch((err) => { console.warn('[pages/[slug]] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
   getCategories().catch(() => []),
 ]);
+const meta = gate.meta;
 
-if (!page) {
+// Closed shop: the missing page is the plan gate 402ing — the honest render
+// is Base's ShopClosed (200 + noindex), not a 404.
+if (!page && !gate.closed) {
   Astro.response.status = 404;
 }
 
@@ -41,7 +46,7 @@ const schemas = page && meta
   description={page?.seo?.description ?? undefined}
   noindex={page?.seo?.noindex}
   schema={schemas}
-  meta={meta}
+  gate={gate}
 >
   <InfoPageView client:load meta={meta} page={page} categories={categories} />
 </Base>

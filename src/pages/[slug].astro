@@ -17,29 +17,31 @@
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getFunnel, getStorefront } from '../lib/api';
+import { getFunnel, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { FunnelPage } from '../views/funnel';
-import type { FunnelPayload, StorefrontMeta } from '../lib/types';
+import type { FunnelPayload } from '../lib/types';
 
 const slug = Astro.params.slug as string;
 
 // Parallel fetches — sequential awaits cost an extra origin round-trip.
-const [funnel, meta]: [FunnelPayload | null, StorefrontMeta | null] = await Promise.all([
+// Each fails soft on its own: getFunnel 402s on the same plan gate, and
+// its rejection must not discard the gate verdict.
+const [funnel, gate]: [FunnelPayload | null, StorefrontGate] = await Promise.all([
   slug
     ? getFunnel(slug).catch((err) => {
         console.warn(`[[slug].astro] getFunnel(${slug}) failed:`, err);
         return null;
       })
     : Promise.resolve(null),
-  getStorefront().catch((err) => {
-    console.warn('[[slug].astro] getStorefront() failed:', err);
-    return null;
-  }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 
-if (!funnel) { Astro.response.status = 404; }
+// Closed shop: the missing funnel is the plan gate 402ing — an ad click
+// still deserves the honest ShopClosed render (Base), not a bare 404.
+if (!funnel && !gate.closed) { Astro.response.status = 404; }
 ---
 
-<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} meta={meta} bengaliFont={funnel?.config?.font === 'bengali'}>
+<Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} gate={gate} bengaliFont={funnel?.config?.font === 'bengali'}>
   <FunnelPage client:load funnel={funnel} meta={meta} />
 </Base>

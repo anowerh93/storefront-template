@@ -12,7 +12,6 @@ export const prerender = false;
 import Base from '../../layouts/Base.astro';
 import { getStorefrontGated, getProducts, getCategories, type ProductSort } from '../../lib/api';
 import { ProductListPage } from '../../views/product-list';
-import ShopClosed from '../../components/layout/shop-closed.astro';
 import type { Category } from '../../lib/types';
 
 const sp = Astro.url.searchParams;
@@ -38,16 +37,13 @@ const meta = gate.meta;
 const searchParams = { search, category, page: String(page), sort };
 ---
 
-<Base title="All products" meta={meta} noindex={gate.closed}>
-  {gate.closed ? (
-    <ShopClosed />
-  ) : (
-    <ProductListPage
-      client:load
-      searchParams={searchParams}
-      meta={meta}
-      productsRes={productsRes}
-      categories={categories}
-    />
-  )}
+{/* gate.closed → Base renders ShopClosed in place of the slot (+ noindex) */}
+<Base title="All products" gate={gate}>
+  <ProductListPage
+    client:load
+    searchParams={searchParams}
+    meta={meta}
+    productsRes={productsRes}
+    categories={categories}
+  />
 </Base>

@@ -6,17 +6,20 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getServices, getStorefront } from '../../lib/api';
+import { getServices, getStorefrontGated, type StorefrontGate } from '../../lib/api';
 import { ServicesPage } from '../../views/services-page';
-import type { ServiceCard, StorefrontMeta } from '../../lib/types';
+import type { ServiceCard } from '../../lib/types';
 
-const [services, meta]: [ServiceCard[] | null, StorefrontMeta | null] = await Promise.all([
+// Each fetch fails soft on its own — the services call 402s on the same
+// plan gate, and its rejection must not discard the gate verdict.
+const [services, gate]: [ServiceCard[] | null, StorefrontGate] = await Promise.all([
   getServices().catch((err) => { console.warn('[services/index] getServices failed:', err); return null; }),
-  getStorefront().catch((err) => { console.warn('[services/index] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 ---
 
-<Base title="Services" description={meta?.about ?? undefined} meta={meta}>
+<Base title="Services" description={meta?.about ?? undefined} gate={gate}>
   {/* client:load — the header's mobile menu inside the view needs hydration */}
   <ServicesPage client:load meta={meta} services={services ?? []} />
 </Base>

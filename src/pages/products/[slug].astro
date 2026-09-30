@@ -21,31 +21,33 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getProduct, getStorefront, resolvePath } from '../../lib/api';
+import { getProduct, getStorefrontGated, resolvePath, type StorefrontGate } from '../../lib/api';
 import { breadcrumbSchema, faqSchema, productSchema } from '../../lib/schema';
 import { ProductDetailPage } from '../../views/product-detail';
-import type { ProductDetail, StorefrontMeta } from '../../lib/types';
+import type { ProductDetail } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
 // Two independent fetches, run in PARALLEL — sequential awaits here cost a
 // full extra origin round-trip per page view. If the product 404s we still
-// want meta for the layout/branding on the rendered NotFoundPage.
-const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Promise.all([
+// want meta for the layout/branding on the rendered NotFoundPage. Each
+// fails soft on its own: getProduct 402s on the same plan gate, and its
+// rejection must not discard the gate verdict.
+const [product, gate]: [ProductDetail | null, StorefrontGate] = await Promise.all([
   getProduct(slug).catch((err) => {
     console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
     return null;
   }),
-  getStorefront().catch((err) => {
-    console.warn('[products/[slug].astro] getStorefront() failed:', err);
-    return null;
-  }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 
 // Slug renames leave a 301 behind — ask the redirect table before rendering
 // a 404 (the miss is logged server-side either way). Local paths only; a
-// poisoned to_path must never become an open redirect.
-if (!product) {
+// poisoned to_path must never become an open redirect. Skipped on a closed
+// shop: the missing product is the plan gate 402ing, and the honest render
+// is Base's ShopClosed (200 + noindex), not a 404.
+if (!product && !gate.closed) {
   const redirect = await resolvePath(`/products/${slug}`);
   if (redirect?.to?.startsWith('/')) {
     return Astro.redirect(redirect.to, redirect.status === 302 ? 302 : 301);
@@ -79,7 +81,7 @@ const schemas = product
   ogImage={product?.image_url ?? undefined}
   noindex={product?.seo?.noindex}
   schema={schemas}
-  meta={meta}
+  gate={gate}
 >
   <ProductDetailPage client:load product={product} meta={meta} />
 </Base>

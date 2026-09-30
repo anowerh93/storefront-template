@@ -8,15 +8,18 @@
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getTeam, getStorefront } from '../lib/api';
+import { getTeam, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { breadcrumbSchema } from '../lib/schema';
 import { TeamPage } from '../views/team-page';
-import type { StorefrontMeta, TeamMember } from '../lib/types';
+import type { TeamMember } from '../lib/types';
 
-const [team, meta]: [TeamMember[] | null, StorefrontMeta | null] = await Promise.all([
+// Both fetches fail soft on their own: getTeam 402s on the same plan gate,
+// and its rejection must not discard the gate verdict.
+const [team, gate]: [TeamMember[] | null, StorefrontGate] = await Promise.all([
   getTeam().catch((err) => { console.warn('[team] getTeam failed:', err); return null; }),
-  getStorefront().catch((err) => { console.warn('[team] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 
 const members = team ?? [];
 const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
@@ -27,7 +30,7 @@ const schemas = meta
   : [];
 ---
 
-<Base title="Our team" noindex={members.length === 0 || meta?.business_type !== 'service'} schema={schemas} meta={meta}>
+<Base title="Our team" noindex={members.length === 0 || meta?.business_type !== 'service'} schema={schemas} gate={gate}>
   {/* client:load — the header's mobile menu inside the view needs hydration */}
   <TeamPage client:load team={members} meta={meta} />
 </Base>

@@ -7,19 +7,22 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getBlogPosts, getStorefront, getCategories } from '../../lib/api';
+import { getBlogPosts, getStorefrontGated, getCategories, type StorefrontGate } from '../../lib/api';
 import { blogSchema, breadcrumbSchema } from '../../lib/schema';
 import { BlogListPage } from '../../views/blog-list';
-import type { BlogPostCard, Category, Paginated, StorefrontMeta } from '../../lib/types';
+import type { BlogPostCard, Category, Paginated } from '../../lib/types';
 
 const page = parseInt(Astro.url.searchParams.get('page') ?? '1', 10);
 const search = (Astro.url.searchParams.get('search') ?? '').trim();
 
-const [posts, meta, categories]: [Paginated<BlogPostCard> | null, StorefrontMeta | null, Category[]] = await Promise.all([
+// Each fetch fails soft on its own — the posts call 402s on the same plan
+// gate, and its rejection must not discard the gate verdict.
+const [posts, gate, categories]: [Paginated<BlogPostCard> | null, StorefrontGate, Category[]] = await Promise.all([
   getBlogPosts({ page, perPage: 12, search: search || undefined }).catch((err) => { console.warn('[blog/index] getBlogPosts failed:', err); return null; }),
-  getStorefront().catch((err) => { console.warn('[blog/index] getStorefront failed:', err); return null; }),
+  getStorefrontGated(),
   getCategories().catch(() => []),
 ]);
+const meta = gate.meta;
 
 const origin = (meta?.public_url ?? Astro.url.origin).replace(/\/+$/, '');
 const schemas = meta
@@ -30,6 +33,6 @@ const schemas = meta
   : [];
 ---
 
-<Base title="Blog" description={meta?.seo?.description ?? meta?.about ?? undefined} schema={schemas} meta={meta}>
+<Base title="Blog" description={meta?.seo?.description ?? meta?.about ?? undefined} schema={schemas} gate={gate}>
   <BlogListPage client:load meta={meta} posts={posts} categories={categories} search={search} />
 </Base>

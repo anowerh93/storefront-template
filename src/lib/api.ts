@@ -187,7 +187,12 @@ export async function getStorefrontGated(): Promise<StorefrontGate> {
   try {
     return { meta: await getStorefront(), closed: false };
   } catch (err) {
-    return { meta: null, closed: err instanceof ApiError && err.status === 402 };
+    const closed = err instanceof ApiError && err.status === 402;
+    // A non-gate failure (network, 5xx, throttle) is an outage, not a closed
+    // shop — log it here once so pages don't each carry a try/catch just to
+    // keep the failure visible in build/worker logs.
+    if (!closed) console.warn('[api] getStorefront() failed (outage, not plan gate):', err);
+    return { meta: null, closed };
   }
 }
 

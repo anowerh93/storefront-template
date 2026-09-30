@@ -11,9 +11,9 @@
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getProduct, getStorefront } from '../lib/api';
+import { getProduct, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { CheckoutPage } from '../views/checkout';
-import type { ProductDetail, StorefrontMeta } from '../lib/types';
+import type { ProductDetail } from '../lib/types';
 
 const params = Astro.url.searchParams;
 const slug = params.get('p') ?? '';
@@ -27,21 +27,21 @@ const variantIndex = Number.isNaN(vRaw) ? null : vRaw;
 const qty = Math.max(1, parseInt(params.get('q') ?? '1', 10) || 1);
 
 // Parallel fetches — sequential awaits cost an extra origin round-trip.
-const [product, meta]: [ProductDetail | null, StorefrontMeta | null] = await Promise.all([
+// Each fails soft on its own: getProduct 402s on the same plan gate, and
+// its rejection must not discard the gate verdict.
+const [product, gate]: [ProductDetail | null, StorefrontGate] = await Promise.all([
   slug
     ? getProduct(slug).catch((err) => {
         console.warn(`[checkout.astro] getProduct(${slug}) failed:`, err);
         return null;
       })
     : Promise.resolve(null),
-  getStorefront().catch((err) => {
-    console.warn('[checkout.astro] getStorefront() failed:', err);
-    return null;
-  }),
+  getStorefrontGated(),
 ]);
+const meta = gate.meta;
 ---
 
 {/* noindex like cart/account: thin utility shell, reachable from every PDP */}
-<Base title="Checkout" description="Secure checkout" noindex={true} meta={meta}>
+<Base title="Checkout" description="Secure checkout" noindex={true} gate={gate}>
   <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} />
 </Base>
