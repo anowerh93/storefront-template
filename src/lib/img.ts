@@ -29,13 +29,25 @@ const RAW = ((import.meta.env.PUBLIC_IMAGE_RESIZE ?? import.meta.env.PUBLIC_IMAG
 const ENABLED = RAW === '1' || (RAW !== '0' && !import.meta.env.DEV);
 export const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undefined) || 'cdn.reply.bd';
 
+/**
+ * SHAPE BUDGET (Sep 2026): every (source file × width × quality) is a
+ * billable "unique transformation" — 5,000/month free, then paid. The
+ * original 18 distinct shapes across the fleet helped exhaust September's
+ * quota, so the whole template now emits exactly FOUR:
+ *
+ *     192 (thumbs/blur) · 480 · 960 · 1440   — all at quality=85
+ *
+ * Do not add a new width or quality without counting it against this
+ * budget — one new shape multiplies across every image on every tenant.
+ */
+
 /** Default srcset width ladder for fluid images (FitImage etc.). */
-export const DEFAULT_WIDTHS = [320, 640, 1024] as const;
+export const DEFAULT_WIDTHS = [480, 960] as const;
 
 /** The homepage big banner (the mobile LCP). One source of truth — the
  *  <img srcset> in hero-grid and the <link rel=preload imagesrcset> in
  *  index.astro MUST agree, or the browser double-downloads. */
-export const BANNER_WIDTHS = [480, 768, 1080, 1440, 1920] as const;
+export const BANNER_WIDTHS = [480, 960, 1440] as const;
 export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
 /** Hero side tiles: full-width stacked on phones, two-up on tablets, single
  *  right column on desktop — MUST mirror hero-grid's tile wrapper
@@ -43,9 +55,10 @@ export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
 export const TILE_SIZES = '(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw';
 /** Funnel + PDP main image — the LCP of ad landing pages.
  *  The middle band caps at 672px because the centred funnel hero is
- *  max-w-2xl — a bare 100vw made ~1000px tablets fetch the 1200w
- *  candidate for a 672px box. */
-export const DETAIL_WIDTHS = [480, 828, 1200] as const;
+ *  max-w-2xl — a bare 100vw made ~1000px tablets fetch the biggest
+ *  candidate for a 672px box. Same ladder as DEFAULT under the shape
+ *  budget; kept as its own name so the sizes pairing stays explicit. */
+export const DETAIL_WIDTHS = [480, 960] as const;
 export const DETAIL_SIZES = '(min-width: 1024px) 600px, (min-width: 672px) 672px, 100vw';
 
 /** Is this a URL the CDN can transform (right host, not already transformed)? */
@@ -75,8 +88,10 @@ export function cdnSrcSet(url: string, widths: readonly number[] = DEFAULT_WIDTH
   return widths.map((w) => `${cdnImage(url, w)} ${w}w`).join(', ');
 }
 
-/** Tiny, cheap version for FitImage's blurred backdrop layer — it renders
- *  behind blur-2xl, so 64px is indistinguishable from the full file. */
+/** FitImage's blurred backdrop layer. Behind blur-2xl any small size looks
+ *  identical — it reuses the 192/q85 thumb shape instead of a dedicated
+ *  64/q50 one, so it never mints a new billable transformation for a file
+ *  whose thumb already rendered somewhere. */
 export function cdnBlurThumb(url: string): string {
-  return cdnImage(url, 64, 50);
+  return cdnImage(url, 192);
 }

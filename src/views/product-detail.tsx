@@ -329,7 +329,7 @@ function BuyBox({
               >
                 {v.image_url && (
                   <img
-                    src={cdnImage(v.image_url, 96)}
+                    src={cdnImage(v.image_url, 192)}
                     alt=""
                     loading="lazy"
                     className="h-8 w-8 shrink-0 rounded-lg object-cover"
@@ -686,7 +686,7 @@ function Sidebar({
             {related.map((p) => (
               <a key={p.slug} href={`/products/${p.slug}`} className="flex items-center gap-3 rounded-xl p-1.5 hover:bg-slate-50">
                 <div className="relative h-14 w-14 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
-                  {p.image_url && <img src={cdnImage(p.image_url, 168)} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
+                  {p.image_url && <img src={cdnImage(p.image_url, 192)} alt={p.name} loading="lazy" className="absolute inset-0 h-full w-full object-contain p-1" />}
                 </div>
                 <div className="min-w-0">
                   <p className="line-clamp-2 text-xs font-semibold text-slate-900">{p.name}</p>

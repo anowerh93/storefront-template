@@ -396,7 +396,7 @@ function SearchBox({ categories, currency }: { categories: Category[]; currency?
             >
               <span className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg bg-slate-100 ring-1 ring-slate-200">
                 {p.image_url && (
-                  <img src={cdnImage(p.image_url, 144)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-0.5" />
+                  <img src={cdnImage(p.image_url, 192)} alt="" loading="lazy" className="absolute inset-0 h-full w-full object-contain p-0.5" />
                 )}
               </span>
               <span className="min-w-0 flex-1">

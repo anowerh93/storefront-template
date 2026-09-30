@@ -132,7 +132,7 @@ function MiniDealCard({ product }: { product: ProductCard }) {
     >
       <div className="relative w-16 h-16 sm:w-20 sm:h-20 rounded-lg bg-slate-50 overflow-hidden shrink-0">
         {product.image_url && (
-          <img src={cdnImage(product.image_url, 240)} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
+          <img src={cdnImage(product.image_url, 192)} alt={product.name} loading="lazy" className="absolute inset-0 h-full w-full object-cover" />
         )}
       </div>
       <div className="min-w-0 flex-1">
