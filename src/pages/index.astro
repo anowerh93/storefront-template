@@ -16,7 +16,8 @@
 import Base from '../layouts/Base.astro';
 import { getStorefrontGated, getProducts, getCategories, ensureHomepageProducts } from '../lib/api';
 import { faqSchema, orgSchema, websiteSchema } from '../lib/schema';
-import { resolveHomeData } from '../lib/home-data';
+import { resolveHomeData, homeItemsFor } from '../lib/home-data';
+import { codOffered } from '../components/order/checkout-extras';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
@@ -60,6 +61,9 @@ if (!meta && !gate.closed) {
 const isServiceSite = meta?.business_type === 'service' && !!meta?.service_home;
 
 const home = meta?.homepage ?? null;
+// A store that has switched Cash on Delivery off must not promise it in the
+// builder's stock cards (see homeItemsFor).
+const takesCod = codOffered(meta);
 // Every product the config references must actually be fetched, no matter
 // how big the catalog: the general list above is capped by the API (60,
 // newest-first), so an older pick used to silently fail to resolve — and a
@@ -201,11 +205,11 @@ const schemas: Record<string, unknown>[] =
             : null;
         case 'services_row':
           return home.services_row.visible
-            ? <ServicesRow items={home.services_row.items} />
+            ? <ServicesRow items={homeItemsFor(home.services_row.items, takesCod)} />
             : null;
         case 'trust_badges':
           return home.trust_badges.visible
-            ? <TrustBadges items={home.trust_badges.items} />
+            ? <TrustBadges items={homeItemsFor(home.trust_badges.items, takesCod)} />
             : null;
         default:
           return null;

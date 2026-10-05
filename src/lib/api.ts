@@ -528,7 +528,12 @@ export async function submitOrder(input: CreateOrderInput, idempotencyKey?: stri
       json?.error?.message ??
       (typeof json?.error === 'string' ? json.error : undefined) ??
       'Sorry, your order could not be placed. Please try again in a minute.';
-    throw new Error(msg);
+    // ApiError (an Error — existing `e.message` callers are unaffected), so
+    // the status and the server's error code travel with it. The order forms
+    // show the server's message as-is: for 'cod_unavailable' /
+    // 'online_unavailable' (the store's payment options changed under an open
+    // page) that message already tells the shopper to refresh.
+    throw new ApiError(msg, res.status, typeof json?.error?.code === 'string' ? json.error.code : undefined);
   }
   if (!json) {
     throw new Error('Sorry, your order could not be placed. Please try again in a minute.');

@@ -9,8 +9,85 @@ import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { OrderDetail } from '../components/order/order-detail';
+import { isOnlineMethod, takePayCartNote } from '../components/order/checkout-extras';
+import { formatBDT } from '../lib/format';
 import { NotFoundPage } from './not-found';
 import type { OrderResponse, StorefrontMeta } from '../lib/types';
+
+/**
+ * Where an order's ONLINE payment stands, from order data alone (the
+ * ?payment= hint on a gateway return URL is untrusted and never consulted).
+ * Pure, so the banner logic can be checked without rendering the page.
+ */
+export function orderPaymentState(order: OrderResponse | null) {
+  // Paid through the gateway — in full ('online') or as an advance with the
+  // rest on delivery ('online_advance'). A payload without the field is COD.
+  const isOnline = isOnlineMethod(order?.payment_method);
+  // Only an order the SERVER still holds for its payment is "confirming". One
+  // the store has already moved on (confirmed over the phone, shipped…) while
+  // unpaid is a live order whose payment simply hasn't been recorded — a
+  // spinner there would spin for the life of the order.
+  const awaitingPayment =
+    !!order && isOnline && order.payment_status === 'unpaid' && order.status === 'awaiting_payment';
+  // 'partially_paid' = the advance of an 'online_advance' order was captured;
+  // the remainder is cash on delivery.
+  const partlyPaid = isOnline && order?.payment_status === 'partially_paid';
+  const moneyCaptured =
+    isOnline &&
+    (order?.payment_status === 'paid' || order?.payment_status === 'refunded' || partlyPaid);
+  // Cancelled AFTER the money was captured (merchant cancel → manual refund)
+  // is a different message than a failed/abandoned payment — telling a
+  // charged customer "you have not been charged" is a dispute generator.
+  const paidThenCanceled = moneyCaptured && order?.status === 'canceled';
+  const paymentPaid =
+    isOnline && (order?.payment_status === 'paid' || partlyPaid) && order?.status !== 'canceled';
+  // "Cancelled, not charged" is about the ORDER being cancelled — never about
+  // payment_status alone: an order the store revived (or confirmed by phone)
+  // can carry a failed/unpaid payment while it is being fulfilled.
+  const paymentFailed = isOnline && !moneyCaptured && order?.status === 'canceled';
+  // Live order, online payment never recorded: say so plainly, no spinner.
+  // A DELIVERED one was settled at the door — there is nothing outstanding
+  // to announce, so it gets the neutral heading.
+  const paymentUnconfirmed =
+    isOnline &&
+    !moneyCaptured &&
+    !!order &&
+    order.status !== 'canceled' &&
+    order.status !== 'delivered' &&
+    !awaitingPayment;
+
+  return { isOnline, awaitingPayment, partlyPaid, moneyCaptured, paidThenCanceled, paymentPaid, paymentFailed, paymentUnconfirmed };
+}
+
+/**
+ * The line under "(Advance) payment received". Amounts arrive formatted;
+ * null = the API did not send them. Once the order has been delivered
+ * nothing is "due on delivery" or "being processed" any more.
+ */
+export function paymentReceivedLine(o: {
+  partlyPaid: boolean;
+  delivered: boolean;
+  paid: string | null;
+  due: string | null;
+  /** The gateway confirmed a payment the store could not credit in taka
+   *  (recorded as 0, held for review) — say it is being checked. */
+  unmatched?: boolean;
+}): string {
+  if (o.unmatched && !o.delivered) {
+    return 'Thank you. Your payment reached the store and is being checked — they will contact you if anything more is needed.';
+  }
+  if (!o.partlyPaid) {
+    return o.delivered
+      ? 'Thank you. Your payment is confirmed.'
+      : 'Thank you. Your payment is confirmed and your order is being processed.';
+  }
+  if (o.delivered) {
+    return o.paid ? `Thank you. Your advance of ${o.paid} was paid online.` : 'Thank you. Your advance was paid online.';
+  }
+  return o.paid && o.due
+    ? `Thank you. Your advance of ${o.paid} is confirmed — ${o.due} is due on delivery.`
+    : 'Thank you. Your advance is confirmed — the rest is due on delivery.';
+}
 
 /**
  * Astro+CF port: previously did its own `await getStorefront()` +
@@ -129,40 +206,26 @@ export function OrderStatusPage({
   // this mostly covers SSLCommerz IPN latency (seconds) — poll quickly at
   // first, then back off. Total budget: 12 refetches over ~3 minutes.
   const POLL_DELAYS_MS = [3000, 4000, 5000, 7000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000];
-  const awaitingPayment =
-    !!order &&
-    order.payment_method === 'online' &&
-    order.payment_status === 'unpaid' &&
-    order.status !== 'canceled';
+  const { awaitingPayment, partlyPaid, paidThenCanceled, paymentPaid, paymentFailed, paymentUnconfirmed } =
+    orderPaymentState(order);
   const pollsExhausted = polls >= POLL_DELAYS_MS.length;
 
-  // Online-payment outcome, derived from ORDER DATA only (the ?payment= URL
-  // hint from the gateway return is untrusted and deliberately ignored — the
-  // polled payment_status is the truth).
-  const isOnline = order?.payment_method === 'online';
-  const moneyCaptured =
-    isOnline && (order?.payment_status === 'paid' || order?.payment_status === 'refunded');
-  // Cancelled AFTER the money was captured (merchant cancel → manual refund)
-  // is a different message than a failed/abandoned payment — telling a
-  // charged customer "you have not been charged" is a dispute generator.
-  const paidThenCanceled = moneyCaptured && order?.status === 'canceled';
-  const paymentPaid = isOnline && order?.payment_status === 'paid' && order?.status !== 'canceled';
-  const paymentFailed =
-    isOnline && !moneyCaptured && (order?.payment_status === 'failed' || order?.status === 'canceled');
+  // What the gateway captured / what the rider collects — server figures,
+  // absent on an API that predates them (the copy then stays generic).
+  const paidOnline = typeof order?.online_paid_amount === 'number' ? order.online_paid_amount : null;
+  const dueOnDelivery = typeof order?.due_on_delivery === 'number' ? order.due_on_delivery : null;
 
   // The checkout deliberately does NOT clear the cart before the gateway
   // redirect (the cart is the shopper's resume path if they back out). Once
-  // the payment is confirmed the sale is done — clear it here, exactly once
-  // per order (localStorage flag), so a later revisit of the paid order can't
-  // wipe a NEW cart the shopper has since built.
+  // the payment is confirmed the sale is done — clear it here, exactly once:
+  // only when THIS browser's cart built the order (the cart checkout's
+  // localStorage note, consumed here). A funnel / buy-now order, or one
+  // looked up from another browser, has no note — confirming it must not
+  // empty an unrelated cart, and a later revisit can't wipe a NEW one.
   useEffect(() => {
     if (!paymentPaid) return;
     try {
-      const k = `replybd:cart-cleared:${orderNumber}`;
-      if (!localStorage.getItem(k)) {
-        clearCart();
-        localStorage.setItem(k, '1');
-      }
+      if (takePayCartNote(orderNumber, localStorage)) clearCart();
     } catch {
       /* storage blocked — worst case the cart badge lingers */
     }
@@ -402,8 +465,18 @@ export function OrderStatusPage({
                 <Check className="h-7 w-7" strokeWidth={3} />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Payment received</h1>
-                <p className="mt-0.5 text-sm text-slate-500">Thank you. Your payment is confirmed and your order is being processed.</p>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                  {partlyPaid ? 'Advance payment received' : 'Payment received'}
+                </h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {paymentReceivedLine({
+                    partlyPaid,
+                    delivered: order.status === 'delivered',
+                    paid: paidOnline !== null && paidOnline > 0 ? formatBDT(paidOnline, { currency: order.currency }) : null,
+                    due: dueOnDelivery !== null ? formatBDT(dueOnDelivery, { currency: order.currency }) : null,
+                    unmatched: paidOnline === 0,
+                  })}
+                </p>
               </div>
             </div>
           ) : awaitingPayment ? (
@@ -419,6 +492,17 @@ export function OrderStatusPage({
                     : 'This usually takes a few seconds. Keep this page open — it updates automatically.'}
                 </p>
               </div>
+            </div>
+          ) : paymentUnconfirmed ? (
+            <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6 shadow-sm">
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Order #{order.order_number}</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Your order is active, but we have not received an online payment for it
+                {dueOnDelivery !== null && dueOnDelivery > 0
+                  ? ` — ${formatBDT(dueOnDelivery, { currency: order.currency })} is due on delivery.`
+                  : '.'}{' '}
+                If you did pay online, it will show here once it is confirmed — or contact the store with your order number.
+              </p>
             </div>
           ) : placed ? (
             <div className="flex items-center gap-4 rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6 shadow-sm">

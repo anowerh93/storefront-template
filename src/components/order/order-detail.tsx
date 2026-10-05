@@ -44,6 +44,25 @@ function variantText(variant: unknown): string {
   return '';
 }
 
+/** How the order is paid, in the shopper's words. Unknown / absent → COD (an
+ *  API that predates the field only ever had COD orders without it). An
+ *  "advance" the gateway collects IN FULL (a small order against a flat
+ *  advance — the picker called it "Pay Online") is simply an online payment:
+ *  there is no cash part to name. */
+export function paymentMethodLabel(
+  order: Pick<OrderResponse, 'payment_method' | 'payment_status' | 'online_charge_amount' | 'total'>,
+): string {
+  const method = order.payment_method;
+  if (method === 'online') return 'Online Payment';
+  if (method === 'online_advance') {
+    const inFull =
+      order.payment_status === 'paid' ||
+      (typeof order.online_charge_amount === 'number' && order.online_charge_amount >= order.total - 0.005);
+    return inFull ? 'Online Payment' : 'Advance Online + Cash on Delivery';
+  }
+  return 'Cash on Delivery';
+}
+
 /** ISO → "19 Jun 2026" (absolute, locale-stable). Empty string when unusable. */
 function formatDate(iso?: string): string {
   if (!iso) return '';
@@ -77,6 +96,22 @@ export function OrderDetail({
 
   const currency = order.currency;
   const items = order.items ?? [];
+
+  // What was paid through the gateway and what the rider still collects —
+  // straight from the server, never derived from payment_status (a short or
+  // review-parked payment is "paid" with a remainder). Both keys are absent
+  // on an API that predates them, which simply hides the rows. "Due on
+  // delivery" is only worth a row when it differs from the total (something
+  // was prepaid) and the order is still going out — not cancelled, and not
+  // already delivered (the rider collected it; nothing is due any more).
+  const paidOnline = typeof order.online_paid_amount === 'number' ? order.online_paid_amount : 0;
+  const dueOnDelivery =
+    order.status !== 'canceled' &&
+    order.status !== 'delivered' &&
+    typeof order.due_on_delivery === 'number' &&
+    Math.abs(order.due_on_delivery - order.total) >= 0.01
+      ? order.due_on_delivery
+      : null;
 
   // shipping_zone is a CODE ('inside_city'); turn it into the human label the
   // tenant configured. Null when shipping is off or no zone was chosen.
@@ -137,10 +172,17 @@ export function OrderDetail({
         <Card title="Order Details">
           <Row label="Order Number" value={<span className="font-bold text-slate-900">{order.order_number}</span>} />
           <Row label="Status" value={<Badge variant={statusInfo.variant}>{statusInfo.label}</Badge>} />
-          <Row label="Payment Method" value={order.payment_method === 'online' ? 'Online Payment' : 'Cash on Delivery'} />
+          {/* multiline: the advance label is wider than a phone's value column. */}
+          <Row label="Payment Method" value={paymentMethodLabel(order)} multiline />
           {zoneLabel && <Row label="Shipping Method" value={zoneLabel} />}
           {placedDate && <Row label="Order Date" value={placedDate} />}
           <Row label="Total" value={<span className="font-bold text-slate-900">{formatBDT(order.total, { currency })}</span>} />
+          {paidOnline > 0 && (
+            <Row label="Paid Online" value={<span className="font-semibold text-emerald-700">{formatBDT(paidOnline, { currency })}</span>} />
+          )}
+          {dueOnDelivery !== null && (
+            <Row label="Due on Delivery" value={<span className="font-bold text-slate-900">{formatBDT(dueOnDelivery, { currency })}</span>} />
+          )}
         </Card>
 
         <Card title="Customer Details">
@@ -214,6 +256,18 @@ export function OrderDetail({
                 <span>Total</span>
                 <span className="tabular-nums">{formatBDT(order.total, { currency })}</span>
               </div>
+              {paidOnline > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Paid online</span>
+                  <span className="tabular-nums">− {formatBDT(paidOnline, { currency })}</span>
+                </div>
+              )}
+              {dueOnDelivery !== null && (
+                <div className="flex items-baseline justify-between font-semibold text-slate-900">
+                  <span>Due on delivery</span>
+                  <span className="tabular-nums">{formatBDT(dueOnDelivery, { currency })}</span>
+                </div>
+              )}
             </div>
           </>
         )}

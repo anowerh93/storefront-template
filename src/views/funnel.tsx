@@ -11,7 +11,7 @@ import {
   Leaf, Zap, Brain, Flame, Droplet, Smile, Activity,
   Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
-import type { FunnelData, FunnelBlockConfig, FunnelProduct, ProductCard, StorefrontMeta } from '../lib/types';
+import type { FunnelData, FunnelBlockConfig, FunnelProduct, PaymentMethod, ProductCard, StorefrontMeta } from '../lib/types';
 import { orderIdempotencyKey, submitOrder } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
@@ -26,7 +26,20 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { Button } from '../components/ui/button';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
-import { AdvancePaymentBox, DistrictThanaFields, advanceAmountFor } from '../components/order/checkout-extras';
+import {
+  AdvancePaymentBox,
+  DistrictThanaFields,
+  PaymentMethodPicker,
+  advanceAmountFor,
+  isOnlineMethod,
+  onlineAdvanceAmountFor,
+  onlineAdvanceCoversOrder,
+  codOffered,
+  isStockCodCopy,
+  paymentMethodsForCart,
+  paymentRetryHint,
+  resolvePaymentMethod,
+} from '../components/order/checkout-extras';
 
 /**
  * Ad funnel landing page (/{slug}). Renders the tenant's block config in
@@ -155,8 +168,15 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       }
       case 'faq':
         return config.faq.visible && config.faq.items.length ? <Faq config={config.faq} /> : null;
-      case 'trust_badges':
-        return config.trust_badges.visible && config.trust_badges.items.length ? <TrustBadges items={config.trust_badges.items} /> : null;
+      case 'trust_badges': {
+        // The builder's stock "Cash on Delivery" badge has no place on a
+        // store that has switched COD off (a badge the tenant worded
+        // themselves stays).
+        const badges = codOffered(meta)
+          ? config.trust_badges.items
+          : config.trust_badges.items.filter((b) => !isStockCodCopy(b.title));
+        return config.trust_badges.visible && badges.length ? <TrustBadges items={badges} /> : null;
+      }
       case 'related_products': {
         // Optional chain: payloads cached before this block existed lack the key.
         // The resolved cards ride on the top-level payload, not in config.
@@ -932,7 +952,7 @@ function RelatedProducts({ heading, products, btn }: { heading: string; products
   );
 }
 
-/* ── Order form (COD) — reuses the checkout schema + submitOrder ──────── */
+/* ── Order form — reuses the checkout schema, payment picker + submitOrder ── */
 function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta; btn: BtnTheme }) {
   const [qty, setQty] = useState(1);
   // Open on the merchant's pre-selected "default pack" (e.g. 3KG) when one is
@@ -942,6 +962,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The shopper's own payment pick (null until they choose); the method in
+  // force is derived below so it is always one the store offers for this
+  // order. Same contract as checkout.tsx.
+  const [pickedMethod, setPickedMethod] = useState<PaymentMethod | null>(null);
 
   const zones = meta.shipping?.zones ?? [];
   const requireZone = !!(meta.shipping?.enabled && zones.length > 0);
@@ -994,12 +1018,31 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled ? 0 : (threshold && subtotal >= threshold ? 0 : (zone?.fee ?? 0));
   const total = subtotal + shippingFee;
-  // Funnels are COD-only, so an active policy applies — but only when it owes
-  // something for THIS subtotal. A zero-charge, threshold-only policy makes the
-  // box appear/vanish as the qty stepper crosses the threshold; gate on the
-  // computed amount so the box (and the last-4 requirement) tracks that.
+  // How this order is paid: whichever of COD / pay online / pay an advance
+  // online the store offers (meta.payment_methods — COD is not guaranteed).
+  const payMethods = paymentMethodsForCart(meta, subtotal, total);
+  const payMethod = resolvePaymentMethod(pickedMethod, payMethods, onlineAdvanceCoversOrder(meta, subtotal, total));
+  const payOnline = isOnlineMethod(payMethod);
+  const onlineAdvance = onlineAdvanceAmountFor(meta, subtotal, total);
+  const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
+  // The builder's stock heading promises Cash on Delivery; on a store that
+  // does not offer it that stock text is dropped (the tenant's own wording
+  // is kept as written).
+  const takesCod = payMethods.includes('cod');
+  const orderHeading = config.heading && (takesCod || !isStockCodCopy(config.heading))
+    ? config.heading
+    : takesCod ? 'Order now — Cash on Delivery' : 'Order now';
+  // A COD-only store keeps the form exactly as it was — the picker only
+  // appears when there is a choice to make or COD is not what's on offer.
+  const showPayPicker = payMethods.length > 1 || payMethods[0] !== 'cod';
+  // The manual wallet advance is a COD thing (the online methods collect
+  // their money at the gateway) and applies only when the policy owes
+  // something for THIS subtotal. A zero-charge, threshold-only policy makes
+  // the box appear/vanish as the qty stepper crosses the threshold; gate on
+  // the computed amount so the box (and the last-4 requirement) tracks that.
   // Absent on old cached payloads → box simply hidden.
-  const advancePolicy = meta.advance_payment ?? null;
+  const codHasAdvance = !!(meta.advance_payment && advanceAmountFor(meta.advance_payment, subtotal) > 0);
+  const advancePolicy = payMethod === 'cod' ? meta.advance_payment ?? null : null;
   const advance = advancePolicy && advanceAmountFor(advancePolicy, subtotal) > 0 ? advancePolicy : null;
   const districtEnabled = !!meta.checkout?.district_enabled;
 
@@ -1062,6 +1105,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       if (!beganCheckout.current) {
         beganCheckout.current = true;
         pixel.initiateCheckout({ value: subtotal, numItems: qty, currency: product.currency, items: ga4Items });
+        // The payment choice is made on this same form — same once-per-visit
+        // guard, so a failed submit's retry doesn't re-push it.
+        pixel.addPaymentInfo({ value: total, currency: product.currency, paymentType: payMethod, items: ga4Items });
       }
       const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
       const orderRes = await submitOrder({
@@ -1088,6 +1134,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
         // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
         cart_key:       getCartKey(),
+        // ALWAYS explicit — an omitted method means "COD" to the server, which
+        // a store that has switched COD off rightly rejects.
+        payment_method: payMethod,
       }, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
         items: [{
@@ -1100,7 +1149,67 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       // Order exists — stop further beacons (the redirect's page-leave flush
       // would resurrect the just-recovered row) and rotate the cart key.
       abandoned.markOrdered();
-      const dest = `/order/${orderRes.order_number}?placed=1&phone=${values.customer_phone.slice(-4)}`;
+      const last4 = values.customer_phone.slice(-4);
+
+      // ── Online payment: hand the browser to the gateway ──
+      // Same contract as checkout.tsx. The order is parked awaiting payment;
+      // the gateway bounces back to /order/{number}?payment=… with NO phone
+      // param, so stash the last-4 for the order page. No client Purchase
+      // pixel here — the order isn't paid yet (the server fires CAPI on
+      // confirmation and the order page fires the browser/GA4 push, reading
+      // the pay-track stash below). No cart note: this order never used the
+      // cart, so confirming it must not empty one (see payCartKey).
+      if (orderRes.payment?.redirect_url) {
+        try {
+          sessionStorage.setItem(`replybd:pay-phone:${orderRes.order_number}`, last4);
+          // Written LAST: it's the only throw point that matters, and the
+          // stashes above must not be lost to it.
+          sessionStorage.setItem(
+            `replybd:pay-track:${orderRes.order_number}`,
+            JSON.stringify({
+              phone: values.customer_phone,
+              items: ga4Items,
+              metaEventId: orderRes.meta_event_id ?? undefined,
+            }),
+          );
+        } catch {
+          /* storage blocked — the order page falls back to its lookup form */
+        }
+        window.location.href = orderRes.payment.redirect_url;
+        return;
+      }
+
+      // A replay of an order that is already CANCELLED (the dedup window
+      // answering for an attempt the gateway declined) is not "your order was
+      // placed" — say so and let the shopper order again.
+      if (orderRes.duplicate && orderRes.status === 'canceled') {
+        setError('Your earlier attempt at this order was cancelled. Please wait a minute and place the order again.');
+        inflight.current = false;
+        setSubmitting(false);
+        return;
+      }
+
+      // Online requested but NO payment link came back — never the COD
+      // success path (no placed=1, no Purchase pixel):
+      //  - a replay of an order still awaiting payment whose gateway re-init
+      //    failed → say so and let the shopper retry;
+      //  - a replay of an order that already resolved → the order page shows
+      //    the REAL payment outcome.
+      if (payOnline) {
+        if (orderRes.status === 'awaiting_payment') {
+          setError(paymentRetryHint(payMethods));
+          inflight.current = false;
+          setSubmitting(false);
+          return;
+        }
+        try {
+          sessionStorage.setItem(`replybd:pay-phone:${orderRes.order_number}`, last4);
+        } catch { /* falls back to the lookup form */ }
+        window.location.href = `/order/${orderRes.order_number}?phone=${last4}`;
+        return;
+      }
+
+      const dest = `/order/${orderRes.order_number}?placed=1&phone=${last4}`;
       // duplicate:true = the dedup window / Idempotency-Key replayed an
       // existing order — don't double-count the purchase.
       if (orderRes.duplicate) {
@@ -1160,7 +1269,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
 
   return (
     <section id="funnel-order" className="mx-auto max-w-2xl scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
-      <RT as="h2" className="text-center text-lg font-bold text-slate-900" html={config.heading || 'Order now — Cash on Delivery'} />
+      <RT as="h2" className="text-center text-lg font-bold text-slate-900" html={orderHeading} />
 
       <form onSubmit={form.handleSubmit(onSubmit, onInvalid)} className="mt-4 space-y-4">
         {error && <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>}
@@ -1273,6 +1382,19 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           </div>
         </div>
 
+        {showPayPicker && (
+          <PaymentMethodPicker
+            name="f-payment-method"
+            methods={payMethods}
+            value={payMethod}
+            onChange={setPickedMethod}
+            codHasAdvance={codHasAdvance}
+            advanceAmount={onlineAdvance}
+            total={total}
+            currency={product.currency}
+          />
+        )}
+
         {advance && (
           <AdvancePaymentBox
             idPrefix="f"
@@ -1299,8 +1421,16 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         </div>
 
         <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
-          <ShoppingBag className="h-4 w-4" />
-          {submitting ? 'Placing order…' : !inStock ? 'Out of stock' : <RT html={config.button_label || 'Confirm Order'} />}
+          {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
+          {submitting
+            ? (payOnline ? 'Starting payment…' : 'Placing order…')
+            : !inStock
+              ? 'Out of stock'
+              : payNowAdvance
+                ? `Pay Advance — ${formatBDT(onlineAdvance, { currency: product.currency })}`
+                : payOnline
+                  ? `Pay Now — ${formatBDT(total, { currency: product.currency })}`
+                  : <RT html={config.button_label || 'Confirm Order'} />}
         </Button>
       </form>
     </section>

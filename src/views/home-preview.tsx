@@ -20,7 +20,8 @@
  */
 import { useEffect, useRef, useState } from 'react';
 import type { StorefrontMeta, ProductCard, Category, HomepageConfig } from '../lib/types';
-import { resolveHomeData, homepageProductIds } from '../lib/home-data';
+import { resolveHomeData, homepageProductIds, homeItemsFor } from '../lib/home-data';
+import { codOffered } from '../components/order/checkout-extras';
 import { getProducts } from '../lib/api';
 import {
   PREVIEW_READY,
@@ -70,6 +71,9 @@ export function HomePreview({ meta, products, categories }: Props) {
   // The preview island only mounts for e-commerce tenants (service tenants
   // have meta.homepage = null and never load /preview/home).
   const [home, setHome] = useState<HomepageConfig>(meta.homepage!);
+  // Same stock-COD-copy swap as the live page (see homeItemsFor), so the
+  // preview shows what the store will actually render.
+  const takesCod = codOffered(meta);
 
   useEffect(() => {
     const parentOrigin = resolveParentOrigin();
@@ -228,11 +232,11 @@ export function HomePreview({ meta, products, categories }: Props) {
                 : null;
             case 'services_row':
               return home.services_row.visible
-                ? <ServicesRow key={key} items={home.services_row.items} />
+                ? <ServicesRow key={key} items={homeItemsFor(home.services_row.items, takesCod)} />
                 : null;
             case 'trust_badges':
               return home.trust_badges.visible
-                ? <TrustBadges key={key} items={home.trust_badges.items} />
+                ? <TrustBadges key={key} items={homeItemsFor(home.trust_badges.items, takesCod)} />
                 : null;
             default:
               return null;
