@@ -1134,6 +1134,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     abandoned.touch();
   }, [variantIdx, qty, sizeChoice, abandoned.touch]);
 
+  // While an order is being sent (`submitting` — it also spans the re-read of
+  // the payment options after a refusal) the pack, the size, the quantity, the
+  // delivery area and the payment method are locked — same contract as
+  // checkout.tsx: what comes back is about the order AS SENT.
   async function onSubmit(values: FormData) {
     if (sizeMissing) return; // the button is disabled — belt and braces
     if (inflight.current) return;
@@ -1378,7 +1382,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
                 const off = discountPct(vp, vc);
                 const selected = variantIdx === v.index;
                 return (
-                  <button type="button" key={v.index} disabled={!v.in_stock} onClick={() => setVariantIdx(v.index)}
+                  <button type="button" key={v.index} disabled={!v.in_stock || submitting} onClick={() => setVariantIdx(v.index)}
                           className={`flex items-center justify-between gap-2 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500' : 'border-slate-300 hover:border-slate-400'} ${!v.in_stock ? 'cursor-not-allowed opacity-40' : ''}`}>
                     <span className="flex items-center gap-2">
                       <span className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full border ${selected ? 'border-brand-500' : 'border-slate-300'}`}>
@@ -1414,6 +1418,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
                 <button
                   key={s}
                   type="button"
+                  disabled={submitting}
                   onClick={() => setSizeChoice(s)}
                   className={`min-w-[3rem] rounded-xl border px-4 py-2 text-sm font-semibold transition ${sizeChoice === s ? 'border-brand-500 bg-brand-50 text-brand-700 ring-1 ring-brand-500' : 'border-slate-300 text-slate-700 hover:border-slate-400'}`}
                 >
@@ -1455,7 +1460,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         {meta.shipping?.enabled && zones.length > 0 && (
           <div>
             <Label className="flex items-center gap-2"><Truck className="h-4 w-4" /> Delivery area</Label>
-            <RadioGroup value={selectedZone} onValueChange={(v) => form.setValue('shipping_zone', v)} className="mt-1.5 grid grid-cols-2 gap-2">
+            <RadioGroup value={selectedZone} onValueChange={(v) => form.setValue('shipping_zone', v)} disabled={submitting} className="mt-1.5 grid grid-cols-2 gap-2">
               {zones.map((z) => (
                 <label key={z.code} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                   <RadioGroupItem value={z.code} />
@@ -1470,9 +1475,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         <div className="flex items-center justify-between border-t border-slate-100 pt-4">
           <span className="text-sm font-medium text-slate-700">Quantity</span>
           <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
-            <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} disabled={qty <= 1} aria-label="Decrease" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setQty(Math.max(1, qty - 1))} disabled={submitting || qty <= 1} aria-label="Decrease" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
             <span className="w-8 text-center text-sm font-semibold tabular-nums">{qty}</span>
-            <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => setQty(qty + 1)} disabled={submitting} aria-label="Increase" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
           </div>
         </div>
 
@@ -1494,6 +1499,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             advanceAmount={onlineAdvance}
             total={total}
             currency={product.currency}
+            disabled={submitting}
           />
         )}
 

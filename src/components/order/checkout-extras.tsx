@@ -510,12 +510,15 @@ export function PaymentMethodPicker({
   advanceAmount,
   total,
   currency,
+  disabled = false,
 }: {
   /** Radio group name — unique per form on the page. */
   name: string;
   methods: PaymentMethod[];
   value: PaymentMethod;
   onChange: (method: PaymentMethod) => void;
+  /** The choice is locked — an order with the method shown is being sent. */
+  disabled?: boolean;
   /** A COD order at this subtotal carries a manual wallet advance. */
   codHasAdvance: boolean;
   /** Gateway advance for THIS cart (see onlineAdvanceAmountFor). */
@@ -576,13 +579,14 @@ export function PaymentMethodPicker({
         return (
           <label
             key={method}
-            className={`flex cursor-pointer items-start gap-3 rounded-xl border p-4 transition ${selected ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}
+            className={`flex items-start gap-3 rounded-xl border p-4 transition ${disabled ? 'cursor-not-allowed opacity-60' : 'cursor-pointer'} ${selected ? 'border-brand-500 bg-brand-50' : disabled ? 'border-slate-200' : 'border-slate-200 hover:border-slate-300'}`}
           >
             <input
               type="radio"
               name={name}
               value={method}
               checked={selected}
+              disabled={disabled}
               onChange={() => onChange(method)}
               className="mt-1 h-4 w-4 shrink-0 border-slate-300 text-brand-600 focus:ring-brand-500"
             />

@@ -426,6 +426,12 @@ export function CheckoutPage({
   const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
   const numItems = lines.reduce((n, l) => n + l.quantity, 0);
 
+  // While an order is being sent (`submitting` — it also spans the re-read of
+  // the payment options after a refusal) the lines, the delivery area and the
+  // payment method are locked. Whatever comes back — a held payment link, a
+  // refusal and its notice, the redirect to the gateway — is about the order
+  // AS SENT; an edit made in between would leave it on screen beside a cart
+  // it does not describe, with nothing left to clear it.
   // Express mode edits a local qty; cart mode writes through to the store.
   function changeQty(line: CartLine, next: number) {
     const clamped = Math.min(Math.max(1, next), lineCeiling(line.max_stock));
@@ -852,8 +858,9 @@ export function CheckoutPage({
                         {!isExpress && (
                           <button
                             type="button"
+                            disabled={submitting}
                             onClick={() => removeCartLine(l.product_id, l.variant_index, l.variant_choice)}
-                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-rose-600"
+                            className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-slate-400 hover:text-rose-600 disabled:pointer-events-none disabled:opacity-40"
                           >
                             <Trash2 className="h-3 w-3" /> Remove
                           </button>
@@ -861,9 +868,9 @@ export function CheckoutPage({
                       </div>
                       {/* qty stepper */}
                       <div className="flex items-center overflow-hidden rounded-lg border border-slate-300">
-                        <button type="button" onClick={() => changeQty(l, l.quantity - 1)} disabled={l.quantity <= 1} aria-label="Decrease quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => changeQty(l, l.quantity - 1)} disabled={submitting || l.quantity <= 1} aria-label="Decrease quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Minus className="h-3.5 w-3.5" /></button>
                         <span className="w-8 text-center text-sm font-semibold tabular-nums">{l.quantity}</span>
-                        <button type="button" onClick={() => changeQty(l, l.quantity + 1)} disabled={l.quantity >= lineCeiling(l.max_stock)} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
+                        <button type="button" onClick={() => changeQty(l, l.quantity + 1)} disabled={submitting || l.quantity >= lineCeiling(l.max_stock)} aria-label="Increase quantity" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50 disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
                       </div>
                     </li>
                   ))}
@@ -875,7 +882,7 @@ export function CheckoutPage({
                     <p className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">
                       <Truck className="h-4 w-4" /> Shipping Method
                     </p>
-                    <RadioGroup value={selectedZone} onValueChange={(v) => form.setValue('shipping_zone', v)} className="grid grid-cols-2 gap-2">
+                    <RadioGroup value={selectedZone} onValueChange={(v) => form.setValue('shipping_zone', v)} disabled={submitting} className="grid grid-cols-2 gap-2">
                       {zones.map((z) => (
                         <label key={z.code} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                           <RadioGroupItem value={z.code} />
@@ -922,6 +929,7 @@ export function CheckoutPage({
                   advanceAmount={onlineAdvance}
                   total={total}
                   currency={currency}
+                  disabled={submitting}
                 />
 
                 {advance && (
