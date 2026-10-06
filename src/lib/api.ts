@@ -550,10 +550,18 @@ const PAYMENT_META_TIMEOUT_MS = 8000;
  * The payment part of the storefront meta, re-read from the BROWSER after the
  * order API refused a payment method. The page's own copy came through the
  * SSR edge cache (60s, keyed by URL, not bumped by a settings save), so the
- * "refresh the page" the server advises can serve the same stale picker; a
- * browser fetch has no such cache in front of it. Never throws: null means
- * "could not find out" (network, throttle, timeout, a payload without the
- * field) and the caller keeps what it has.
+ * "refresh the page" the server advises can serve the same stale picker.
+ *
+ * The API marks this route `public, s-maxage=60, stale-while-revalidate=300`
+ * for a CDN, and `cache: 'no-store'` only skips the BROWSER's cache. A shared
+ * copy of the bare URL would be minutes old — and, having been filled by the
+ * SSR worker (which sends no Origin), would carry no CORS header at all, so
+ * this fetch would simply fail. Hence the one-off `fresh` query: a URL no
+ * cache has seen (the API ignores the parameter). What it cannot skip is the
+ * API's own 60s payload cache — the caller's refusal list covers that.
+ *
+ * Never throws: null means "could not find out" (network, throttle, timeout,
+ * a payload without the field) and the caller keeps what it has.
  */
 export async function refreshPaymentMeta(): Promise<Pick<
   StorefrontMeta,
@@ -562,7 +570,7 @@ export async function refreshPaymentMeta(): Promise<Pick<
   const abort = typeof AbortController !== 'undefined' ? new AbortController() : null;
   const timer = abort ? setTimeout(() => abort.abort(), PAYMENT_META_TIMEOUT_MS) : null;
   try {
-    const res = await fetch(buildUrl(''), {
+    const res = await fetch(buildUrl('', { fresh: Date.now() }), {
       headers: { Accept: 'application/json' },
       cache: 'no-store',
       signal: abort?.signal,
