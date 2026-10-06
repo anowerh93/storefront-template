@@ -1,6 +1,6 @@
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { CreditCard, Truck, Wallet } from 'lucide-react';
-import type { PaymentMethod, StorefrontMeta } from '../../lib/types';
+import type { CreateOrderInput, PaymentMethod, StorefrontMeta } from '../../lib/types';
 import { BD_DISTRICTS } from '../../lib/districts';
 import { formatBDT } from '../../lib/format';
 import { Input } from '../ui/input';
@@ -386,6 +386,135 @@ export function payAmountChanged(promised: number, server: number | null | undef
   if (typeof server !== 'number' || !Number.isFinite(server)) return null;
   const paisa = Math.round(server * 100);
   return Math.abs(paisa - Math.round(promised * 100)) < 1 ? null : paisa / 100;
+}
+
+/**
+ * Everything about an order AS SENT that the shopper sees and can change on
+ * the form — who, where, what, how it is paid — as one comparable string.
+ * Left out on purpose: the password (never kept anywhere), and what the
+ * shopper does not choose (cart key, ad params, page URL, Turnstile token).
+ *
+ * The order API's own dedup identity is narrower — phone + items, for 90
+ * seconds: a resubmit that changed only the address, the delivery area or a
+ * note is answered with the FIRST order (`duplicate`). The forms compare this
+ * to know when that happened (payPauseFor) and when nothing changed at all
+ * (heldPauseFor).
+ */
+export function orderSubmitSignature(input: CreateOrderInput): string {
+  const s = (v: string | null | undefined) => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
+  return JSON.stringify([
+    s(input.customer_name),
+    s(input.customer_phone),
+    s(input.customer_email),
+    s(input.address),
+    s(input.customer_city),
+    s(input.thana),
+    s(input.advance_sender_last4),
+    s(input.shipping_zone),
+    s(input.notes),
+    input.items.map((i) => [i.product_id, i.variant_index ?? null, s(i.variant?.size), i.quantity]),
+    input.payment_method ?? null,
+    input.create_account === true,
+  ]);
+}
+
+/** A payment link held back for one tap, and what the box over it must say. */
+export type PayPause = {
+  url: string;
+  orderNumber: string;
+  /** What the gateway will ask for. */
+  amount: number;
+  restOnDelivery: boolean;
+  /** The order is one an EARLIER submit placed, and the form as it stands now
+   *  is not — or cannot be shown to be — what it was placed with. */
+  earlier: boolean;
+};
+
+/** The order this page itself placed, exactly as it was sent. */
+export type PlacedOrder = { orderNumber: string; sig: string };
+
+/**
+ * Should the shopper see a box before the gateway — and which one? Two
+ * reasons, both "the gateway is about to take money for something the screen
+ * does not say":
+ *
+ *  - the charge the server stamped is not what the pay button promised
+ *    (payAmountChanged);
+ *  - the server answered with an order an earlier submit placed (`duplicate`)
+ *    and this page KNOWS it sent that one with other details (`placed`) — an
+ *    address or delivery-area edit the dedup window swallowed.
+ *
+ * `earlier` picks the wording: true whenever the order is a replay that is
+ * not provably the form as it stands, so the box never blames "updated
+ * prices" for a difference the shopper's own edit made. A replay this page
+ * cannot place (its first answer was lost) and whose charge matches goes
+ * straight on, as it always did. No number from the server → nothing to
+ * compare and nothing to show → no box (an API that predates the field).
+ */
+export function payPauseFor(o: {
+  url: string;
+  orderNumber: string;
+  duplicate: boolean;
+  /** What the pay button promised. */
+  promised: number;
+  /** `payment.amount`, as the server sent it. */
+  serverAmount: number | null | undefined;
+  orderTotal: number;
+  method: PaymentMethod;
+  /** orderSubmitSignature of what was just sent. */
+  sig: string;
+  placed: PlacedOrder | null;
+}): PayPause | null {
+  if (typeof o.serverAmount !== 'number' || !Number.isFinite(o.serverAmount)) return null;
+  const mine = o.placed !== null && o.placed.orderNumber === o.orderNumber ? o.placed : null;
+  const edited = o.duplicate && mine !== null && mine.sig !== o.sig;
+  const changed = payAmountChanged(o.promised, o.serverAmount);
+  if (changed === null && !edited) return null;
+  const amount = changed ?? Math.round(o.serverAmount * 100) / 100;
+  return {
+    url: o.url,
+    orderNumber: o.orderNumber,
+    amount,
+    restOnDelivery: o.method === 'online_advance' && amount < o.orderTotal,
+    earlier: o.duplicate && !(mine !== null && mine.sig === o.sig),
+  };
+}
+
+/** The pause box's sentence, around the amount: `lead` AMOUNT `tail`. */
+export function payPauseCopy(p: Pick<PayPause, 'orderNumber' | 'earlier' | 'restOnDelivery'>): { lead: string; tail: string } {
+  const rest = p.restOnDelivery ? ' The rest is paid on delivery.' : '';
+  if (p.earlier) {
+    return {
+      lead: `${p.orderNumber ? `Order #${p.orderNumber}` : 'This order'} was already placed a moment ago, as you first sent it — changes made since are not part of it. The amount to pay for it is`,
+      tail: `.${rest} Continue to pay for it as it is, or wait a minute and place the order again.`,
+    };
+  }
+  return {
+    lead: `The amount to pay for ${p.orderNumber ? `order #${p.orderNumber}` : 'this order'} is`,
+    tail: ` (prices or delivery charges were updated).${rest}`,
+  };
+}
+
+/** How long a held payment link is offered again without asking the server —
+ *  well inside the hour after which the API's reaper cancels an unpaid order. */
+export const PAY_PAUSE_REUSE_MS = 10 * 60 * 1000;
+
+/** A pause the shopper stepped back from ("Change my order"), kept with the
+ *  order it was for and when the link was issued. */
+export type HeldPay = { sig: string; at: number; pause: PayPause };
+
+/**
+ * "Change my order" only hides the pause. Pressed again with NOTHING changed,
+ * the pay button offers the same link — without a request. Asking the server
+ * instead is right only inside its 90-second dedup window: after it the same
+ * press places a second order beside the first (which keeps its stock until
+ * the reaper), or is refused as out of stock by the shopper's own first order.
+ * Anything changed, or the link too old → null: the server is asked.
+ */
+export function heldPauseFor(held: HeldPay | null, sig: string, now: number): PayPause | null {
+  if (!held || held.sig !== sig) return null;
+  const age = now - held.at;
+  return age >= 0 && age < PAY_PAUSE_REUSE_MS ? held.pause : null;
 }
 
 /** Shopper-facing error for a rejected / unstartable payment, never naming a

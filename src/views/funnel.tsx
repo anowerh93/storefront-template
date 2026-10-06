@@ -11,7 +11,7 @@ import {
   Leaf, Zap, Brain, Flame, Droplet, Smile, Activity,
   Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
-import type { FunnelData, FunnelBlockConfig, FunnelProduct, PaymentMethod, ProductCard, StorefrontMeta } from '../lib/types';
+import type { CreateOrderInput, FunnelData, FunnelBlockConfig, FunnelProduct, PaymentMethod, ProductCard, StorefrontMeta } from '../lib/types';
 import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
@@ -31,12 +31,15 @@ import {
   DistrictThanaFields,
   PaymentMethodPicker,
   advanceAmountFor,
+  heldPauseFor,
   isOnlineMethod,
   isPaymentRefusal,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
-  payAmountChanged,
+  orderSubmitSignature,
+  payPauseCopy,
+  payPauseFor,
   codOffered,
   isStockCodCopy,
   paymentMethodsForCart,
@@ -46,7 +49,10 @@ import {
   refusalsForNewCart,
   resolvePaymentMethod,
   withPaymentRefusal,
+  type HeldPay,
+  type PayPause,
   type PaymentRefusal,
+  type PlacedOrder,
 } from '../components/order/checkout-extras';
 
 /**
@@ -981,10 +987,15 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
   const [refusals, setRefusals] = useState<PaymentRefusal[]>([]);
   const [payNotice, setPayNotice] = useState<{ text: string; code: string } | null>(null);
-  // The gateway is about to charge something other than the pay button said
-  // (see payAmountChanged): the order's payment link, held until the shopper
-  // has seen the real figure and tapped through. Same contract as checkout.tsx.
-  const [payConfirm, setPayConfirm] = useState<{ url: string; amount: number; restOnDelivery: boolean } | null>(null);
+  // The gateway is about to take money for something the screen does not say
+  // (see payPauseFor — another amount, or an order an earlier submit placed):
+  // the order's payment link, held until the shopper has read which order and
+  // how much, and tapped through. `heldPay` keeps the link when "Change my
+  // order" hides the box; `placedAs` is the order this form placed, as sent.
+  // Same contract as checkout.tsx.
+  const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
+  const heldPay = useRef<HeldPay | null>(null);
+  const placedAs = useRef<PlacedOrder | null>(null);
 
   const zones = meta.shipping?.zones ?? [];
   const requireZone = !!(meta.shipping?.enabled && zones.length > 0);
@@ -1020,13 +1031,14 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // submitting=true baked in — the order button would be stuck on "Placing
   // order…" forever. Same fix as checkout.tsx. A restored-page resubmit of
   // the same funnel order collapses server-side via the Idempotency-Key. A
-  // held payment link (payConfirm) goes too — it has been used.
+  // held payment link (payConfirm / heldPay) goes too — it has been used.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         inflight.current = false;
         setSubmitting(false);
         setPayConfirm(null);
+        heldPay.current = null;
       }
     };
     window.addEventListener('pageshow', onPageShow);
@@ -1087,6 +1099,12 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   useEffect(() => {
     setPayConfirm(null);
   }, [variantIdx, qty, sizeChoice, payMethod, selectedZone]);
+  // …and so does any edit to the form itself (name, phone, address, note) —
+  // the link is not lost (heldPay). Same contract as checkout.tsx.
+  useEffect(() => {
+    const sub = form.watch(() => setPayConfirm(null));
+    return () => sub.unsubscribe();
+  }, [form]);
 
   // When the advance box leaves the screen (qty drops back under the threshold),
   // drop any half-typed last-4 so a stale value in a now-hidden field can't fail
@@ -1141,6 +1159,46 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   async function onSubmit(values: FormData) {
     if (sizeMissing) return; // the button is disabled — belt and braces
     if (inflight.current) return;
+    const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
+    const input: CreateOrderInput = {
+      customer_name:  values.customer_name,
+      customer_phone: values.customer_phone,
+      address:        values.customer_address,
+      customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
+      thana:          districtEnabled ? values.thana || undefined : undefined,
+      advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
+      shipping_zone:  values.shipping_zone || undefined,
+      notes:          values.notes,
+      // Funnels are single-product by design — a 1-element items[] cart.
+      // `variant.size` = the ONE size chosen for a size-range row, so the
+      // order records "L", never the whole "M, L, XL" list.
+      items: [{
+        product_id: product.id,
+        variant_index: variant ? variant.index : null,
+        ...(sizeChoice ? { variant: { size: sizeChoice } } : {}),
+        quantity: qty,
+      }],
+      utm_source:     sp?.get('utm_source') || undefined,
+      utm_medium:     sp?.get('utm_medium') || undefined,
+      utm_campaign:   sp?.get('utm_campaign') || undefined,
+      funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+      // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
+      cart_key:       getCartKey(),
+      // ALWAYS explicit — an omitted method means "COD" to the server, which
+      // a store that has switched COD off rightly rejects.
+      payment_method: payMethod,
+    };
+    // A payment link the shopper stepped back from and then changed nothing
+    // about is offered again as it is — no request, never a second order
+    // (see heldPauseFor; same contract as checkout.tsx).
+    const sig = orderSubmitSignature(input);
+    const held = heldPauseFor(heldPay.current, sig, Date.now());
+    if (held) {
+      setError(null);
+      setPayNotice(null);
+      setPayConfirm(held);
+      return;
+    }
     inflight.current = true;
     setSubmitting(true);
     setError(null);
@@ -1156,35 +1214,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         // guard, so a failed submit's retry doesn't re-push it.
         pixel.addPaymentInfo({ value: total, currency: product.currency, paymentType: payMethod, items: ga4Items });
       }
-      const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
-      const orderRes = await submitOrder({
-        customer_name:  values.customer_name,
-        customer_phone: values.customer_phone,
-        address:        values.customer_address,
-        customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
-        thana:          districtEnabled ? values.thana || undefined : undefined,
-        advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
-        shipping_zone:  values.shipping_zone || undefined,
-        notes:          values.notes,
-        // Funnels are single-product by design — a 1-element items[] cart.
-        // `variant.size` = the ONE size chosen for a size-range row, so the
-        // order records "L", never the whole "M, L, XL" list.
-        items: [{
-          product_id: product.id,
-          variant_index: variant ? variant.index : null,
-          ...(sizeChoice ? { variant: { size: sizeChoice } } : {}),
-          quantity: qty,
-        }],
-        utm_source:     sp?.get('utm_source') || undefined,
-        utm_medium:     sp?.get('utm_medium') || undefined,
-        utm_campaign:   sp?.get('utm_campaign') || undefined,
-        funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
-        // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
-        cart_key:       getCartKey(),
-        // ALWAYS explicit — an omitted method means "COD" to the server, which
-        // a store that has switched COD off rightly rejects.
-        payment_method: payMethod,
-      }, orderIdempotencyKey(idemKey.current, {
+      const orderRes = await submitOrder(input, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
         items: [{
           product_id: product.id,
@@ -1193,6 +1223,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           quantity: qty,
         }],
       }));
+      // What this form placed, as sent: a later `duplicate` answer for the
+      // same order is compared with it (see payPauseFor).
+      if (!orderRes.duplicate) placedAs.current = { orderNumber: orderRes.order_number, sig };
       // Order exists — stop further beacons (the redirect's page-leave flush
       // would resurrect the just-recovered row) and rotate the cart key.
       abandoned.markOrdered();
@@ -1233,14 +1266,25 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         // The server stamped a different charge than the pay button promised:
         // hold the link and show the real figure first — same contract as
         // checkout.tsx. The order and the stashes above stand either way;
-        // nothing is paid yet, so still no Purchase pixel.
-        const changed = payAmountChanged(payNowAdvance ? onlineAdvance : total, orderRes.payment.amount);
-        if (changed !== null) {
-          setPayConfirm({
-            url: orderRes.payment.redirect_url,
-            amount: changed,
-            restOnDelivery: payMethod === 'online_advance' && changed < orderRes.total,
-          });
+        // nothing is paid yet, so still no Purchase pixel. An order an
+        // EARLIER submit placed (the 90s dedup answering a resubmit) is said
+        // to be that, and pauses even at an unchanged amount when this form
+        // knows it sent it with other details.
+        const pause = payPauseFor({
+          url: orderRes.payment.redirect_url,
+          orderNumber: orderRes.order_number,
+          duplicate: orderRes.duplicate === true,
+          promised: payNowAdvance ? onlineAdvance : total,
+          serverAmount: orderRes.payment.amount,
+          orderTotal: orderRes.total,
+          method: payMethod,
+          sig,
+          placed: placedAs.current,
+        });
+        // A link the server has just issued outdates any held from before.
+        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), pause } : null;
+        if (pause) {
+          setPayConfirm(pause);
           inflight.current = false;
           setSubmitting(false);
           return;
@@ -1364,6 +1408,8 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         : 'Please check your details before placing the order.',
     );
   }
+
+  const pauseCopy = payConfirm ? payPauseCopy(payConfirm) : null;
 
   return (
     <section id="funnel-order" className="mx-auto max-w-2xl scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">
@@ -1528,16 +1574,15 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           </div>
         </div>
 
-        {/* The gateway will charge something other than the button said (see
-            payAmountChanged): the real figure, and one tap to go on with it —
-            in place of the order button. */}
-        {payConfirm ? (
+        {/* The gateway will take money for something the button did not say
+            (see payPauseFor): which order, the real figure, and one tap to go
+            on with it — in place of the order button. */}
+        {payConfirm && pauseCopy ? (
           <>
             <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-              The amount to pay for this order is{' '}
-              <span className="font-bold">{formatBDT(payConfirm.amount, { currency: product.currency })}</span>{' '}
-              (prices or delivery charges were updated).
-              {payConfirm.restOnDelivery && ' The rest is paid on delivery.'}
+              {pauseCopy.lead}{' '}
+              <span className="font-bold">{formatBDT(payConfirm.amount, { currency: product.currency })}</span>
+              {pauseCopy.tail}
             </div>
             <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} onClick={() => { window.location.href = payConfirm.url; }}>
               <CreditCard className="h-4 w-4" />

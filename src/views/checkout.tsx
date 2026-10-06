@@ -3,7 +3,7 @@ import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
-import type { PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
+import type { CreateOrderInput, PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
 import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToken } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
@@ -16,13 +16,16 @@ import {
   DistrictThanaFields,
   PaymentMethodPicker,
   advanceAmountFor,
+  heldPauseFor,
   isOnlineMethod,
   isPaymentRefusal,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
-  payAmountChanged,
+  orderSubmitSignature,
   payCartKey,
+  payPauseCopy,
+  payPauseFor,
   paymentMethodsForCart,
   paymentRefusalNotice,
   paymentRetryHint,
@@ -30,7 +33,10 @@ import {
   refusalsForNewCart,
   resolvePaymentMethod,
   withPaymentRefusal,
+  type HeldPay,
+  type PayPause,
   type PaymentRefusal,
+  type PlacedOrder,
 } from '../components/order/checkout-extras';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -159,10 +165,19 @@ export function CheckoutPage({
   const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
   const [refusals, setRefusals] = useState<PaymentRefusal[]>([]);
   const [payNotice, setPayNotice] = useState<{ text: string; code: string } | null>(null);
-  // The gateway is about to charge something other than the pay button said
-  // (see payAmountChanged): the order exists, and its payment link is held
-  // here until the shopper has seen the real figure and tapped through.
-  const [payConfirm, setPayConfirm] = useState<{ url: string; amount: number; restOnDelivery: boolean } | null>(null);
+  // The gateway is about to take money for something the screen does not say
+  // (see payPauseFor — another amount, or an order an earlier submit placed):
+  // the order exists, and its payment link is held here until the shopper has
+  // read which order and how much, and tapped through.
+  const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
+  // "Change my order" hides that box but must not throw the link away: it is
+  // kept with the order it was for (heldPauseFor), so the pay button pressed
+  // again with nothing changed offers it again instead of asking the server
+  // for what would, after its 90s dedup window, be a second order.
+  const heldPay = useRef<HeldPay | null>(null);
+  // The order this page placed, as sent — what a later `duplicate` answer is
+  // compared with.
+  const placedAs = useRef<PlacedOrder | null>(null);
 
   // Coming BACK from the gateway (shopper changed their mind, wants COD, or
   // the gateway page stalled) restores this page from bfcache with its React
@@ -170,14 +185,15 @@ export function CheckoutPage({
   // leave the button permanently stuck on "Starting payment…". Reset it.
   // Resubmitting is safe: the 90s dedup window replays the SAME order and
   // renews the SAME gateway session (order-stable transaction id), never a
-  // second payable one. A held payment link (payConfirm) goes too — it has
-  // been used; the resubmit fetches the renewed one.
+  // second payable one. A held payment link (payConfirm / heldPay) goes too —
+  // it has been used; the resubmit fetches the renewed one.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         inflight.current = false;
         setSubmitting(false);
         setPayConfirm(null);
+        heldPay.current = null;
       }
     };
     window.addEventListener('pageshow', onPageShow);
@@ -346,6 +362,16 @@ export function CheckoutPage({
   useEffect(() => {
     setPayConfirm(null);
   }, [linesSig, payMethod, zoneLive?.code]);
+  // …and so does any edit to the form itself (name, phone, address, note): a
+  // box that says "continue to payment" must not sit over fields that no
+  // longer say what the order does. The link is not lost (heldPay): with the
+  // field put back, the pay button brings the same box back; with it left
+  // changed, the server is asked and the box says which order it has
+  // (payPauseFor).
+  useEffect(() => {
+    const sub = form.watch(() => setPayConfirm(null));
+    return () => sub.unsubscribe();
+  }, [form]);
 
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
@@ -399,6 +425,7 @@ export function CheckoutPage({
 
   const currency = meta.currency;
   const selectedZone = form.watch('shipping_zone');
+  const pauseCopy = payConfirm ? payPauseCopy(payConfirm) : null;
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
   // Advance applies to COD only, and only when the policy owes something for
@@ -442,6 +469,47 @@ export function CheckoutPage({
   async function onSubmit(values: FormData) {
     if (lines.length === 0) return;
     if (inflight.current) return;
+    const input: CreateOrderInput = {
+      customer_name:  values.customer_name,
+      customer_phone: values.customer_phone,
+      customer_email: values.customer_email || undefined,
+      address:        values.customer_address,
+      customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
+      thana:          districtEnabled ? values.thana || undefined : undefined,
+      // Only when the advance box was actually on screen (COD + policy).
+      advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
+      shipping_zone:  values.shipping_zone || undefined,
+      notes:          values.notes,
+      items: lines.map((l) => ({
+        product_id:    l.product_id,
+        variant_index: l.variant_index,
+        // The ONE size chosen on the PDP for a size-range row — the order
+        // records "L", never the whole "M, L, XL" list. Omitted when no
+        // choice exists (legacy line / no range), keeping the old payload.
+        ...(l.variant_choice?.size ? { variant: { size: l.variant_choice.size } } : {}),
+        quantity:      l.quantity,
+      })),
+      funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
+      // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
+      cart_key:       getCartKey(),
+      // Only sent when the box is ticked → guest checkout is unchanged otherwise.
+      ...(values.create_account ? { create_account: true, password: values.password } : {}),
+      // ALWAYS explicit. An omitted method means "COD" to the server (how
+      // pre-picker builds asked for it) — which a store that has switched
+      // COD off rightly rejects.
+      payment_method: payMethod,
+    };
+    // The order exactly as the form has it now. A payment link the shopper
+    // stepped back from ("Change my order") and then changed nothing about is
+    // offered again as it is — no request, so never a second order.
+    const sig = orderSubmitSignature(input);
+    const held = heldPauseFor(heldPay.current, sig, Date.now());
+    if (held) {
+      setError(null);
+      setPayNotice(null);
+      setPayConfirm(held);
+      return;
+    }
     inflight.current = true;
     setSubmitting(true);
     setError(null);
@@ -464,36 +532,7 @@ export function CheckoutPage({
       pixel.addPaymentInfo({ value: total, currency, paymentType: payMethod, items: ga4Items });
     }
     try {
-      const order = await submitOrder({
-        customer_name:  values.customer_name,
-        customer_phone: values.customer_phone,
-        customer_email: values.customer_email || undefined,
-        address:        values.customer_address,
-        customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
-        thana:          districtEnabled ? values.thana || undefined : undefined,
-        // Only when the advance box was actually on screen (COD + policy).
-        advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
-        shipping_zone:  values.shipping_zone || undefined,
-        notes:          values.notes,
-        items: lines.map((l) => ({
-          product_id:    l.product_id,
-          variant_index: l.variant_index,
-          // The ONE size chosen on the PDP for a size-range row — the order
-          // records "L", never the whole "M, L, XL" list. Omitted when no
-          // choice exists (legacy line / no range), keeping the old payload.
-          ...(l.variant_choice?.size ? { variant: { size: l.variant_choice.size } } : {}),
-          quantity:      l.quantity,
-        })),
-        funnel_url:     typeof window !== 'undefined' ? window.location.href : undefined,
-        // Abandoned Cart Recovery: read BEFORE markOrdered() rotates the key.
-        cart_key:       getCartKey(),
-        // Only sent when the box is ticked → guest checkout is unchanged otherwise.
-        ...(values.create_account ? { create_account: true, password: values.password } : {}),
-        // ALWAYS explicit. An omitted method means "COD" to the server (how
-        // pre-picker builds asked for it) — which a store that has switched
-        // COD off rightly rejects.
-        payment_method: payMethod,
-      }, orderIdempotencyKey(idemKey.current, {
+      const order = await submitOrder(input, orderIdempotencyKey(idemKey.current, {
         customer_phone: values.customer_phone,
         // The size choice is part of the intent: ordering M after L within
         // the dedup window must mint a new key, not replay the L order.
@@ -504,6 +543,9 @@ export function CheckoutPage({
           quantity: l.quantity,
         })),
       }));
+      // What this page placed, as sent: a later `duplicate` answer for the
+      // same order is compared with it (see payPauseFor).
+      if (!order.duplicate) placedAs.current = { orderNumber: order.order_number, sig };
       // Account provisioned alongside the order → auto-login by storing the
       // token. If the phone already had an account (account_exists), no token
       // comes back — pass a flag so the success page nudges them to log in.
@@ -583,13 +625,27 @@ export function CheckoutPage({
         // figure they have not seen. The order and the stashes above stand
         // either way — hold the link and let them tap through, or change the
         // order. Nothing is paid yet: no Purchase pixel, the cart stays.
-        const changed = payAmountChanged(payNowAdvance ? onlineAdvance : total, order.payment.amount);
-        if (changed !== null) {
-          setPayConfirm({
-            url: order.payment.redirect_url,
-            amount: changed,
-            restOnDelivery: payMethod === 'online_advance' && changed < order.total,
-          });
+        // The same goes for an order an EARLIER submit placed (the server's
+        // 90s dedup answers a resubmit with it, whatever was edited since
+        // except the items): the box then says so instead of "prices were
+        // updated" — and it appears even at an unchanged amount when this page
+        // knows it sent that order with other details.
+        const pause = payPauseFor({
+          url: order.payment.redirect_url,
+          orderNumber: order.order_number,
+          duplicate: order.duplicate === true,
+          promised: payNowAdvance ? onlineAdvance : total,
+          serverAmount: order.payment.amount,
+          orderTotal: order.total,
+          method: payMethod,
+          sig,
+          placed: placedAs.current,
+        });
+        // A link the server has just issued outdates any held from before;
+        // only one for the form as it stands is worth keeping.
+        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), pause } : null;
+        if (pause) {
+          setPayConfirm(pause);
           inflight.current = false;
           setSubmitting(false);
           return;
@@ -949,16 +1005,16 @@ export function CheckoutPage({
                   Your details are used only to process and deliver this order.
                 </p>
 
-                {/* The gateway will charge something other than the button
-                    said (see payAmountChanged): the real figure, and one tap
-                    to go on with it — in place of the order button. */}
-                {payConfirm ? (
+                {/* The gateway will take money for something the button did
+                    not say (see payPauseFor): which order, the real figure,
+                    and one tap to go on with it — in place of the order
+                    button. */}
+                {payConfirm && pauseCopy ? (
                   <>
                     <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                      The amount to pay for this order is{' '}
-                      <span className="font-bold">{formatBDT(payConfirm.amount, { currency })}</span>{' '}
-                      (prices or delivery charges were updated).
-                      {payConfirm.restOnDelivery && ' The rest is paid on delivery.'}
+                      {pauseCopy.lead}{' '}
+                      <span className="font-bold">{formatBDT(payConfirm.amount, { currency })}</span>
+                      {pauseCopy.tail}
                     </div>
                     <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" onClick={() => { window.location.href = payConfirm.url; }}>
                       <CreditCard className="h-4 w-4" />
