@@ -1281,6 +1281,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           duplicate: orderRes.duplicate === true,
           promised: payNowAdvance ? onlineAdvance : total,
           serverAmount: orderRes.payment.amount,
+          promisedTotal: total,
           orderTotal: orderRes.total,
           method: payMethod,
           sig,
@@ -1424,7 +1425,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     );
   }
 
-  const pauseCopy = payConfirm ? payPauseCopy(payConfirm) : null;
+  const pauseCopy = payConfirm ? payPauseCopy(payConfirm, product.currency) : null;
 
   return (
     <section id="funnel-order" className="mx-auto max-w-2xl scroll-mt-4 rounded-2xl bg-white p-5 ring-1 ring-slate-200 sm:p-6">

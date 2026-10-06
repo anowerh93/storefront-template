@@ -426,7 +426,7 @@ export function CheckoutPage({
 
   const currency = meta.currency;
   const selectedZone = form.watch('shipping_zone');
-  const pauseCopy = payConfirm ? payPauseCopy(payConfirm) : null;
+  const pauseCopy = payConfirm ? payPauseCopy(payConfirm, currency) : null;
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = lines.reduce((n, l) => n + l.unit_price * l.quantity, 0);
   // Advance applies to COD only, and only when the policy owes something for
@@ -659,6 +659,7 @@ export function CheckoutPage({
           duplicate: order.duplicate === true,
           promised: payNowAdvance ? onlineAdvance : total,
           serverAmount: order.payment.amount,
+          promisedTotal: total,
           orderTotal: order.total,
           method: payMethod,
           sig,

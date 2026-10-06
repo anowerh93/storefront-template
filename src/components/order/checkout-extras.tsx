@@ -424,7 +424,10 @@ export type PayPause = {
   orderNumber: string;
   /** What the gateway will ask for. */
   amount: number;
-  restOnDelivery: boolean;
+  /** An advance: what is then left to pay on delivery — the ORDER's total,
+   *  as the server has it, less `amount`. null when the gateway takes the
+   *  whole order. */
+  rest: number | null;
   /** The order is one an EARLIER submit placed, and the form as it stands now
    *  is not — or cannot be shown to be — what it was placed with. */
   earlier: boolean;
@@ -434,12 +437,20 @@ export type PayPause = {
 export type PlacedOrder = { orderNumber: string; sig: string };
 
 /**
- * Should the shopper see a box before the gateway — and which one? Two
- * reasons, both "the gateway is about to take money for something the screen
+ * Should the shopper see a box before the gateway — and which one? Three
+ * reasons, all "the gateway is about to take money for something the screen
  * does not say":
  *
  *  - the charge the server stamped is not what the pay button promised
  *    (payAmountChanged);
+ *  - an ADVANCE whose order total is not the one on screen. The picker told
+ *    the shopper what is left for the door ("বাকি ৳500 ডেলিভারিতে") — the
+ *    total less the advance — and the advance rule is all but flat: a price
+ *    or delivery fee that moved changes the total and NOT the charge. The
+ *    gateway would take exactly what the button said, for an order that then
+ *    costs more at the door than the screen promised, with the advance
+ *    already paid. (A full online payment needs no such check: there the
+ *    charge IS the total. Cash on Delivery takes no money first.)
  *  - the server answered with an order an earlier submit placed (`duplicate`)
  *    and this page KNOWS it sent that one with other details (`placed`) — an
  *    address or delivery-area edit the dedup window swallowed.
@@ -447,7 +458,7 @@ export type PlacedOrder = { orderNumber: string; sig: string };
  * `earlier` picks the wording: true whenever the order is a replay that is
  * not provably the form as it stands, so the box never blames "updated
  * prices" for a difference the shopper's own edit made. A replay this page
- * cannot place (its first answer was lost) and whose charge matches goes
+ * cannot place (its first answer was lost) and whose figures match goes
  * straight on, as it always did. No number from the server → nothing to
  * compare and nothing to show → no box (an API that predates the field).
  */
@@ -459,6 +470,10 @@ export function payPauseFor(o: {
   promised: number;
   /** `payment.amount`, as the server sent it. */
   serverAmount: number | null | undefined;
+  /** The order total the screen showed (what the picker's "rest on delivery"
+   *  was worked out from). */
+  promisedTotal: number;
+  /** The order's total, as the server sent it. */
   orderTotal: number;
   method: PaymentMethod;
   /** orderSubmitSignature of what was just sent. */
@@ -469,20 +484,29 @@ export function payPauseFor(o: {
   const mine = o.placed !== null && o.placed.orderNumber === o.orderNumber ? o.placed : null;
   const edited = o.duplicate && mine !== null && mine.sig !== o.sig;
   const changed = payAmountChanged(o.promised, o.serverAmount);
-  if (changed === null && !edited) return null;
+  const totalChanged = o.method === 'online_advance' && payAmountChanged(o.promisedTotal, o.orderTotal) !== null;
+  if (changed === null && !edited && !totalChanged) return null;
   const amount = changed ?? Math.round(o.serverAmount * 100) / 100;
+  // Whole paisa, like every comparison here — and no "rest" of a fraction of
+  // one, or without a total to take it from.
+  const restPaisa = o.method === 'online_advance' ? Math.round(o.orderTotal * 100) - Math.round(amount * 100) : 0;
   return {
     url: o.url,
     orderNumber: o.orderNumber,
     amount,
-    restOnDelivery: o.method === 'online_advance' && amount < o.orderTotal,
+    rest: restPaisa > 0 ? restPaisa / 100 : null,
     earlier: o.duplicate && !(mine !== null && mine.sig === o.sig),
   };
 }
 
-/** The pause box's sentence, around the amount: `lead` AMOUNT `tail`. */
-export function payPauseCopy(p: Pick<PayPause, 'orderNumber' | 'earlier' | 'restOnDelivery'>): { lead: string; tail: string } {
-  const rest = p.restOnDelivery ? ' The rest is paid on delivery.' : '';
+/** The pause box's sentence, around the amount: `lead` AMOUNT `tail`. The
+ *  rest of an advance is said as a figure — it is the one the picker's own
+ *  "rest on delivery" has to be read against. */
+export function payPauseCopy(
+  p: Pick<PayPause, 'orderNumber' | 'earlier' | 'rest'>,
+  currency?: string,
+): { lead: string; tail: string } {
+  const rest = p.rest !== null ? ` The rest — ${formatBDT(p.rest, { currency })} — is paid on delivery.` : '';
   if (p.earlier) {
     return {
       lead: `${p.orderNumber ? `Order #${p.orderNumber}` : 'This order'} was already placed a moment ago, as you first sent it — changes made since are not part of it. The amount to pay for it is`,
