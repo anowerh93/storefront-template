@@ -178,6 +178,155 @@ export function takePayCartNote(orderNumber: string, storage: Pick<Storage, 'get
   return true;
 }
 
+/**
+ * The note BOTH order forms leave (localStorage — the gateway return lands in
+ * another tab as often as not, same reason as payCartKey) before handing the
+ * shopper to the gateway: the page they ordered from, so the order page can
+ * offer "Try again" when the payment does not go through. A path + query only
+ * (utm / fbclid ride along) — never a name, a phone or an address.
+ *
+ * The stored string is NEVER used as a link: readPayReturnNote re-parses it,
+ * keeps it only while it is a fresh, same-origin path that is not an order
+ * page, and hands back the re-serialised pathname + search. A foreign,
+ * malformed or expired note is deleted and yields no link.
+ */
+export const PAY_RETURN_TTL_MS = 24 * 60 * 60 * 1000;
+const PAY_RETURN_PREFIX = 'replybd:pay-return:';
+/** Longest path + query worth keeping — an ad URL runs to a few hundred chars. */
+const PAY_RETURN_MAX_LENGTH = 2000;
+
+export function payReturnKey(orderNumber: string): string {
+  return `${PAY_RETURN_PREFIX}${orderNumber}`;
+}
+
+/** A site-relative path: ONE leading slash — never `//host` or `/\host`,
+ *  which a browser reads as another site. */
+function isLocalPath(path: string): boolean {
+  return /^\/(?![/\\])/.test(path);
+}
+
+/** The order pages are never a place to "try again" from (the link would
+ *  lead straight back to the page it is on). */
+function isOrderPath(pathname: string): boolean {
+  let path = pathname;
+  try {
+    path = decodeURIComponent(pathname);
+  } catch {
+    /* a stray % — judge the raw path */
+  }
+  return /^\/order(\/|$)/i.test(path);
+}
+
+/** The stamp of a stored note, or null when it is malformed or older than
+ *  the TTL (a stamp from the future by more than the TTL is no better). */
+function payReturnNoteOf(raw: string, now: number): { p: string; t: number } | null {
+  let note: { p?: unknown; t?: unknown } | null = null;
+  try {
+    note = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!note || typeof note.p !== 'string' || typeof note.t !== 'number' || !Number.isFinite(note.t)) return null;
+  if (Math.abs(now - note.t) > PAY_RETURN_TTL_MS) return null;
+  return { p: note.p, t: note.t };
+}
+
+/**
+ * Leave the note for this order. Never throws: blocked or full storage only
+ * means the order page offers no "Try again". Notes of earlier attempts that
+ * have outlived the TTL are swept here — nothing else removes an abandoned one.
+ */
+export function leavePayReturnNote(
+  orderNumber: string,
+  location: Pick<Location, 'pathname' | 'search'>,
+  storage: Pick<Storage, 'length' | 'key' | 'getItem' | 'setItem' | 'removeItem'>,
+  now: number,
+): void {
+  try {
+    const stale: string[] = [];
+    for (let i = 0; i < storage.length; i++) {
+      const key = storage.key(i);
+      if (!key || !key.startsWith(PAY_RETURN_PREFIX)) continue;
+      if (!payReturnNoteOf(storage.getItem(key) ?? '', now)) stale.push(key);
+    }
+    stale.forEach((key) => storage.removeItem(key));
+  } catch {
+    /* a sweep that cannot run must not cost this order its note */
+  }
+  try {
+    const path = location.pathname + location.search;
+    if (path.length > PAY_RETURN_MAX_LENGTH || !isLocalPath(path) || isOrderPath(location.pathname)) return;
+    storage.setItem(payReturnKey(orderNumber), JSON.stringify({ p: path, t: now }));
+  } catch {
+    /* storage blocked / full */
+  }
+}
+
+/**
+ * The path to send the shopper back to, or null. NOT consumed: Back from the
+ * retry must still find it (a retry leaves its own note under the new order
+ * number). `origin` is the page's own (window.location.origin).
+ */
+export function readPayReturnNote(
+  orderNumber: string,
+  origin: string,
+  storage: Pick<Storage, 'getItem' | 'removeItem'>,
+  now: number,
+): string | null {
+  try {
+    const key = payReturnKey(orderNumber);
+    const raw = storage.getItem(key);
+    if (raw === null) return null;
+    let path: string | null = null;
+    const note = payReturnNoteOf(raw, now);
+    if (note && note.p.length <= PAY_RETURN_MAX_LENGTH && isLocalPath(note.p)) {
+      try {
+        const url = new URL(note.p, origin);
+        const local = url.pathname + url.search;
+        // Checked again AFTER the parse: "/.//host" is same-origin going in
+        // and re-serialises to "//host".
+        if (url.origin === origin && isLocalPath(local) && !isOrderPath(url.pathname)) path = local;
+      } catch {
+        /* not a URL */
+      }
+    }
+    if (path === null) storage.removeItem(key);
+    return path;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPayReturnNote(orderNumber: string, storage: Pick<Storage, 'removeItem'>): void {
+  try {
+    storage.removeItem(payReturnKey(orderNumber));
+  } catch {
+    /* storage blocked */
+  }
+}
+
+/** The "Try again" link for a return path. The checkout page IS the form; a
+ *  funnel's order form sits far down its landing page, so land on it. */
+export function payRetryHref(returnPath: string): string {
+  const pathname = returnPath.split('?')[0].replace(/\/+$/, '');
+  return pathname === '/checkout' ? returnPath : `${returnPath}#funnel-order`;
+}
+
+/**
+ * Did the gateway send the shopper back saying the payment failed or was
+ * cancelled (/order/{n}?payment=fail|cancel)? An untrusted URL hint: it may
+ * only reveal the "Try again" link sooner, never decide what happened to the
+ * payment — the order data does that.
+ */
+export function payReturnSaysFailed(search: string): boolean {
+  try {
+    const hint = new URLSearchParams(search).get('payment');
+    return hint === 'fail' || hint === 'cancel';
+  } catch {
+    return false;
+  }
+}
+
 /** Shopper-facing error for a rejected / unstartable payment, never naming a
  *  method this store doesn't offer. */
 export function paymentRetryHint(methods: PaymentMethod[]): string {

@@ -17,6 +17,7 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   isOnlineMethod,
+  leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   payCartKey,
@@ -488,6 +489,14 @@ export function CheckoutPage({
           } catch {
             /* storage blocked — the cart badge lingers after payment */
           }
+        }
+        // Where the shopper ordered from (cart or buy-now URL), so the order
+        // page can offer "Try again" if this payment does not go through
+        // (see payReturnKey). Its own try, for the same reason.
+        try {
+          leavePayReturnNote(order.order_number, window.location, localStorage, Date.now());
+        } catch {
+          /* storage blocked — the order page offers no "Try again" */
         }
         try {
           sessionStorage.setItem(`replybd:pay-phone:${order.order_number}`, last4);

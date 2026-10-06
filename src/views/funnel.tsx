@@ -32,6 +32,7 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   isOnlineMethod,
+  leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   codOffered,
@@ -1160,6 +1161,14 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       // the pay-track stash below). No cart note: this order never used the
       // cart, so confirming it must not empty one (see payCartKey).
       if (orderRes.payment?.redirect_url) {
+        // This landing page (ad params and all), so the order page can offer
+        // "Try again" if this payment does not go through (see payReturnKey).
+        // Its own try — a throw here must not lose the stashes below.
+        try {
+          leavePayReturnNote(orderRes.order_number, window.location, localStorage, Date.now());
+        } catch {
+          /* storage blocked — the order page offers no "Try again" */
+        }
         try {
           sessionStorage.setItem(`replybd:pay-phone:${orderRes.order_number}`, last4);
           // Written LAST: it's the only throw point that matters, and the
