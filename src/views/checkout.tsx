@@ -467,6 +467,22 @@ export function CheckoutPage({
     else setCartQty(line.product_id, line.variant_index, clamped, line.variant_choice);
   }
 
+  // "Continue to payment" on the pause box. The browser is leaving for the
+  // gateway, and on a phone that takes seconds: lock the order and say so,
+  // exactly as the straight redirect does (it leaves `submitting` set).
+  // Without this the tap looked dead, and everything — the payment picker
+  // included — stayed live under a gateway page that was already loading; a
+  // shopper who then picked another method would have had this very order
+  // cancelled while its payment page opened. Nothing is sent from here: the
+  // tap only follows the held link. Released the way the straight redirect
+  // is — by the bfcache restore above.
+  function continueToPayment(url: string) {
+    if (inflight.current) return;
+    inflight.current = true;
+    setSubmitting(true);
+    window.location.href = url;
+  }
+
   async function onSubmit(values: FormData) {
     if (lines.length === 0) return;
     if (inflight.current) return;
@@ -1023,11 +1039,11 @@ export function CheckoutPage({
                       <span className="font-bold">{formatBDT(payConfirm.amount, { currency })}</span>
                       {pauseCopy.tail}
                     </div>
-                    <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" onClick={() => { window.location.href = payConfirm.url; }}>
+                    <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
                       <CreditCard className="h-4 w-4" />
-                      Continue to payment — {formatBDT(payConfirm.amount, { currency })}
+                      {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency })}`}
                     </Button>
-                    <Button type="button" variant="link" className="mt-2 w-full" onClick={() => setPayConfirm(null)}>
+                    <Button type="button" variant="link" className="mt-2 w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
                       Change my order
                     </Button>
                   </>

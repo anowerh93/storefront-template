@@ -1391,6 +1391,16 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     }
   }
 
+  // "Continue to payment" on the pause box: the browser is leaving for the
+  // gateway — lock the order and say so, as the straight redirect does. Nothing
+  // is sent; the tap only follows the held link. Same contract as checkout.tsx.
+  function continueToPayment(url: string) {
+    if (inflight.current) return;
+    inflight.current = true;
+    setSubmitting(true);
+    window.location.href = url;
+  }
+
   // Safety net: if validation blocks submit on a field that isn't on screen
   // (e.g. a hidden shipping_zone when shipping is off), the inline message never
   // renders and the order button looks dead. Name the offending field(s) at the
@@ -1589,11 +1599,11 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
               <span className="font-bold">{formatBDT(payConfirm.amount, { currency: product.currency })}</span>
               {pauseCopy.tail}
             </div>
-            <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} onClick={() => { window.location.href = payConfirm.url; }}>
+            <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
               <CreditCard className="h-4 w-4" />
-              Continue to payment — {formatBDT(payConfirm.amount, { currency: product.currency })}
+              {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency: product.currency })}`}
             </Button>
-            <Button type="button" variant="link" className="w-full" onClick={() => setPayConfirm(null)}>
+            <Button type="button" variant="link" className="w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
               Change my order
             </Button>
           </>
