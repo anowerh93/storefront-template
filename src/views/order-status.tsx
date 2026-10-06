@@ -13,7 +13,8 @@ import {
   clearPayReturnNote,
   isOnlineMethod,
   payRetryHref,
-  payReturnSaysFailed,
+  payRetryOffer,
+  payReturnHint,
   readPayReturnNote,
   takePayCartNote,
 } from '../components/order/checkout-extras';
@@ -152,7 +153,10 @@ export function OrderStatusPage({
   // browser left for the gateway (the note both forms leave — see
   // payReturnKey). Read, not consumed, and already vetted as a same-origin
   // path; null in any other browser, after 24h, or with storage blocked — the
-  // page is then exactly what it was without the link.
+  // page is then exactly what it was without the link. Read from the browser
+  // in the initial state, which the server cannot match — safe only because
+  // nothing derived from it (or from `returnHint` below) reaches the DOM
+  // before `order` has loaded, and the hydrating render never has an order.
   const [retryHref] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
     try {
@@ -162,11 +166,11 @@ export function OrderStatusPage({
       return null;
     }
   });
-  // The gateway's own ?payment=fail|cancel on the return URL. Untrusted: it
-  // only lets the link above show before the status polls run out — what
-  // happened to the payment is still read from the order alone.
-  const [returnSaysFailed] = useState<boolean>(
-    () => typeof window !== 'undefined' && payReturnSaysFailed(window.location.search),
+  // The gateway's own ?payment= on the return URL. Untrusted: it only shapes
+  // the "Try again" offer (see payRetryOffer) — what happened to the payment
+  // is still read from the order alone.
+  const [returnHint] = useState(() =>
+    typeof window !== 'undefined' ? payReturnHint(window.location.search) : null,
   );
   // A logged-in customer can view the order WITHOUT a phone (the account
   // session is the identity proof) — resolved in the mount effect below.
@@ -295,13 +299,17 @@ export function OrderStatusPage({
     }
   }, [paymentPaid, paidThenCanceled, orderNumber]);
 
-  // Offer the way back to the order form once the payment is known to have
-  // failed — or, while the order is still awaiting it, once the polls have
-  // run out or the gateway itself said so on the return URL (a push-IPN
-  // gateway's fail / cancel return leaves the order awaiting, so "failed"
-  // alone would strand that shopper on the spinner). Derived, never state.
-  const showRetry =
-    !!retryHref && (paymentFailed || (awaitingPayment && (pollsExhausted || returnSaysFailed)));
+  // The way back to the order form: 'failed' once the order was cancelled
+  // unpaid; 'unfinished' while it still awaits its payment — and never while
+  // the gateway's return says the money was (or may have been) taken. See
+  // payRetryOffer. Derived, never state.
+  const retryOffer = payRetryOffer({
+    hasLink: !!retryHref,
+    paymentFailed,
+    awaitingPayment,
+    pollsExhausted,
+    hint: returnHint,
+  });
 
   // ── Purchase pixel for ONLINE orders ──
   // Fired HERE (payment confirmed), never at checkout submit, so abandoned
@@ -603,23 +611,32 @@ export function OrderStatusPage({
 
           <OrderDetail order={order} meta={meta} phoneLast4={phoneKey} />
 
-          {/* With "Try again" on offer it is the primary action: "Continue
-              Shopping" steps back to outline and "Back to Cart" goes (a cart
-              checkout's retry link already leads back to that cart). */}
+          {/* After a FAILED payment "Try again" is the primary action and
+              "Continue Shopping" steps back to outline. While the order still
+              awaits its payment the link is the quiet one, and says who it is
+              for: the shopper who paid must not read it as the next step.
+              Either way "Back to Cart" goes (a cart checkout's retry link
+              already leads back to that cart). */}
           <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-            {showRetry && retryHref && (
+            {retryOffer && retryHref && (
               <a href={retryHref}>
-                <Button variant="brand" className="w-full sm:w-auto">Try again</Button>
+                {retryOffer === 'failed' ? (
+                  <Button variant="brand" className="w-full sm:w-auto">Try again</Button>
+                ) : (
+                  <Button variant="outline" className="h-auto min-h-10 w-full whitespace-normal sm:w-auto">
+                    Didn’t complete the payment? Try again
+                  </Button>
+                )}
               </a>
             )}
             <a href="/products">
-              <Button variant={showRetry ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
+              <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
             </a>
             {authed ? (
               <a href="/account">
                 <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
               </a>
-            ) : !showRetry ? (
+            ) : !retryOffer ? (
               <a href="/cart">
                 <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
               </a>

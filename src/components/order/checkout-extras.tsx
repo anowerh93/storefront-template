@@ -320,18 +320,57 @@ export function payRetryHref(returnPath: string): string {
 }
 
 /**
- * Did the gateway send the shopper back saying the payment failed or was
- * cancelled (/order/{n}?payment=fail|cancel)? An untrusted URL hint: it may
- * only reveal the "Try again" link sooner, never decide what happened to the
- * payment — the order data does that.
+ * What the gateway return URL says happened (/order/{n}?payment=…): the four
+ * values the API and the gateways send, else null. An UNTRUSTED hint — it
+ * never decides what happened to the payment (the order data does that); it
+ * only shapes the "Try again" offer, see payRetryOffer.
+ *  - 'success'  the gateway sent the shopper back as paid;
+ *  - 'pending'  the API could not learn a verdict yet (the money may be taken);
+ *  - 'fail' / 'cancel'  the gateway sent the shopper back unpaid.
  */
-export function payReturnSaysFailed(search: string): boolean {
+export type PayReturnHint = 'success' | 'pending' | 'fail' | 'cancel';
+
+export function payReturnHint(search: string): PayReturnHint | null {
   try {
     const hint = new URLSearchParams(search).get('payment');
-    return hint === 'fail' || hint === 'cancel';
+    return hint === 'success' || hint === 'pending' || hint === 'fail' || hint === 'cancel' ? hint : null;
   } catch {
-    return false;
+    return null;
   }
+}
+
+/**
+ * Whether — and how — the order page offers the way back to the order form:
+ *  - 'failed'      the order was cancelled unpaid. The primary action.
+ *  - 'unfinished'  the order still awaits its payment and nothing says the
+ *                  money was taken. A quiet link, worded for the shopper who
+ *                  did NOT pay — a retry from here is a second payable order
+ *                  once the API's 90s dedup window has passed.
+ *  - null          no link.
+ *
+ * While the order is awaiting, the return hint is used in the safe direction
+ * only. 'success' / 'pending' HIDE the link for as long as the order awaits —
+ * the gateway took the money, or may have, and only our confirmation is late
+ * (a slow IPN, a status pull that could not be made): offering "Try again"
+ * there is how a shopper pays twice. 'fail' / 'cancel' show it at once (a
+ * push-IPN gateway's fail / cancel return leaves the order awaiting, so
+ * waiting for "cancelled" would strand that shopper on the spinner). With no
+ * hint at all it appears once the status polls have run out.
+ */
+export function payRetryOffer(o: {
+  /** A vetted return path exists (readPayReturnNote). */
+  hasLink: boolean;
+  paymentFailed: boolean;
+  awaitingPayment: boolean;
+  pollsExhausted: boolean;
+  hint: PayReturnHint | null;
+}): 'failed' | 'unfinished' | null {
+  if (!o.hasLink) return null;
+  if (o.paymentFailed) return 'failed';
+  if (!o.awaitingPayment) return null;
+  if (o.hint === 'success' || o.hint === 'pending') return null;
+  if (o.hint === 'fail' || o.hint === 'cancel') return 'unfinished';
+  return o.pollsExhausted ? 'unfinished' : null;
 }
 
 /**
