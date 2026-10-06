@@ -21,6 +21,7 @@ import {
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
+  payAmountChanged,
   payCartKey,
   paymentMethodsForCart,
   paymentRefusalNotice,
@@ -153,6 +154,10 @@ export function CheckoutPage({
   const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
   const [refused, setRefused] = useState<PaymentMethod[]>([]);
   const [payNotice, setPayNotice] = useState<string | null>(null);
+  // The gateway is about to charge something other than the pay button said
+  // (see payAmountChanged): the order exists, and its payment link is held
+  // here until the shopper has seen the real figure and tapped through.
+  const [payConfirm, setPayConfirm] = useState<{ url: string; amount: number; restOnDelivery: boolean } | null>(null);
 
   // Coming BACK from the gateway (shopper changed their mind, wants COD, or
   // the gateway page stalled) restores this page from bfcache with its React
@@ -160,12 +165,14 @@ export function CheckoutPage({
   // leave the button permanently stuck on "Starting payment…". Reset it.
   // Resubmitting is safe: the 90s dedup window replays the SAME order and
   // renews the SAME gateway session (order-stable transaction id), never a
-  // second payable one.
+  // second payable one. A held payment link (payConfirm) goes too — it has
+  // been used; the resubmit fetches the renewed one.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         inflight.current = false;
         setSubmitting(false);
+        setPayConfirm(null);
       }
     };
     window.addEventListener('pageshow', onPageShow);
@@ -323,6 +330,13 @@ export function CheckoutPage({
     setRefused((r) => (r.length ? [] : r));
     setPayNotice(null);
   }, [linesSig]);
+  // A held payment link (payConfirm) belongs to the order exactly as it was
+  // sent. Change what is ordered, how it is paid or where it goes, and the
+  // normal button comes back — the next submit goes through the server's own
+  // dedup (same cart + method → the same order, its link renewed).
+  useEffect(() => {
+    setPayConfirm(null);
+  }, [linesSig, payMethod, zoneLive?.code]);
 
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
@@ -547,6 +561,23 @@ export function CheckoutPage({
           );
         } catch {
           /* storage blocked — the order page falls back to its lookup form */
+        }
+        // The server stamped a different charge than the pay button promised
+        // (a price, delivery fee or advance rule that changed after this page
+        // or cart was loaded): never hand the shopper to the gateway on a
+        // figure they have not seen. The order and the stashes above stand
+        // either way — hold the link and let them tap through, or change the
+        // order. Nothing is paid yet: no Purchase pixel, the cart stays.
+        const changed = payAmountChanged(payNowAdvance ? onlineAdvance : total, order.payment.amount);
+        if (changed !== null) {
+          setPayConfirm({
+            url: order.payment.redirect_url,
+            amount: changed,
+            restOnDelivery: payMethod === 'online_advance' && changed < order.total,
+          });
+          inflight.current = false;
+          setSubmitting(false);
+          return;
         }
         window.location.href = order.payment.redirect_url;
         return;
@@ -895,16 +926,37 @@ export function CheckoutPage({
                   Your details are used only to process and deliver this order.
                 </p>
 
-                <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
-                  {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-                  {submitting
-                    ? (payOnline ? 'Starting payment…' : 'Placing order…')
-                    : payNowAdvance
-                      ? `Pay Advance — ${formatBDT(onlineAdvance, { currency })}`
-                      : payOnline
-                        ? `Pay Now — ${formatBDT(total, { currency })}`
-                        : `Place Order — ${formatBDT(total, { currency })}`}
-                </Button>
+                {/* The gateway will charge something other than the button
+                    said (see payAmountChanged): the real figure, and one tap
+                    to go on with it — in place of the order button. */}
+                {payConfirm ? (
+                  <>
+                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                      The amount to pay for this order is{' '}
+                      <span className="font-bold">{formatBDT(payConfirm.amount, { currency })}</span>{' '}
+                      (prices or delivery charges were updated).
+                      {payConfirm.restOnDelivery && ' The rest is paid on delivery.'}
+                    </div>
+                    <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" onClick={() => { window.location.href = payConfirm.url; }}>
+                      <CreditCard className="h-4 w-4" />
+                      Continue to payment — {formatBDT(payConfirm.amount, { currency })}
+                    </Button>
+                    <Button type="button" variant="link" className="mt-2 w-full" onClick={() => setPayConfirm(null)}>
+                      Change my order
+                    </Button>
+                  </>
+                ) : (
+                  <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
+                    {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                    {submitting
+                      ? (payOnline ? 'Starting payment…' : 'Placing order…')
+                      : payNowAdvance
+                        ? `Pay Advance — ${formatBDT(onlineAdvance, { currency })}`
+                        : payOnline
+                          ? `Pay Now — ${formatBDT(total, { currency })}`
+                          : `Place Order — ${formatBDT(total, { currency })}`}
+                  </Button>
+                )}
               </div>
             </div>
           </form>

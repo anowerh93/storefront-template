@@ -36,6 +36,7 @@ import {
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
+  payAmountChanged,
   codOffered,
   isStockCodCopy,
   paymentMethodsForCart,
@@ -975,6 +976,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
   const [refused, setRefused] = useState<PaymentMethod[]>([]);
   const [payNotice, setPayNotice] = useState<string | null>(null);
+  // The gateway is about to charge something other than the pay button said
+  // (see payAmountChanged): the order's payment link, held until the shopper
+  // has seen the real figure and tapped through. Same contract as checkout.tsx.
+  const [payConfirm, setPayConfirm] = useState<{ url: string; amount: number; restOnDelivery: boolean } | null>(null);
 
   const zones = meta.shipping?.zones ?? [];
   const requireZone = !!(meta.shipping?.enabled && zones.length > 0);
@@ -1009,12 +1014,14 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // Coming BACK from the order page restores this island from bfcache with
   // submitting=true baked in — the order button would be stuck on "Placing
   // order…" forever. Same fix as checkout.tsx. A restored-page resubmit of
-  // the same funnel order collapses server-side via the Idempotency-Key.
+  // the same funnel order collapses server-side via the Idempotency-Key. A
+  // held payment link (payConfirm) goes too — it has been used.
   useEffect(() => {
     const onPageShow = (e: PageTransitionEvent) => {
       if (e.persisted) {
         inflight.current = false;
         setSubmitting(false);
+        setPayConfirm(null);
       }
     };
     window.addEventListener('pageshow', onPageShow);
@@ -1065,6 +1072,13 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     setRefused((r) => (r.length ? [] : r));
     setPayNotice(null);
   }, [variantIdx, qty]);
+  // A held payment link (payConfirm) belongs to the order exactly as it was
+  // sent. Change the pack, the quantity, how it is paid or where it goes, and
+  // the normal button comes back — the next submit goes through the server's
+  // own dedup (same order + method → the same order, its link renewed).
+  useEffect(() => {
+    setPayConfirm(null);
+  }, [variantIdx, qty, sizeChoice, payMethod, selectedZone]);
 
   // When the advance box leaves the screen (qty drops back under the threshold),
   // drop any half-typed last-4 so a stale value in a now-hidden field can't fail
@@ -1203,6 +1217,21 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           );
         } catch {
           /* storage blocked — the order page falls back to its lookup form */
+        }
+        // The server stamped a different charge than the pay button promised:
+        // hold the link and show the real figure first — same contract as
+        // checkout.tsx. The order and the stashes above stand either way;
+        // nothing is paid yet, so still no Purchase pixel.
+        const changed = payAmountChanged(payNowAdvance ? onlineAdvance : total, orderRes.payment.amount);
+        if (changed !== null) {
+          setPayConfirm({
+            url: orderRes.payment.redirect_url,
+            amount: changed,
+            restOnDelivery: payMethod === 'online_advance' && changed < orderRes.total,
+          });
+          inflight.current = false;
+          setSubmitting(false);
+          return;
         }
         window.location.href = orderRes.payment.redirect_url;
         return;
@@ -1479,18 +1508,39 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           </div>
         </div>
 
-        <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
-          {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
-          {submitting
-            ? (payOnline ? 'Starting payment…' : 'Placing order…')
-            : !inStock
-              ? 'Out of stock'
-              : payNowAdvance
-                ? `Pay Advance — ${formatBDT(onlineAdvance, { currency: product.currency })}`
-                : payOnline
-                  ? `Pay Now — ${formatBDT(total, { currency: product.currency })}`
-                  : <RT html={config.button_label || 'Confirm Order'} />}
-        </Button>
+        {/* The gateway will charge something other than the button said (see
+            payAmountChanged): the real figure, and one tap to go on with it —
+            in place of the order button. */}
+        {payConfirm ? (
+          <>
+            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+              The amount to pay for this order is{' '}
+              <span className="font-bold">{formatBDT(payConfirm.amount, { currency: product.currency })}</span>{' '}
+              (prices or delivery charges were updated).
+              {payConfirm.restOnDelivery && ' The rest is paid on delivery.'}
+            </div>
+            <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} onClick={() => { window.location.href = payConfirm.url; }}>
+              <CreditCard className="h-4 w-4" />
+              Continue to payment — {formatBDT(payConfirm.amount, { currency: product.currency })}
+            </Button>
+            <Button type="button" variant="link" className="w-full" onClick={() => setPayConfirm(null)}>
+              Change my order
+            </Button>
+          </>
+        ) : (
+          <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
+            {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
+            {submitting
+              ? (payOnline ? 'Starting payment…' : 'Placing order…')
+              : !inStock
+                ? 'Out of stock'
+                : payNowAdvance
+                  ? `Pay Advance — ${formatBDT(onlineAdvance, { currency: product.currency })}`
+                  : payOnline
+                    ? `Pay Now — ${formatBDT(total, { currency: product.currency })}`
+                    : <RT html={config.button_label || 'Confirm Order'} />}
+          </Button>
+        )}
       </form>
     </section>
   );

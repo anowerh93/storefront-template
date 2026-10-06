@@ -334,6 +334,21 @@ export function payReturnSaysFailed(search: string): boolean {
   }
 }
 
+/**
+ * The gateway charge the server stamped on the order (`payment.amount`) when
+ * it is NOT what the pay button promised — else null. The button's figure is
+ * client maths (cart-stored prices, a client-side delivery fee, a meta that
+ * can be a minute old); the server's is what the gateway will ask for, so a
+ * difference is put to the shopper before the redirect, never sprung on them
+ * at the gateway. Compared in whole paisa — float noise is not a difference —
+ * and an API that predates the field (no number) has nothing to compare.
+ */
+export function payAmountChanged(promised: number, server: number | null | undefined): number | null {
+  if (typeof server !== 'number' || !Number.isFinite(server)) return null;
+  const paisa = Math.round(server * 100);
+  return Math.abs(paisa - Math.round(promised * 100)) < 1 ? null : paisa / 100;
+}
+
 /** Shopper-facing error for a rejected / unstartable payment, never naming a
  *  method this store doesn't offer. */
 export function paymentRetryHint(methods: PaymentMethod[]): string {
