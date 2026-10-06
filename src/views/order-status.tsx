@@ -6,7 +6,7 @@ import { useCart } from '../stores/cart';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { OrderDetail } from '../components/order/order-detail';
 import {
@@ -458,7 +458,11 @@ export function OrderStatusPage({
         <main className="mx-auto max-w-md px-4 sm:px-6 py-10">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Track order #{orderNumber}</h1>
           <p className="text-sm text-slate-500 mb-6">Enter the last 4 digits of the phone number you used to place the order.</p>
-          <OrderLookupForm orderNumber={orderNumber} />
+          {/* The gateway's ?payment= hint rides along to the looked-up page:
+              a return that landed in another tab (no stashed last-4) comes
+              through this form, and the hint must still shape "Try again"
+              there — above all still hide it after a 'success' return. */}
+          <OrderLookupForm orderNumber={orderNumber} paymentHint={returnHint} />
         </main>
         <Footer meta={meta} />
       </>
@@ -540,6 +544,14 @@ export function OrderStatusPage({
                   This order was cancelled and you have not been charged. If money did leave your
                   account, it will be confirmed automatically — or contact the store with your order number.
                 </p>
+                {/* The way back, right where the failure is announced — the
+                    actions row is a whole order card further down. Same link,
+                    same vetted href (retryHref), same condition (retryOffer). */}
+                {retryOffer === 'failed' && retryHref && (
+                  <a href={retryHref} className={buttonVariants({ variant: 'brand', className: 'mt-3' })}>
+                    Try again
+                  </a>
+                )}
               </div>
             </div>
           ) : paymentPaid ? (
@@ -574,6 +586,17 @@ export function OrderStatusPage({
                     ? 'This is taking longer than usual. If you completed the payment, this page will update once it’s confirmed — you can also refresh in a few minutes.'
                     : 'This usually takes a few seconds. Keep this page open — it updates automatically.'}
                 </p>
+                {/* Only once payRetryOffer allows it — never while the return
+                    says the money was (or may have been) taken. A text link:
+                    it must not look like the next step to a shopper who paid. */}
+                {retryOffer === 'unfinished' && retryHref && (
+                  <p className="mt-2 text-sm text-slate-600">
+                    Didn’t complete the payment?{' '}
+                    <a href={retryHref} className="whitespace-nowrap font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
+                      Try again
+                    </a>
+                  </p>
+                )}
               </div>
             </div>
           ) : paymentUnconfirmed ? (
