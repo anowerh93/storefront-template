@@ -539,6 +539,25 @@ export function payPauseCopy(
  */
 export const PAY_PAUSE_BACK_LABEL = 'Go back to the form';
 
+/**
+ * Is the shopper typing — is the focus in a control that takes text? The
+ * pause box takes the focus when it appears (see the order forms), but never
+ * out of a field: the text fields stay editable while an order is being sent,
+ * and the next key must reach the field (where it drops the box, as any edit
+ * does) rather than land on something it was not meant for.
+ */
+const NOT_TEXT_INPUTS = ['radio', 'checkbox', 'button', 'submit', 'reset', 'image', 'file', 'range', 'color', 'hidden'];
+
+export function isTextEntry(
+  el: { tagName?: string; type?: string | null; isContentEditable?: boolean } | null | undefined,
+): boolean {
+  if (!el) return false;
+  if (el.isContentEditable === true) return true;
+  const tag = (el.tagName ?? '').toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT') return true;
+  return tag === 'INPUT' && !NOT_TEXT_INPUTS.includes((el.type ?? 'text').toLowerCase());
+}
+
 /** How long a held payment link is offered again without asking the server —
  *  well inside the hour after which the API's reaper cancels an unpaid order. */
 export const PAY_PAUSE_REUSE_MS = 10 * 60 * 1000;

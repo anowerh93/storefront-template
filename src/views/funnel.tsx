@@ -35,6 +35,7 @@ import {
   heldPayForSend,
   isOnlineMethod,
   isPaymentRefusal,
+  isTextEntry,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
@@ -996,6 +997,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // steps back (PAY_PAUSE_BACK_LABEL) and the box is hidden; `placedAs` is the
   // order this form placed, as sent. Same contract as checkout.tsx.
   const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
+  const payBox = useRef<HTMLDivElement>(null);
+  const orderBtn = useRef<HTMLButtonElement>(null);
+  const steppedBack = useRef(false);
   const heldPay = useRef<HeldPay | null>(null);
   const placedAs = useRef<PlacedOrder | null>(null);
 
@@ -1107,6 +1111,24 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     const sub = form.watch(() => setPayConfirm(null));
     return () => sub.unsubscribe();
   }, [form]);
+  // The box replaces the button that was just pressed, which has already
+  // dropped the focus: the box is an alert and takes the focus itself (not
+  // the button — a second Enter must not skip the figure), never out of a
+  // field the shopper is typing in. Stepping back (PAY_PAUSE_BACK_LABEL)
+  // unmounts the link that was pressed: the focus then goes to the order
+  // button that returns in its place — for that press only. Same contract as
+  // checkout.tsx.
+  useEffect(() => {
+    if (payConfirm) {
+      steppedBack.current = false;
+      if (!isTextEntry(document.activeElement)) payBox.current?.focus();
+      return;
+    }
+    if (steppedBack.current) {
+      steppedBack.current = false;
+      orderBtn.current?.focus();
+    }
+  }, [payConfirm]);
 
   // When the advance box leaves the screen (qty drops back under the threshold),
   // drop any half-typed last-4 so a stale value in a now-hidden field can't fail
@@ -1549,7 +1571,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             gate — a store left with COD alone shows no picker, and still owes
             the shopper the explanation. */}
         {payNotice && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice.text}</div>
+          <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice.text}</div>
         )}
 
         {showPayPicker && (
@@ -1593,24 +1615,31 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
 
         {/* The gateway will take money for something the button did not say
             (see payPauseFor): which order, the real figure, and one tap to go
-            on with it — in place of the order button. */}
+            on with it — in place of the order button. An alert that takes the
+            focus (see the payBox effect); the button is described by it. */}
         {payConfirm && pauseCopy ? (
           <>
-            <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+            <div
+              ref={payBox}
+              id="f-pay-pause"
+              role="alert"
+              tabIndex={-1}
+              className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+            >
               {pauseCopy.lead}{' '}
               <span className="font-bold">{formatBDT(payConfirm.amount, { currency: product.currency })}</span>
               {pauseCopy.tail}
             </div>
-            <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
+            <Button type="button" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} aria-describedby="f-pay-pause" disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
               <CreditCard className="h-4 w-4" />
               {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency: product.currency })}`}
             </Button>
-            <Button type="button" variant="link" className="w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
+            <Button type="button" variant="link" className="w-full" disabled={submitting} onClick={() => { steppedBack.current = true; setPayConfirm(null); }}>
               {PAY_PAUSE_BACK_LABEL}
             </Button>
           </>
         ) : (
-          <Button type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
+          <Button ref={orderBtn} type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
             {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
             {submitting
               ? (payOnline ? 'Starting payment…' : 'Placing order…')

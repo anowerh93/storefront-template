@@ -20,6 +20,7 @@ import {
   heldPayForSend,
   isOnlineMethod,
   isPaymentRefusal,
+  isTextEntry,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
@@ -172,6 +173,12 @@ export function CheckoutPage({
   // the order exists, and its payment link is held here until the shopper has
   // read which order and how much, and tapped through.
   const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
+  // The box itself — it takes the focus when it appears — and the order button
+  // that comes back in its place when the shopper steps back from it (see the
+  // focus effect below).
+  const payBox = useRef<HTMLDivElement>(null);
+  const orderBtn = useRef<HTMLButtonElement>(null);
+  const steppedBack = useRef(false);
   // Stepping back (PAY_PAUSE_BACK_LABEL) hides that box but must not throw the
   // link away: it is kept with the order it was for (heldPauseFor), so the pay
   // button pressed again with nothing changed offers it again instead of
@@ -375,6 +382,32 @@ export function CheckoutPage({
     const sub = form.watch(() => setPayConfirm(null));
     return () => sub.unsubscribe();
   }, [form]);
+  // The box takes the place of the button that was just pressed — and that
+  // button, disabled while the order was being sent, has already dropped the
+  // focus (to <body>). A keyboard or screen-reader user would be left with
+  // nothing focused and nothing said, on a page that now needs a second,
+  // different press. So the box is an alert (read out when it appears) and
+  // takes the focus, which makes "Continue to payment" the next Tab stop. To
+  // the BOX, not the button: Enter held down or pressed twice must not carry
+  // the shopper to the gateway past the figure they are here to read. And
+  // never out of a field they are typing in (isTextEntry).
+  // The way out has the same hole the other way round: PAY_PAUSE_BACK_LABEL
+  // unmounts the very link that was pressed. The focus then goes to the order
+  // button that returns in its place, so the picker, the delivery area and
+  // the quantities are one Shift+Tab away instead of a whole page of Tabs.
+  // Only for that press — a box dropped by an edit leaves the focus where the
+  // shopper is editing. Above the early returns, like every hook here.
+  useEffect(() => {
+    if (payConfirm) {
+      steppedBack.current = false;
+      if (!isTextEntry(document.activeElement)) payBox.current?.focus();
+      return;
+    }
+    if (steppedBack.current) {
+      steppedBack.current = false;
+      orderBtn.current?.focus();
+    }
+  }, [payConfirm]);
 
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
@@ -1000,7 +1033,7 @@ export function CheckoutPage({
                 {/* A refused payment method: said HERE, on the picker it
                     changed — the error box sits a screen above on a phone. */}
                 {payNotice && (
-                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice.text}</div>
+                  <div role="alert" className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice.text}</div>
                 )}
                 <PaymentMethodPicker
                   name="payment_method"
@@ -1034,24 +1067,31 @@ export function CheckoutPage({
                 {/* The gateway will take money for something the button did
                     not say (see payPauseFor): which order, the real figure,
                     and one tap to go on with it — in place of the order
-                    button. */}
+                    button. An alert that takes the focus (see the payBox
+                    effect); the button is described by it. */}
                 {payConfirm && pauseCopy ? (
                   <>
-                    <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    <div
+                      ref={payBox}
+                      id="co-pay-pause"
+                      role="alert"
+                      tabIndex={-1}
+                      className="mt-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-400"
+                    >
                       {pauseCopy.lead}{' '}
                       <span className="font-bold">{formatBDT(payConfirm.amount, { currency })}</span>
                       {pauseCopy.tail}
                     </div>
-                    <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
+                    <Button type="button" variant="brand" size="lg" className="mt-4 w-full shadow-md" aria-describedby="co-pay-pause" disabled={submitting} onClick={() => continueToPayment(payConfirm.url)}>
                       <CreditCard className="h-4 w-4" />
                       {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency })}`}
                     </Button>
-                    <Button type="button" variant="link" className="mt-2 w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
+                    <Button type="button" variant="link" className="mt-2 w-full" disabled={submitting} onClick={() => { steppedBack.current = true; setPayConfirm(null); }}>
                       {PAY_PAUSE_BACK_LABEL}
                     </Button>
                   </>
                 ) : (
-                  <Button type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
+                  <Button ref={orderBtn} type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
                     {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
                     {submitting
                       ? (payOnline ? 'Starting payment…' : 'Placing order…')
