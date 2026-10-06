@@ -125,21 +125,17 @@ export function OrderStatusPage({
   meta: StorefrontMeta | null;
 }) {
   const [order, setOrder] = useState<OrderResponse | null>(null);
-  // Gateway return URLs (/order/{n}?payment=…) carry NO phone param — checkout
-  // stashed the last-4 in sessionStorage before redirecting to the gateway
-  // (same browser comes back; it's a redirect flow). Recover it so the shopper
-  // lands straight on their order instead of the lookup form.
-  const [phoneKey] = useState<string | undefined>(() => {
-    if (phone) return phone;
-    if (typeof window === 'undefined') return undefined;
-    try {
-      return sessionStorage.getItem(`replybd:pay-phone:${orderNumber}`) ?? undefined;
-    } catch {
-      return undefined;
-    }
-  });
-  // A logged-in customer can view the order WITHOUT a phone (the account
-  // session is the identity proof) — resolved on the client below.
+  // Who is asking, as far as the SERVER can know: the ?phone= last-4, nobody
+  // logged in. The two browser-only sources — the last-4 the order forms
+  // stash before a gateway redirect, and the account token — are read in the
+  // mount effect below, never during render: the first client render must be
+  // the very tree the server sent. Reading them in the initial state made a
+  // gateway return (no ?phone=, stash present) hydrate a loader over the
+  // server's lookup form — React #418, the whole island thrown away and
+  // rendered again. `ready` = that read has happened; until then the page
+  // shows the neutral loader on both sides.
+  const [phoneKey, setPhoneKey] = useState<string | undefined>(phone);
+  const [ready, setReady] = useState(false);
   // The "log in to track your orders" nudge: from the URL on the COD path,
   // from the sessionStorage stash on the online path (the gateway redirect
   // can't carry query flags of ours).
@@ -172,8 +168,10 @@ export function OrderStatusPage({
   const [returnSaysFailed] = useState<boolean>(
     () => typeof window !== 'undefined' && payReturnSaysFailed(window.location.search),
   );
-  const [authed, setAuthed] = useState<boolean>(typeof window !== 'undefined' && Boolean(getToken()));
-  const [loading, setLoading] = useState<boolean>(Boolean(phoneKey) || authed);
+  // A logged-in customer can view the order WITHOUT a phone (the account
+  // session is the identity proof) — resolved in the mount effect below.
+  const [authed, setAuthed] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(Boolean(phone));
   const [notFound, setNotFound] = useState<boolean>(false);
   // Lookup refused for a reason OTHER than 404 (throttled, transient 5xx) —
   // rendered as a soft "try again" screen, never as "order not found".
@@ -184,7 +182,34 @@ export function OrderStatusPage({
   const [polls, setPolls] = useState(0);
   const clearCart = useCart((s) => s.clear);
 
+  // After hydration: recover who is asking from this browser. Gateway return
+  // URLs (/order/{n}?payment=…) carry NO phone param — the order forms stash
+  // the last-4 in sessionStorage before the redirect (same tab comes back),
+  // so the shopper lands straight on their order instead of the lookup form.
+  // One batch with `ready`, so the lookup below starts exactly once, with the
+  // final identity, and an identity found here goes loader → order with no
+  // lookup form (or "not found") in between.
   useEffect(() => {
+    let stashedPhone: string | undefined;
+    if (!phone) {
+      try {
+        stashedPhone = sessionStorage.getItem(`replybd:pay-phone:${orderNumber}`) ?? undefined;
+      } catch {
+        /* storage blocked — the lookup form asks for the last-4 */
+      }
+    }
+    const hasToken = Boolean(getToken());
+    if (stashedPhone) setPhoneKey(stashedPhone);
+    if (hasToken) setAuthed(true);
+    if (stashedPhone || hasToken) setLoading(true);
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Not before the mount effect above has said who is asking — otherwise a
+    // logged-in customer on a ?phone= URL would fire the lookup twice.
+    if (!ready) return;
     let cancelled = false;
 
     // Guest path: look up by phone last-4. Account path: a logged-in customer
@@ -219,7 +244,7 @@ export function OrderStatusPage({
     }
 
     return () => { cancelled = true; };
-  }, [orderNumber, phoneKey, authed, retryTick]);
+  }, [ready, orderNumber, phoneKey, authed, retryTick]);
 
   // ── Online-payment status polling ──
   // An online order sits `unpaid` until the gateway confirmation lands
@@ -415,7 +440,10 @@ export function OrderStatusPage({
 
   // Guest with no phone → render the lookup form (identity verification).
   // A logged-in customer skips this (handled by the authed fetch above).
-  if (!phoneKey && !authed) {
+  // Only once `ready`: before the mount effect has read this browser's stash
+  // / token, neither the server nor the hydrating render can know whether to
+  // ask for the last-4 — both show the loader below.
+  if (ready && !phoneKey && !authed) {
     return (
       <>
         <Header meta={meta} />
@@ -429,7 +457,7 @@ export function OrderStatusPage({
     );
   }
 
-  if (loading) {
+  if (!ready || loading) {
     return (
       <>
         <Header meta={meta} />
