@@ -24,6 +24,7 @@ import {
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   orderSubmitSignature,
+  PAY_PAUSE_BACK_LABEL,
   payCartKey,
   payPauseCopy,
   payPauseFor,
@@ -171,10 +172,11 @@ export function CheckoutPage({
   // the order exists, and its payment link is held here until the shopper has
   // read which order and how much, and tapped through.
   const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
-  // "Change my order" hides that box but must not throw the link away: it is
-  // kept with the order it was for (heldPauseFor), so the pay button pressed
-  // again with nothing changed offers it again instead of asking the server
-  // for what would, after its 90s dedup window, be a second order.
+  // Stepping back (PAY_PAUSE_BACK_LABEL) hides that box but must not throw the
+  // link away: it is kept with the order it was for (heldPauseFor), so the pay
+  // button pressed again with nothing changed offers it again instead of
+  // asking the server for what would, after its 90s dedup window, be a second
+  // order.
   const heldPay = useRef<HeldPay | null>(null);
   // The order this page placed, as sent — what a later `duplicate` answer is
   // compared with.
@@ -517,7 +519,7 @@ export function CheckoutPage({
       payment_method: payMethod,
     };
     // The order exactly as the form has it now. A payment link the shopper
-    // stepped back from ("Change my order") and then changed nothing about is
+    // stepped back from (PAY_PAUSE_BACK_LABEL) and then changed nothing about is
     // offered again as it is — no request, so never a second order.
     const sig = orderSubmitSignature(input);
     const held = heldPauseFor(heldPay.current, sig, Date.now());
@@ -1045,7 +1047,7 @@ export function CheckoutPage({
                       {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency })}`}
                     </Button>
                     <Button type="button" variant="link" className="mt-2 w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
-                      Change my order
+                      {PAY_PAUSE_BACK_LABEL}
                     </Button>
                   </>
                 ) : (

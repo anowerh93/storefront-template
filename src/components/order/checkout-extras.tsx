@@ -499,36 +499,56 @@ export function payPauseFor(o: {
   };
 }
 
-/** The pause box's sentence, around the amount: `lead` AMOUNT `tail`. The
- *  rest of an advance is said as a figure — it is the one the picker's own
- *  "rest on delivery" has to be read against. */
+/**
+ * The pause box's sentence, around the amount: `lead` AMOUNT `tail`. The
+ * rest of an advance is said as a figure — it is the one the picker's own
+ * "rest on delivery" has to be read against.
+ *
+ * Both wordings end on what becomes of the order the box NAMES, because the
+ * way out of the box (PAY_PAUSE_BACK_LABEL) cannot change it: the order
+ * exists on the server, and whatever the shopper sends next either replays
+ * it or is another order — it is never edited. Left unpaid it is cancelled by
+ * the API's reaper; no time is given, that one is the API's to set. The
+ * "earlier" wording says two minutes, not one: the API's dedup window is 90
+ * seconds from the first placement, and a press inside it brings this same
+ * box back.
+ */
 export function payPauseCopy(
   p: Pick<PayPause, 'orderNumber' | 'earlier' | 'rest'>,
   currency?: string,
 ): { lead: string; tail: string } {
   const rest = p.rest !== null ? ` The rest — ${formatBDT(p.rest, { currency })} — is paid on delivery.` : '';
+  const it = p.orderNumber ? `order #${p.orderNumber}` : 'this order';
   if (p.earlier) {
     return {
       lead: `${p.orderNumber ? `Order #${p.orderNumber}` : 'This order'} was already placed a moment ago, as you first sent it — changes made since are not part of it. The amount to pay for it is`,
-      tail: `.${rest} Continue to pay for it as it is, or wait a minute and place the order again.`,
+      tail: `.${rest} Continue to pay for it as it is, or wait two minutes and place the order again — ${it} is then left unpaid and is cancelled automatically.`,
     };
   }
   return {
-    lead: `The amount to pay for ${p.orderNumber ? `order #${p.orderNumber}` : 'this order'} is`,
-    tail: ` (prices or delivery charges were updated).${rest}`,
+    lead: `The amount to pay for ${it} is`,
+    tail: ` (prices or delivery charges were updated).${rest} If you go back to the form instead, ${it} is not changed — left unpaid, it is cancelled automatically.`,
   };
 }
+
+/**
+ * The way out of the pause box. It only hides the box (the link is kept —
+ * heldPauseFor); it does not touch the order the box names, so it must not
+ * say it does. It used to read "Change my order": a shopper who then lowered
+ * the quantity placed a SECOND order while the first kept its stock.
+ */
+export const PAY_PAUSE_BACK_LABEL = 'Go back to the form';
 
 /** How long a held payment link is offered again without asking the server —
  *  well inside the hour after which the API's reaper cancels an unpaid order. */
 export const PAY_PAUSE_REUSE_MS = 10 * 60 * 1000;
 
-/** A pause the shopper stepped back from ("Change my order"), kept with the
+/** A pause the shopper stepped back from (PAY_PAUSE_BACK_LABEL), kept with the
  *  order it was for, how that order is paid and when the link was issued. */
 export type HeldPay = { sig: string; at: number; method: PaymentMethod; pause: PayPause };
 
 /**
- * "Change my order" only hides the pause. Pressed again with NOTHING changed,
+ * Stepping back only hides the pause. Pressed again with NOTHING changed,
  * the pay button offers the same link — without a request. Asking the server
  * instead is right only inside its 90-second dedup window: after it the same
  * press places a second order beside the first (which keeps its stock until

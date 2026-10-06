@@ -39,6 +39,7 @@ import {
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   orderSubmitSignature,
+  PAY_PAUSE_BACK_LABEL,
   payPauseCopy,
   payPauseFor,
   codOffered,
@@ -991,9 +992,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // The gateway is about to take money for something the screen does not say
   // (see payPauseFor — another amount, or an order an earlier submit placed):
   // the order's payment link, held until the shopper has read which order and
-  // how much, and tapped through. `heldPay` keeps the link when "Change my
-  // order" hides the box; `placedAs` is the order this form placed, as sent.
-  // Same contract as checkout.tsx.
+  // how much, and tapped through. `heldPay` keeps the link when the shopper
+  // steps back (PAY_PAUSE_BACK_LABEL) and the box is hidden; `placedAs` is the
+  // order this form placed, as sent. Same contract as checkout.tsx.
   const [payConfirm, setPayConfirm] = useState<PayPause | null>(null);
   const heldPay = useRef<HeldPay | null>(null);
   const placedAs = useRef<PlacedOrder | null>(null);
@@ -1605,7 +1606,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
               {submitting ? 'Starting payment…' : `Continue to payment — ${formatBDT(payConfirm.amount, { currency: product.currency })}`}
             </Button>
             <Button type="button" variant="link" className="w-full" disabled={submitting} onClick={() => setPayConfirm(null)}>
-              Change my order
+              {PAY_PAUSE_BACK_LABEL}
             </Button>
           </>
         ) : (
