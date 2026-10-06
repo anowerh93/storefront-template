@@ -24,6 +24,20 @@ export default defineConfig({
   integrations: [
     react(),
   ],
+  // Astro's origin check answers 403 to every cross-site form POST on an
+  // on-demand route — and that is exactly how a push-IPN payment gateway
+  // (SSLCommerz) hands the shopper back: a form POST from ITS origin to
+  // /order/{n}?payment=success|fail|cancel. With the check on, a shopper who
+  // just paid (or pressed Cancel) lands on a bare "Cross-site POST form
+  // submissions are forbidden" instead of their order. The check runs before
+  // any middleware of ours, so it cannot be relaxed for that one route.
+  //
+  // Turning it off gives nothing away HERE: this template has no cookies, no
+  // sessions, no actions and no POST handler — its only endpoints are GET
+  // (robots / sitemap / indexnow), and every write goes from the browser
+  // straight to the Reply.BD API with a header token. Whoever adds a
+  // state-changing POST route to this worker must check the Origin there.
+  security: { checkOrigin: false },
   vite: {
     plugins: [tailwindcss()],
     // DEV ONLY: accept any Host header so host-dependent behavior (the

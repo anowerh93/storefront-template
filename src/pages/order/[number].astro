@@ -21,6 +21,24 @@ import Base from '../../layouts/Base.astro';
 import { getStorefrontGated } from '../../lib/api';
 import { OrderStatusPage } from '../../views/order-status';
 
+// A push-IPN gateway (SSLCommerz) sends the shopper back here with a
+// cross-site FORM POST (see `security.checkOrigin` in astro.config.mjs).
+// Nothing in that body is read — the payment is confirmed server-to-server
+// and the page looks the order up itself — so answer with a 303 to the same
+// URL: the browser re-requests it as a plain GET, the page behaves exactly as
+// on any other return, and a refresh never asks to "resubmit the form".
+// Same path + query, so there is nowhere else this can lead.
+if (Astro.request.method !== 'GET' && Astro.request.method !== 'HEAD') {
+  // Discard the body without buffering it (it is the gateway's own copy of
+  // the transaction, of no use here) so the connection is left clean.
+  try {
+    await Astro.request.body?.pipeTo(new WritableStream());
+  } catch {
+    /* already consumed / aborted — nothing to discard */
+  }
+  return Astro.redirect(Astro.url.pathname + Astro.url.search, 303);
+}
+
 const orderNumber = Astro.params.number ?? '';
 const phone = Astro.url.searchParams.get('phone') ?? undefined;
 const placed = Astro.url.searchParams.get('placed') === '1';
