@@ -410,6 +410,44 @@ export function isPaymentRefusal(code: string | null | undefined): boolean {
   return (PAYMENT_REFUSAL_CODES as readonly string[]).includes(code ?? '');
 }
 
+/** A method the order API refused, with the code it gave. */
+export type PaymentRefusal = { method: PaymentMethod; code: string };
+
+/**
+ * Is this refusal about THIS cart rather than about the store? Only
+ * 'advance_unavailable' is — the advance rule owes nothing at this subtotal,
+ * and may owe something at another. 'cod_unavailable' / 'online_unavailable'
+ * say what the store offers, whatever is in the cart.
+ */
+export function refusalEndsWithCart(code: string | null | undefined): boolean {
+  return code === 'advance_unavailable';
+}
+
+/**
+ * The refusals with one more recorded — one entry per method. A method the
+ * STORE refused stays refused by the store even if a later answer is only
+ * about the cart. Returns the same array when nothing changes.
+ */
+export function withPaymentRefusal(refusals: PaymentRefusal[], method: PaymentMethod, code: string): PaymentRefusal[] {
+  const known = refusals.find((r) => r.method === method);
+  if (!known) return [...refusals, { method, code }];
+  if (refusalEndsWithCart(known.code) && !refusalEndsWithCart(code)) {
+    return refusals.map((r) => (r === known ? { method, code } : r));
+  }
+  return refusals;
+}
+
+/**
+ * The refusals still in force once the cart has changed: the store-level ones
+ * for the life of the page — they are all that keeps a refused method off the
+ * picker while the re-read options are themselves a minute stale — and the
+ * cart-bound ones gone. Returns the same array when nothing was dropped.
+ */
+export function refusalsForNewCart(refusals: PaymentRefusal[]): PaymentRefusal[] {
+  const kept = refusals.filter((r) => !refusalEndsWithCart(r.code));
+  return kept.length === refusals.length ? refusals : kept;
+}
+
 /** A method, as a sentence names it — only ever one that is still on offer. */
 const REFUSAL_NEXT_NAMES: Record<PaymentMethod, string> = {
   cod: 'Cash on Delivery',
@@ -424,13 +462,27 @@ const REFUSAL_NEXT_NAMES: Record<PaymentMethod, string> = {
  * `methodsNow` (same rule as paymentRetryHint). null = the picker could not
  * be changed (the refused method is still all there is to show): there is
  * nothing true to add, and the server's own message stands.
+ *
+ * `advanceReadsAsFull` = the gateway advance covers this whole order, which
+ * the picker therefore titles "Pay Online" (see PaymentMethodPicker). Then
+ *  - a refused 'online' leaves a picker that looks exactly as it did — the
+ *    notice must not claim an option went away or that the options "have
+ *    been updated"; it only asks the shopper to choose and press again;
+ *  - the advance is named the way the picker names it.
  */
 export function paymentRefusalNotice(
   code: string | null | undefined,
   refused: PaymentMethod,
   methodsNow: PaymentMethod[],
+  advanceReadsAsFull = false,
 ): string | null {
   if (!methodsNow.length || methodsNow.includes(refused)) return null;
+  const looksTheSame = refused === 'online' && advanceReadsAsFull && methodsNow.includes('online_advance');
+  if (looksTheSame) {
+    return methodsNow.length > 1
+      ? 'We could not start that payment. Please choose one of the payment options below and place your order again.'
+      : 'We could not start that payment. Please press the order button again.';
+  }
   const gone =
     refused === 'cod'
       ? 'Cash on Delivery is no longer available at this store.'
@@ -439,10 +491,13 @@ export function paymentRefusalNotice(
         : methodsNow.some(isOnlineMethod)
           ? 'That online payment option is no longer available at this store.'
           : 'Online payment is not available at this store right now.';
+  const only = methodsNow[0];
   const next =
     methodsNow.length > 1
       ? 'The payment options below have been updated — please choose one and place your order again.'
-      : `You can place this order with ${REFUSAL_NEXT_NAMES[methodsNow[0]]} instead — please press the order button again.`;
+      : `You can place this order with ${
+          only === 'online_advance' && advanceReadsAsFull ? REFUSAL_NEXT_NAMES.online : REFUSAL_NEXT_NAMES[only]
+        } instead — please press the order button again.`;
   return `${gone} ${next}`;
 }
 

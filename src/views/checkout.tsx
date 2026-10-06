@@ -26,7 +26,11 @@ import {
   paymentMethodsForCart,
   paymentRefusalNotice,
   paymentRetryHint,
+  refusalEndsWithCart,
+  refusalsForNewCart,
   resolvePaymentMethod,
+  withPaymentRefusal,
+  type PaymentRefusal,
 } from '../components/order/checkout-extras';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -149,11 +153,12 @@ export function CheckoutPage({
   // After the order API REFUSED a payment method (422 — see
   // paymentRefusalNotice): the store's payment options as re-read from the
   // browser (null = the page's own meta is all there is), the methods refused
-  // for this cart since, and the line that says what changed. They feed the
-  // payment picker and nothing else.
+  // since — each with the code it was refused with, which says whether it is
+  // about the store or only about this cart — and the line that says what
+  // changed. They feed the payment picker and nothing else.
   const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
-  const [refused, setRefused] = useState<PaymentMethod[]>([]);
-  const [payNotice, setPayNotice] = useState<string | null>(null);
+  const [refusals, setRefusals] = useState<PaymentRefusal[]>([]);
+  const [payNotice, setPayNotice] = useState<{ text: string; code: string } | null>(null);
   // The gateway is about to charge something other than the pay button said
   // (see payAmountChanged): the order exists, and its payment link is held
   // here until the shopper has seen the real figure and tapped through.
@@ -264,8 +269,9 @@ export function CheckoutPage({
     ? 0
     : zoneLive?.fee ?? 0;
   // The page's meta with its payment part as last re-read (see payMeta), and
-  // the picker minus whatever the order API has refused for this cart.
+  // the picker minus whatever the order API has refused.
   const liveMeta = meta && payMeta ? { ...meta, ...payMeta } : meta;
+  const refused = refusals.map((r) => r.method);
   const payMethods = paymentMethodsForCart(liveMeta, advanceSubtotalLive, advanceSubtotalLive + shippingLive, refused);
   const payMethod = resolvePaymentMethod(
     pickedMethod,
@@ -322,13 +328,16 @@ export function CheckoutPage({
   useEffect(() => {
     abandoned.touch();
   }, [linesSig, abandoned.touch]);
-  // A method refused for one cart can be right for another (an advance the
-  // rule did not owe at that subtotal), so the refusals — and the line about
-  // them — end with the cart they were made for. Above the early returns,
-  // like every hook here.
+  // An advance refused for one cart can be right for another (the rule did
+  // not owe one at that subtotal), so THAT refusal — and the line about it —
+  // ends with the cart it was made for. A method the STORE does not offer
+  // stays off the picker whatever is in the cart: the re-read options can be
+  // a minute stale, and the refusal is then all that keeps the selection from
+  // sliding back onto the method the server just turned down. Above the early
+  // returns, like every hook here.
   useEffect(() => {
-    setRefused((r) => (r.length ? [] : r));
-    setPayNotice(null);
+    setRefusals(refusalsForNewCart);
+    setPayNotice((n) => (n && refusalEndsWithCart(n.code) ? null : n));
   }, [linesSig]);
   // A held payment link (payConfirm) belongs to the order exactly as it was
   // sent. Change what is ordered, how it is paid or where it goes, and the
@@ -667,16 +676,22 @@ export function CheckoutPage({
       // Could not re-read, or nothing else to offer → the server's own
       // message below, exactly as before.
       if (e instanceof ApiError && isPaymentRefusal(e.code)) {
+        const code = e.code ?? '';
         const fresh = await refreshPaymentMeta();
-        const refusedNow = refused.includes(payMethod) ? refused : [...refused, payMethod];
+        const refusalsNow = withPaymentRefusal(refusals, payMethod, code);
         const notice = fresh
-          ? paymentRefusalNotice(e.code, payMethod, paymentMethodsForCart(fresh, subtotal, total, refusedNow))
+          ? paymentRefusalNotice(
+              code,
+              payMethod,
+              paymentMethodsForCart(fresh, subtotal, total, refusalsNow.map((r) => r.method)),
+              onlineAdvanceCoversOrder(fresh, subtotal, total),
+            )
           : null;
         if (fresh && notice) {
           setPayMeta(fresh);
-          setRefused(refusedNow);
+          setRefusals(refusalsNow);
           setPickedMethod(null);
-          setPayNotice(notice);
+          setPayNotice({ text: notice, code });
           inflight.current = false;
           setSubmitting(false);
           return;
@@ -896,7 +911,7 @@ export function CheckoutPage({
                 {/* A refused payment method: said HERE, on the picker it
                     changed — the error box sits a screen above on a phone. */}
                 {payNotice && (
-                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice}</div>
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice.text}</div>
                 )}
                 <PaymentMethodPicker
                   name="payment_method"
