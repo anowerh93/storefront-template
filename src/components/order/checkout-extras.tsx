@@ -320,6 +320,18 @@ export function payRetryHref(returnPath: string): string {
 }
 
 /**
+ * Said beside every "Try again". The link is a plain navigation to the page
+ * the order was placed from — a fresh form, nothing carried over (by design:
+ * no name, phone or address is kept anywhere to prefill it). That also means
+ * a funnel is back on its default pack, quantity 1 and the first delivery
+ * area, and a buy-now checkout on the quantity in its URL: "Try again" is a
+ * new order, not a second go at the failed one, and the shopper has to look
+ * at what it is for before paying.
+ */
+export const PAY_RETRY_FRESH_NOTE =
+  'The order form opens fresh — please check the items, quantity and delivery area again before you pay.';
+
+/**
  * What the gateway return URL says happened (/order/{n}?payment=…): the four
  * values the API and the gateways send, else null. An UNTRUSTED hint — it
  * never decides what happened to the payment (the order data does that); it

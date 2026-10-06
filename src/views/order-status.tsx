@@ -10,6 +10,7 @@ import { Button, buttonVariants } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { OrderDetail } from '../components/order/order-detail';
 import {
+  PAY_RETRY_FRESH_NOTE,
   clearPayReturnNote,
   isOnlineMethod,
   payRetryHref,
@@ -546,11 +547,16 @@ export function OrderStatusPage({
                 </p>
                 {/* The way back, right where the failure is announced — the
                     actions row is a whole order card further down. Same link,
-                    same vetted href (retryHref), same condition (retryOffer). */}
+                    same vetted href (retryHref), same condition (retryOffer).
+                    With it, what the link is: a fresh form, so a new order to
+                    look over — not a second go at this one. */}
                 {retryOffer === 'failed' && retryHref && (
-                  <a href={retryHref} className={buttonVariants({ variant: 'brand', className: 'mt-3' })}>
-                    Try again
-                  </a>
+                  <>
+                    <a href={retryHref} className={buttonVariants({ variant: 'brand', className: 'mt-3' })}>
+                      Try again
+                    </a>
+                    <p className="mt-2 text-xs text-slate-500">{PAY_RETRY_FRESH_NOTE}</p>
+                  </>
                 )}
               </div>
             </div>
@@ -590,12 +596,15 @@ export function OrderStatusPage({
                     says the money was (or may have been) taken. A text link:
                     it must not look like the next step to a shopper who paid. */}
                 {retryOffer === 'unfinished' && retryHref && (
-                  <p className="mt-2 text-sm text-slate-600">
-                    Didn’t complete the payment?{' '}
-                    <a href={retryHref} className="whitespace-nowrap font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
-                      Try again
-                    </a>
-                  </p>
+                  <>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Didn’t complete the payment?{' '}
+                      <a href={retryHref} className="whitespace-nowrap font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
+                        Try again
+                      </a>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{PAY_RETRY_FRESH_NOTE}</p>
+                  </>
                 )}
               </div>
             </div>
@@ -639,31 +648,38 @@ export function OrderStatusPage({
               awaits its payment the link is the quiet one, and says who it is
               for: the shopper who paid must not read it as the next step.
               Either way "Back to Cart" goes (a cart checkout's retry link
-              already leads back to that cart). */}
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
+              already leads back to that cart). The line over the row says
+              what the link opens — the banner that says it too is a whole
+              order card further up. */}
+          <div className="space-y-3 pt-2">
             {retryOffer && retryHref && (
-              <a href={retryHref}>
-                {retryOffer === 'failed' ? (
-                  <Button variant="brand" className="w-full sm:w-auto">Try again</Button>
-                ) : (
-                  <Button variant="outline" className="h-auto min-h-10 w-full whitespace-normal sm:w-auto">
-                    Didn’t complete the payment? Try again
-                  </Button>
-                )}
-              </a>
+              <p className="text-xs text-slate-500 sm:text-right">{PAY_RETRY_FRESH_NOTE}</p>
             )}
-            <a href="/products">
-              <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
-            </a>
-            {authed ? (
-              <a href="/account">
-                <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              {retryOffer && retryHref && (
+                <a href={retryHref}>
+                  {retryOffer === 'failed' ? (
+                    <Button variant="brand" className="w-full sm:w-auto">Try again</Button>
+                  ) : (
+                    <Button variant="outline" className="h-auto min-h-10 w-full whitespace-normal sm:w-auto">
+                      Didn’t complete the payment? Try again
+                    </Button>
+                  )}
+                </a>
+              )}
+              <a href="/products">
+                <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
               </a>
-            ) : !retryOffer ? (
-              <a href="/cart">
-                <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
-              </a>
-            ) : null}
+              {authed ? (
+                <a href="/account">
+                  <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
+                </a>
+              ) : !retryOffer ? (
+                <a href="/cart">
+                  <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
+                </a>
+              ) : null}
+            </div>
           </div>
         </div>
       </main>
