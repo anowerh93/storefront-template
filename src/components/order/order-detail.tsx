@@ -112,6 +112,16 @@ export function OrderDetail({
     Math.abs(order.due_on_delivery - order.total) >= 0.01
       ? order.due_on_delivery
       : null;
+  // A manual wallet advance (bKash / Nagad / Rocket) the store recorded on the
+  // order. The server already takes it off `due_on_delivery`, so without its
+  // own row a COD order reads "Total 1000 / Due on Delivery 800" with nothing
+  // accounting for the 200. It is money already received, so it shows whatever
+  // the status — also delivered / cancelled, where the Due row is hidden. The
+  // key is absent on an API that predates it (and 0 when there is none):
+  // no row, the page exactly as before. Never folded into `paidOnline` — that
+  // is gateway money, a separate ledger.
+  const advancePaid =
+    typeof order.advance_paid_amount === 'number' && order.advance_paid_amount > 0 ? order.advance_paid_amount : 0;
 
   // shipping_zone is a CODE ('inside_city'); turn it into the human label the
   // tenant configured. Null when shipping is off or no zone was chosen.
@@ -179,6 +189,9 @@ export function OrderDetail({
           <Row label="Total" value={<span className="font-bold text-slate-900">{formatBDT(order.total, { currency })}</span>} />
           {paidOnline > 0 && (
             <Row label="Paid Online" value={<span className="font-semibold text-emerald-700">{formatBDT(paidOnline, { currency })}</span>} />
+          )}
+          {advancePaid > 0 && (
+            <Row label="Advance Paid" value={<span className="font-semibold text-emerald-700">{formatBDT(advancePaid, { currency })}</span>} />
           )}
           {dueOnDelivery !== null && (
             <Row label="Due on Delivery" value={<span className="font-bold text-slate-900">{formatBDT(dueOnDelivery, { currency })}</span>} />
@@ -260,6 +273,12 @@ export function OrderDetail({
                 <div className="flex justify-between text-emerald-700">
                   <span>Paid online</span>
                   <span className="tabular-nums">− {formatBDT(paidOnline, { currency })}</span>
+                </div>
+              )}
+              {advancePaid > 0 && (
+                <div className="flex justify-between text-emerald-700">
+                  <span>Advance paid</span>
+                  <span className="tabular-nums">− {formatBDT(advancePaid, { currency })}</span>
                 </div>
               )}
               {dueOnDelivery !== null && (

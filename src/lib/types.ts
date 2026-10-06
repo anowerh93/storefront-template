@@ -775,6 +775,11 @@ export type OrderResponse = {
   online_paid_amount?: number;
   due_on_delivery?: number;
   online_charge_amount?: number | null;
+  // From GET /orders/{number} — a manual wallet advance (bKash / Nagad /
+  // Rocket) the store recorded on the order: money received OUTSIDE the
+  // gateway, so never part of `online_paid_amount`, and already taken off
+  // `due_on_delivery`. 0 when none; absent on an API that predates it.
+  advance_paid_amount?: number;
   // Phase 1: present when the order was placed with `create_account: true`.
   // `customer.token` → auto-login the new account. `account_exists: true` means
   // the phone already has an account (no token issued) — invite them to log in.
