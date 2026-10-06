@@ -4,7 +4,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
 import type { PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
-import { orderIdempotencyKey, submitOrder, setToken } from '../lib/api';
+import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToken } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
@@ -17,11 +17,13 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   isOnlineMethod,
+  isPaymentRefusal,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   payCartKey,
   paymentMethodsForCart,
+  paymentRefusalNotice,
   paymentRetryHint,
   resolvePaymentMethod,
 } from '../components/order/checkout-extras';
@@ -143,6 +145,14 @@ export function CheckoutPage({
   // never picks WHICH gateway — the server routes to the store's own
   // connected account (SSLCommerz / EPS / aamarPay / shurjoPay).
   const [pickedMethod, setPickedMethod] = useState<PaymentMethod | null>(null);
+  // After the order API REFUSED a payment method (422 — see
+  // paymentRefusalNotice): the store's payment options as re-read from the
+  // browser (null = the page's own meta is all there is), the methods refused
+  // for this cart since, and the line that says what changed. They feed the
+  // payment picker and nothing else.
+  const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
+  const [refused, setRefused] = useState<PaymentMethod[]>([]);
+  const [payNotice, setPayNotice] = useState<string | null>(null);
 
   // Coming BACK from the gateway (shopper changed their mind, wants COD, or
   // the gateway page stalled) restores this page from bfcache with its React
@@ -246,13 +256,16 @@ export function CheckoutPage({
     : freeFromLive && advanceSubtotalLive >= freeFromLive
     ? 0
     : zoneLive?.fee ?? 0;
-  const payMethods = paymentMethodsForCart(meta, advanceSubtotalLive, advanceSubtotalLive + shippingLive);
+  // The page's meta with its payment part as last re-read (see payMeta), and
+  // the picker minus whatever the order API has refused for this cart.
+  const liveMeta = meta && payMeta ? { ...meta, ...payMeta } : meta;
+  const payMethods = paymentMethodsForCart(liveMeta, advanceSubtotalLive, advanceSubtotalLive + shippingLive, refused);
   const payMethod = resolvePaymentMethod(
     pickedMethod,
     payMethods,
-    onlineAdvanceCoversOrder(meta, advanceSubtotalLive, advanceSubtotalLive + shippingLive),
+    onlineAdvanceCoversOrder(liveMeta, advanceSubtotalLive, advanceSubtotalLive + shippingLive),
   );
-  const advancePolicy = payMethod === 'cod' ? meta?.advance_payment ?? null : null;
+  const advancePolicy = payMethod === 'cod' ? liveMeta?.advance_payment ?? null : null;
   const advanceVisible = !!(advancePolicy && advanceAmountFor(advancePolicy, advanceSubtotalLive) > 0);
   // When the box leaves the screen (payment switch, or the subtotal drops back
   // under the threshold), drop any half-typed last-4 so a stale value in a
@@ -302,6 +315,14 @@ export function CheckoutPage({
   useEffect(() => {
     abandoned.touch();
   }, [linesSig, abandoned.touch]);
+  // A method refused for one cart can be right for another (an advance the
+  // rule did not owe at that subtotal), so the refusals — and the line about
+  // them — end with the cart they were made for. Above the early returns,
+  // like every hook here.
+  useEffect(() => {
+    setRefused((r) => (r.length ? [] : r));
+    setPayNotice(null);
+  }, [linesSig]);
 
   // ── Empty / loading states ──
   // An express attempt whose product failed to load shows "Nothing to check
@@ -364,7 +385,8 @@ export function CheckoutPage({
   // Whether a COD order at this subtotal carries an advance — used for the COD
   // OPTION copy, which describes Cash-on-Delivery regardless of which method is
   // currently selected (so it must not gate on payMethod like `advance` does).
-  const codHasAdvance = !!(meta.advance_payment && advanceAmountFor(meta.advance_payment, subtotal) > 0);
+  const codAdvancePolicy = liveMeta?.advance_payment ?? null;
+  const codHasAdvance = !!(codAdvancePolicy && advanceAmountFor(codAdvancePolicy, subtotal) > 0);
   const districtEnabled = !!meta.checkout?.district_enabled;
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
@@ -377,7 +399,7 @@ export function CheckoutPage({
   // 'online_advance' — the store's advance for this cart (the rest is paid on
   // delivery). Display only; the server stamps the real charge.
   const payOnline = isOnlineMethod(payMethod);
-  const onlineAdvance = onlineAdvanceAmountFor(meta, subtotal, total);
+  const onlineAdvance = onlineAdvanceAmountFor(liveMeta, subtotal, total);
   const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
   const numItems = lines.reduce((n, l) => n + l.quantity, 0);
 
@@ -394,6 +416,7 @@ export function CheckoutPage({
     inflight.current = true;
     setSubmitting(true);
     setError(null);
+    setPayNotice(null);
     // GA4 items for the dataLayer half of the tracking calls (GTM tenants).
     const ga4Items = lines.map((l) => ({
       item_id: l.product_id.toString(),
@@ -605,6 +628,29 @@ export function CheckoutPage({
       if (!isExpress) clearCart();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      // The store no longer offers this payment method (or, for an advance,
+      // owes none on this cart): re-read its options from the browser, take
+      // the refused method out of the picker and say what changed, right
+      // above the picker. The order is NEVER sent again from here — the
+      // shopper presses the button themselves, on a method they can see.
+      // Could not re-read, or nothing else to offer → the server's own
+      // message below, exactly as before.
+      if (e instanceof ApiError && isPaymentRefusal(e.code)) {
+        const fresh = await refreshPaymentMeta();
+        const refusedNow = refused.includes(payMethod) ? refused : [...refused, payMethod];
+        const notice = fresh
+          ? paymentRefusalNotice(e.code, payMethod, paymentMethodsForCart(fresh, subtotal, total, refusedNow))
+          : null;
+        if (fresh && notice) {
+          setPayMeta(fresh);
+          setRefused(refusedNow);
+          setPickedMethod(null);
+          setPayNotice(notice);
+          inflight.current = false;
+          setSubmitting(false);
+          return;
+        }
+      }
       // 422 password_required (create_account set without a password) — the
       // client-side zod check normally prevents this, but surface it on the
       // password field as a belt-and-suspenders if the server rejects.
@@ -816,6 +862,11 @@ export function CheckoutPage({
 
               {/* Payment method + Place Order */}
               <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-6">
+                {/* A refused payment method: said HERE, on the picker it
+                    changed — the error box sits a screen above on a phone. */}
+                {payNotice && (
+                  <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice}</div>
+                )}
                 <PaymentMethodPicker
                   name="payment_method"
                   methods={payMethods}

@@ -84,18 +84,25 @@ export function onlineAdvanceAmountFor(
  *    twice. That needs the order `total`; a caller that passes none skips it.
  * If that would leave nothing, the full set is returned and the server has
  * the last word.
+ *
+ * `exclude` = the methods the order API has just refused for this cart (see
+ * paymentRefusalNotice), taken out LAST — and by the same rule: were that to
+ * leave nothing, they stay and the server has the last word.
  */
 export function paymentMethodsForCart(
   meta: Pick<StorefrontMeta, 'payment_methods' | 'online_advance'> | null | undefined,
   subtotal: number,
   total?: number,
+  exclude: PaymentMethod[] = [],
 ): PaymentMethod[] {
   const offered = offeredPaymentMethods(meta);
   const rule = meta?.online_advance ?? null;
   const advance = rule ? advanceAmountFor(rule, subtotal) : 0;
   const sameAsFull = total !== undefined && advance >= total && offered.includes('online');
   const usable = offered.filter((m) => m !== 'online_advance' || (advance > 0 && !sameAsFull));
-  return usable.length ? usable : offered;
+  const forCart = usable.length ? usable : offered;
+  const left = forCart.filter((m) => !exclude.includes(m));
+  return left.length ? left : forCart;
 }
 
 /** Does this store take Cash on Delivery at all? */
@@ -333,6 +340,56 @@ export function paymentRetryHint(methods: PaymentMethod[]): string {
   return methods.includes('cod')
     ? 'We could not start the online payment. Please try again, or choose Cash on Delivery.'
     : 'We could not start the online payment. Please try again in a moment.';
+}
+
+/**
+ * The order API's "that payment method is not on offer" answers (422): the
+ * store's options changed under an open page, or — 'advance_unavailable' —
+ * its advance rule asks for nothing on this cart. Both forms then re-read the
+ * options (refreshPaymentMeta), take the refused method out of the picker and
+ * say what changed. The order is NOT placed again for the shopper: they press
+ * the button themselves, on a method they can see.
+ */
+export const PAYMENT_REFUSAL_CODES = ['cod_unavailable', 'online_unavailable', 'advance_unavailable'] as const;
+
+export function isPaymentRefusal(code: string | null | undefined): boolean {
+  return (PAYMENT_REFUSAL_CODES as readonly string[]).includes(code ?? '');
+}
+
+/** A method, as a sentence names it — only ever one that is still on offer. */
+const REFUSAL_NEXT_NAMES: Record<PaymentMethod, string> = {
+  cod: 'Cash on Delivery',
+  online: 'online payment',
+  online_advance: 'an advance paid online',
+};
+
+/**
+ * The notice for a refused method, given the methods the picker shows NOW
+ * (re-read options, refused ones taken out). It says what went away, then
+ * points only at what is still there — never at a method outside
+ * `methodsNow` (same rule as paymentRetryHint). null = the picker could not
+ * be changed (the refused method is still all there is to show): there is
+ * nothing true to add, and the server's own message stands.
+ */
+export function paymentRefusalNotice(
+  code: string | null | undefined,
+  refused: PaymentMethod,
+  methodsNow: PaymentMethod[],
+): string | null {
+  if (!methodsNow.length || methodsNow.includes(refused)) return null;
+  const gone =
+    refused === 'cod'
+      ? 'Cash on Delivery is no longer available at this store.'
+      : code === 'advance_unavailable'
+        ? 'This order does not need an advance payment.'
+        : methodsNow.some(isOnlineMethod)
+          ? 'That online payment option is no longer available at this store.'
+          : 'Online payment is not available at this store right now.';
+  const next =
+    methodsNow.length > 1
+      ? 'The payment options below have been updated — please choose one and place your order again.'
+      : `You can place this order with ${REFUSAL_NEXT_NAMES[methodsNow[0]]} instead — please press the order button again.`;
+  return `${gone} ${next}`;
 }
 
 export function PaymentMethodPicker({

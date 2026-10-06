@@ -12,7 +12,7 @@ import {
   Globe, MessageCircle, HelpCircle,
 } from 'lucide-react';
 import type { FunnelData, FunnelBlockConfig, FunnelProduct, PaymentMethod, ProductCard, StorefrontMeta } from '../lib/types';
-import { orderIdempotencyKey, submitOrder } from '../lib/api';
+import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
@@ -32,12 +32,14 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   isOnlineMethod,
+  isPaymentRefusal,
   leavePayReturnNote,
   onlineAdvanceAmountFor,
   onlineAdvanceCoversOrder,
   codOffered,
   isStockCodCopy,
   paymentMethodsForCart,
+  paymentRefusalNotice,
   paymentRetryHint,
   resolvePaymentMethod,
 } from '../components/order/checkout-extras';
@@ -967,6 +969,12 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // force is derived below so it is always one the store offers for this
   // order. Same contract as checkout.tsx.
   const [pickedMethod, setPickedMethod] = useState<PaymentMethod | null>(null);
+  // After the order API REFUSED a payment method (422): the store's payment
+  // options as re-read from the browser, the methods refused for this order
+  // since, and the line that says what changed. Same contract as checkout.tsx.
+  const [payMeta, setPayMeta] = useState<Awaited<ReturnType<typeof refreshPaymentMeta>>>(null);
+  const [refused, setRefused] = useState<PaymentMethod[]>([]);
+  const [payNotice, setPayNotice] = useState<string | null>(null);
 
   const zones = meta.shipping?.zones ?? [];
   const requireZone = !!(meta.shipping?.enabled && zones.length > 0);
@@ -1021,10 +1029,13 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const total = subtotal + shippingFee;
   // How this order is paid: whichever of COD / pay online / pay an advance
   // online the store offers (meta.payment_methods — COD is not guaranteed).
-  const payMethods = paymentMethodsForCart(meta, subtotal, total);
-  const payMethod = resolvePaymentMethod(pickedMethod, payMethods, onlineAdvanceCoversOrder(meta, subtotal, total));
+  // `liveMeta` = the page's meta with its payment part as last re-read (see
+  // payMeta); `refused` takes out what the order API has since turned down.
+  const liveMeta = payMeta ? { ...meta, ...payMeta } : meta;
+  const payMethods = paymentMethodsForCart(liveMeta, subtotal, total, refused);
+  const payMethod = resolvePaymentMethod(pickedMethod, payMethods, onlineAdvanceCoversOrder(liveMeta, subtotal, total));
   const payOnline = isOnlineMethod(payMethod);
-  const onlineAdvance = onlineAdvanceAmountFor(meta, subtotal, total);
+  const onlineAdvance = onlineAdvanceAmountFor(liveMeta, subtotal, total);
   const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
   // The builder's stock heading promises Cash on Delivery; on a store that
   // does not offer it that stock text is dropped (the tenant's own wording
@@ -1042,10 +1053,18 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   // the box appear/vanish as the qty stepper crosses the threshold; gate on
   // the computed amount so the box (and the last-4 requirement) tracks that.
   // Absent on old cached payloads → box simply hidden.
-  const codHasAdvance = !!(meta.advance_payment && advanceAmountFor(meta.advance_payment, subtotal) > 0);
-  const advancePolicy = payMethod === 'cod' ? meta.advance_payment ?? null : null;
+  const codHasAdvance = !!(liveMeta.advance_payment && advanceAmountFor(liveMeta.advance_payment, subtotal) > 0);
+  const advancePolicy = payMethod === 'cod' ? liveMeta.advance_payment ?? null : null;
   const advance = advancePolicy && advanceAmountFor(advancePolicy, subtotal) > 0 ? advancePolicy : null;
   const districtEnabled = !!meta.checkout?.district_enabled;
+
+  // A method refused for one order can be right for another (an advance the
+  // rule did not owe at that subtotal), so the refusals — and the line about
+  // them — end with the pack / quantity they were made for.
+  useEffect(() => {
+    setRefused((r) => (r.length ? [] : r));
+    setPayNotice(null);
+  }, [variantIdx, qty]);
 
   // When the advance box leaves the screen (qty drops back under the threshold),
   // drop any half-typed last-4 so a stale value in a now-hidden field can't fail
@@ -1099,6 +1118,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     inflight.current = true;
     setSubmitting(true);
     setError(null);
+    setPayNotice(null);
     // GA4 item for the dataLayer half of the tracking calls (GTM tenants) —
     // funnels are single-product by design.
     const ga4Items = [{ item_id: product.id.toString(), item_name: product.name, price: unitPrice, quantity: qty }];
@@ -1247,6 +1267,28 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
         onFlushed: () => { window.location.href = dest; },
       });
     } catch (e) {
+      // The store no longer offers this payment method (or, for an advance,
+      // owes none on this order) — same handling as checkout.tsx: re-read the
+      // options from the browser, take the refused method out of the picker
+      // and say what changed, right where the picker is. The order is NEVER
+      // sent again from here. Could not re-read, or nothing else to offer →
+      // the server's own message below, exactly as before.
+      if (e instanceof ApiError && isPaymentRefusal(e.code)) {
+        const fresh = await refreshPaymentMeta();
+        const refusedNow = refused.includes(payMethod) ? refused : [...refused, payMethod];
+        const notice = fresh
+          ? paymentRefusalNotice(e.code, payMethod, paymentMethodsForCart(fresh, subtotal, total, refusedNow))
+          : null;
+        if (fresh && notice) {
+          setPayMeta(fresh);
+          setRefused(refusedNow);
+          setPickedMethod(null);
+          setPayNotice(notice);
+          inflight.current = false;
+          setSubmitting(false);
+          return;
+        }
+      }
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       inflight.current = false;
       setSubmitting(false);
@@ -1390,6 +1432,14 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             <button type="button" onClick={() => setQty(qty + 1)} aria-label="Increase" className="px-2 py-1.5 text-slate-600 hover:bg-slate-50"><Plus className="h-3.5 w-3.5" /></button>
           </div>
         </div>
+
+        {/* A refused payment method: said HERE, where the picker changed (the
+            error box is at the top of a long form). Outside the picker's own
+            gate — a store left with COD alone shows no picker, and still owes
+            the shopper the explanation. */}
+        {payNotice && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">{payNotice}</div>
+        )}
 
         {showPayPicker && (
           <PaymentMethodPicker
