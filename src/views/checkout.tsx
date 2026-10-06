@@ -17,6 +17,7 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   heldPauseFor,
+  heldPayForSend,
   isOnlineMethod,
   isPaymentRefusal,
   leavePayReturnNote,
@@ -510,6 +511,12 @@ export function CheckoutPage({
       setPayConfirm(held);
       return;
     }
+    // The server is about to be asked. If that is for another payment method
+    // than the held link's order, the server gives that order up for it —
+    // whatever then becomes of the answer — so the link goes first (see
+    // heldPayForSend). Below the check above: an unchanged press never gets
+    // here.
+    heldPay.current = heldPayForSend(heldPay.current, payMethod);
     inflight.current = true;
     setSubmitting(true);
     setError(null);
@@ -643,7 +650,7 @@ export function CheckoutPage({
         });
         // A link the server has just issued outdates any held from before;
         // only one for the form as it stands is worth keeping.
-        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), pause } : null;
+        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), method: payMethod, pause } : null;
         if (pause) {
           setPayConfirm(pause);
           inflight.current = false;

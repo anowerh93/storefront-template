@@ -500,8 +500,8 @@ export function payPauseCopy(p: Pick<PayPause, 'orderNumber' | 'earlier' | 'rest
 export const PAY_PAUSE_REUSE_MS = 10 * 60 * 1000;
 
 /** A pause the shopper stepped back from ("Change my order"), kept with the
- *  order it was for and when the link was issued. */
-export type HeldPay = { sig: string; at: number; pause: PayPause };
+ *  order it was for, how that order is paid and when the link was issued. */
+export type HeldPay = { sig: string; at: number; method: PaymentMethod; pause: PayPause };
 
 /**
  * "Change my order" only hides the pause. Pressed again with NOTHING changed,
@@ -515,6 +515,29 @@ export function heldPauseFor(held: HeldPay | null, sig: string, now: number): Pa
   if (!held || held.sig !== sig) return null;
   const age = now - held.at;
   return age >= 0 && age < PAY_PAUSE_REUSE_MS ? held.pause : null;
+}
+
+/**
+ * What is left of the held link once a request for `method` is about to leave
+ * the page. Asking for the same cart with ANOTHER payment method is the one
+ * request that makes the order API give the unpaid order up: it cancels it
+ * and places the new one in a single transaction — and it has done so even
+ * when the answer is lost on the way back, or is an error about the NEW order
+ * (its gateway would not start). The held link still opens the gateway for
+ * the cancelled order, and back on the first method the form's signature
+ * matches it again: the box would offer that link without asking anyone, and
+ * the money would land on a dead order. So it is dropped BEFORE the request,
+ * whatever the answer turns out to be; an answer that carries a link for the
+ * form as it stands arms a new one.
+ *
+ * The same method keeps it: that request can only replay the order or place
+ * another beside it (other items, another phone) — the order the link pays
+ * for is still waiting either way, and the link is the shopper's way back to
+ * it when that request fails. Should the API ever give an unpaid order up for
+ * anything else (an items or address edit), this must drop on that too.
+ */
+export function heldPayForSend(held: HeldPay | null, method: PaymentMethod): HeldPay | null {
+  return held !== null && held.method === method ? held : null;
 }
 
 /** Shopper-facing error for a rejected / unstartable payment, never naming a

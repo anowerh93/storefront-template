@@ -32,6 +32,7 @@ import {
   PaymentMethodPicker,
   advanceAmountFor,
   heldPauseFor,
+  heldPayForSend,
   isOnlineMethod,
   isPaymentRefusal,
   leavePayReturnNote,
@@ -1199,6 +1200,10 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       setPayConfirm(held);
       return;
     }
+    // The server is about to be asked: a request for another payment method
+    // makes it give the held link's order up, so the link goes first (see
+    // heldPayForSend; same contract as checkout.tsx).
+    heldPay.current = heldPayForSend(heldPay.current, payMethod);
     inflight.current = true;
     setSubmitting(true);
     setError(null);
@@ -1282,7 +1287,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           placed: placedAs.current,
         });
         // A link the server has just issued outdates any held from before.
-        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), pause } : null;
+        heldPay.current = pause && !pause.earlier ? { sig, at: Date.now(), method: payMethod, pause } : null;
         if (pause) {
           setPayConfirm(pause);
           inflight.current = false;
