@@ -578,6 +578,7 @@ export function CheckoutPage({
     // whatever then becomes of the answer — so the link goes first (see
     // heldPayForSend). Below the check above: an unchanged press never gets
     // here.
+    const heldBefore = heldPay.current;
     heldPay.current = heldPayForSend(heldPay.current, payMethod);
     inflight.current = true;
     setSubmitting(true);
@@ -810,6 +811,10 @@ export function CheckoutPage({
       // shopper presses when the timer ends.
       const wait = e instanceof ApiError ? payWaitSeconds(e.code, e.retryAfter) : 0;
       if (wait > 0) {
+        // Nothing was given up after all: a pay link the shopper had stepped
+        // back from is still their order's. Put it back, so choosing that
+        // method again offers it as it is — no request, no submit spent.
+        heldPay.current = heldBefore;
         payWait.start(wait, payMethod);
         inflight.current = false;
         setSubmitting(false);

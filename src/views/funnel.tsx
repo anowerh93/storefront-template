@@ -1235,6 +1235,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
     // The server is about to be asked: a request for another payment method
     // makes it give the held link's order up, so the link goes first (see
     // heldPayForSend; same contract as checkout.tsx).
+    const heldBefore = heldPay.current;
     heldPay.current = heldPayForSend(heldPay.current, payMethod);
     inflight.current = true;
     setSubmitting(true);
@@ -1424,6 +1425,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       // under it. Never sent again from here.
       const wait = e instanceof ApiError ? payWaitSeconds(e.code, e.retryAfter) : 0;
       if (wait > 0) {
+        // Nothing was given up after all: put a held pay link back (same
+        // contract as checkout.tsx).
+        heldPay.current = heldBefore;
         payWait.start(wait, payMethod);
         inflight.current = false;
         setSubmitting(false);

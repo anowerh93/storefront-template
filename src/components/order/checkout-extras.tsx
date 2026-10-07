@@ -415,11 +415,13 @@ export type PayLateState = 'checking' | 'not_found' | null;
  * and chose another payment method) and reached this page before our
  * confirmation did. Telling them "you have not been charged — try again" is
  * wrong in the one way that costs money, so on that return the order page is
- *  - 'checking'   refetching while the status polls last. One ladder per tab:
- *                 the page notes when it began (payLateCheckedKey) and a
- *                 reload picks the ladder up where the clock says it is
- *                 (payPollsSpent) — it neither starts over (the guest lookup
- *                 is limited per IP) nor gives up early;
+ *  - 'checking'   refetching while the status polls last. One ladder per
+ *                 gateway return: the page notes when it began
+ *                 (payLateCheckedKey) and a reload picks the ladder up where
+ *                 the clock says it is (payPollsSpent) — it neither starts
+ *                 over (the guest lookup is limited per IP) nor gives up
+ *                 early. Only the gateway sending the shopper back AGAIN
+ *                 begins another (payLateLadder);
  *  - 'not_found'  done looking, nothing recorded: it says a payment is not
  *                 confirmed — never "not charged" — and offers only the quiet
  *                 way back (payRetryOffer).
@@ -428,7 +430,10 @@ export type PayLateState = 'checking' | 'not_found' | null;
  * `toldInThisTab`: the tab has been on such a return for this order. It
  * stands in for a hint the URL no longer carries (the order re-opened from
  * "My Orders" or the tracking form) — never against a hint that is there: a
- * later 'fail' / 'cancel' return is the API's newer word.
+ * later 'fail' / 'cancel' return is the API's newer word. It is not forgotten
+ * on that return, though: the next hint-less visit reads "not confirmed"
+ * again. The API's 'fail' can be no more than the gateway's cancel URL with
+ * nobody to ask, and the careful line costs the shopper nothing.
  *
  * The API answers 'pending' for such a return only while the order's gateway
  * session can still be alive (its verify window). The URL outlives that — a
@@ -462,23 +467,84 @@ export function payLateCheck(o: {
   return o.pollsExhausted ? 'not_found' : 'checking';
 }
 
-/** sessionStorage: when this tab began payLateCheck's ladder for the order (epoch ms). */
+/** sessionStorage: this tab's payLateCheck for the order — see PayLateStamp. */
 export function payLateCheckedKey(orderNumber: string): string {
   return `replybd:pay-latecheck:${orderNumber}`;
 }
 
-/** The stamp under payLateCheckedKey — null for none, or anything that is not one. */
-export function payLateStartedAt(raw: string | null): number | null {
-  if (raw === null || !/^\d{1,16}$/.test(raw)) return null;
-  const at = Number(raw);
-  return at > 0 ? at : null;
+/** How many poll ladders one tab runs on one order's late-payment check, at most. */
+export const PAY_LATE_MAX_LADDERS = 3;
+
+/** The note under payLateCheckedKey: when the tab's current ladder began (epoch ms) and which one it is (1 = the first). */
+export type PayLateStamp = { at: number; n: number };
+
+export function serializePayLateStamp(stamp: PayLateStamp): string {
+  return `${stamp.at}:${stamp.n}`;
+}
+
+/** The stored stamp — null for none, or anything this code could not have written. */
+export function readPayLateStamp(raw: string | null): PayLateStamp | null {
+  const m = raw === null ? null : /^(\d{1,16}):(\d{1,2})$/.exec(raw);
+  if (!m) return null;
+  const at = Number(m[1]);
+  const n = Number(m[2]);
+  return at > 0 && n >= 1 ? { at, n } : null;
+}
+
+/**
+ * How the page was entered: 'navigate' = a fresh arrival (a link, a redirect
+ * — the gateway sending the shopper back); 'other' = a reload, Back / Forward,
+ * a restored tab, or a browser that cannot say.
+ */
+export type PayArrival = 'navigate' | 'other';
+
+export function payArrival(perf: unknown): PayArrival {
+  try {
+    const p = perf as
+      | { getEntriesByType?: (type: string) => unknown; navigation?: { type?: unknown } | null }
+      | null
+      | undefined;
+    const entries = p?.getEntriesByType?.('navigation');
+    const entry = Array.isArray(entries) ? (entries[0] as { type?: unknown } | undefined) : undefined;
+    if (entry && typeof entry.type === 'string') return entry.type === 'navigate' ? 'navigate' : 'other';
+    // Older WebKit: only the deprecated performance.navigation (0 = navigate).
+    return p?.navigation?.type === 0 ? 'navigate' : 'other';
+  } catch {
+    return 'other';
+  }
+}
+
+/**
+ * Where this page load stands in the tab's late-payment check for the order:
+ * `startedAt` = when the ladder it continues began (null = this load begins
+ * one, if the check runs at all); `ladders` = how many the tab has begun.
+ *
+ * A reload, a restored tab or Back / Forward continues the ladder the stamp
+ * names — the hint stays in the address bar, and running the polls again on
+ * every reload would spend the lookup's per-IP limit. A FRESH arrival on a
+ * return that says a payment may have been made is another event: the
+ * gateway has sent the shopper back again (they went back to its page and
+ * paid, say), and that return is watched like the first — its own ladder,
+ * not the tail of a spent one. At most PAY_LATE_MAX_LADDERS per tab and
+ * order; after that, and for a browser that cannot tell a reload from an
+ * arrival, the stamp's ladder stands.
+ */
+export function payLateLadder(o: {
+  stamp: PayLateStamp | null;
+  hint: PayReturnHint | null;
+  arrival: PayArrival;
+}): { startedAt: number | null; ladders: number } {
+  if (o.stamp === null) return { startedAt: null, ladders: 0 };
+  const again =
+    o.arrival === 'navigate' && (o.hint === 'success' || o.hint === 'pending') && o.stamp.n < PAY_LATE_MAX_LADDERS;
+  return { startedAt: again ? null : o.stamp.at, ladders: o.stamp.n };
 }
 
 /**
  * How many slots of a poll ladder (`delays`: ms before each poll) have gone
  * by, `elapsedMs` after it began — where a reloaded page takes the ladder up
  * again. A clock that went backwards starts it over (bounded all the same:
- * one ladder is all a page ever runs).
+ * one ladder is all a page load ever runs).
  */
 export function payPollsSpent(delays: readonly number[], elapsedMs: number): number {
   if (!(elapsedMs > 0)) return 0;
@@ -561,14 +627,17 @@ export function readPayWait(raw: string | null, page: string, now: number): PayW
 }
 
 /**
- * The lock after one more refusal on `page`: the newest answer sets the end,
- * and the refused methods add up (a lock from another page, or a spent one,
- * is not carried over).
+ * The lock after one more refusal on `page`: the refused methods add up, and
+ * the LATER end stands (a lock from another page, or a spent one, is not
+ * carried over). The API's hold is on the earlier order, not on a method —
+ * one refusal that asks for a minute because the gateway could not be
+ * reached does not end the two minutes another was told.
  */
 export function payWaitWith(wait: PayWait | null, method: PaymentMethod, seconds: number, page: string, now: number): PayWait {
-  const methods = wait !== null && wait.page === page && wait.until > now ? wait.methods : [];
+  const carried = wait !== null && wait.page === page && wait.until > now ? wait : null;
+  const methods = carried ? carried.methods : [];
   return {
-    until: now + seconds * 1000,
+    until: Math.max(carried ? carried.until : 0, now + seconds * 1000),
     methods: methods.includes(method) ? methods : [...methods, method],
     page,
   };
@@ -580,16 +649,26 @@ export function payWaitClock(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
-const PAY_WAIT_KEY = 'replybd:pay-wait';
+/** sessionStorage: one entry per order form — a refusal on one form never replaces another form's lock. */
+export function payWaitKey(page: string): string {
+  return `replybd:pay-wait:${page}`;
+}
+
+/** The form a "Try again" link (payRetryHref) leads to, as that form's payWaitPage. */
+export function payWaitPageOfHref(href: string): string {
+  return href.split('#')[0];
+}
 
 /**
- * Lift the lock: the order page calls this once it shows an online order of
- * this shopper that is no longer awaiting its payment — paid or cancelled,
- * the API would not answer "still being checked" for it again, and the
- * shopper may be on their way back to the form ("Try again").
+ * Lift the lock of the order form at `page`. The order page calls this once
+ * it shows an online order that THIS browser took to the gateway from that
+ * form (its return note) and that is no longer awaiting its payment — paid or
+ * cancelled, the API would not answer "still being checked" for it again, and
+ * "Try again" leads straight back there. Never for another order the tab
+ * happens to show: the hold that lock stands for may still be running.
  */
-export function clearPayWait(storage: Pick<Storage, 'removeItem'>): void {
-  storage.removeItem(PAY_WAIT_KEY);
+export function clearPayWait(storage: Pick<Storage, 'removeItem'>, page: string): void {
+  storage.removeItem(payWaitKey(page));
 }
 
 /**
@@ -612,7 +691,8 @@ export function usePayWait(): {
     const sync = () => {
       try {
         const now = Date.now();
-        const stored = readPayWait(sessionStorage.getItem(PAY_WAIT_KEY), payWaitPage(window.location), now);
+        const page = payWaitPage(window.location);
+        const stored = readPayWait(sessionStorage.getItem(payWaitKey(page)), page, now);
         setWait(stored);
         setLeft(stored ? Math.ceil((stored.until - now) / 1000) : 0);
       } catch {
@@ -641,7 +721,7 @@ export function usePayWait(): {
       setLeft(0);
       setWait(null);
       try {
-        sessionStorage.removeItem(PAY_WAIT_KEY);
+        sessionStorage.removeItem(payWaitKey(wait.page));
       } catch {
         /* storage blocked */
       }
@@ -654,9 +734,9 @@ export function usePayWait(): {
     if (!(seconds > 0)) return;
     const next = payWaitWith(wait, method, seconds, payWaitPage(window.location), Date.now());
     setWait(next);
-    setLeft(Math.ceil(seconds));
+    setLeft(Math.ceil((next.until - Date.now()) / 1000));
     try {
-      sessionStorage.setItem(PAY_WAIT_KEY, serializePayWait(next));
+      sessionStorage.setItem(payWaitKey(next.page), serializePayWait(next));
     } catch {
       /* storage blocked */
     }

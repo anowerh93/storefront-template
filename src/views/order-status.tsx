@@ -15,9 +15,13 @@ import {
   clearPayWait,
   isOnlineMethod,
   payLateCheck,
+  payArrival,
   payLateCheckedKey,
-  payLateStartedAt,
+  payLateLadder,
   payPollsSpent,
+  payWaitPageOfHref,
+  readPayLateStamp,
+  serializePayLateStamp,
   payRetryHref,
   payRetryOffer,
   payReturnHint,
@@ -192,19 +196,25 @@ export function OrderStatusPage({
   const [returnHint] = useState(() =>
     typeof window !== 'undefined' ? payReturnHint(window.location.search) : null,
   );
-  // payLateCheck's two browser inputs, latched for the life of the page: when
-  // this tab began looking for a late payment on this order, if it ever did
-  // (the hint stays in the address bar — a reload must take the poll ladder up
-  // where it was, not run it again), and the moment the page loaded. Same
-  // hydration rule as `retryHref` above.
-  const [lateStartedAt] = useState<number | null>(() => {
-    if (typeof window === 'undefined') return null;
+  // payLateCheck's two browser inputs, latched for the life of the page: where
+  // this load stands in the tab's check for the order (payLateLadder — the
+  // hint stays in the address bar, so a reload must take the poll ladder up
+  // where it was, while the gateway sending the shopper back AGAIN gets a
+  // ladder of its own), and the moment the page loaded. Same hydration rule
+  // as `retryHref` above.
+  const [lateLadder] = useState<{ startedAt: number | null; ladders: number }>(() => {
+    if (typeof window === 'undefined') return { startedAt: null, ladders: 0 };
     try {
-      return payLateStartedAt(sessionStorage.getItem(payLateCheckedKey(orderNumber)));
+      return payLateLadder({
+        stamp: readPayLateStamp(sessionStorage.getItem(payLateCheckedKey(orderNumber))),
+        hint: returnHint,
+        arrival: payArrival(window.performance),
+      });
     } catch {
-      return null;
+      return { startedAt: null, ladders: 0 };
     }
   });
+  const lateStartedAt = lateLadder.startedAt;
   const [loadedAt] = useState(() => Date.now());
   // A logged-in customer can view the order WITHOUT a phone (the account
   // session is the identity proof) — resolved in the mount effect below.
@@ -342,7 +352,7 @@ export function OrderStatusPage({
   const late = payLateCheck({
     paymentFailed,
     hint: returnHint,
-    toldInThisTab: lateStartedAt !== null,
+    toldInThisTab: lateLadder.ladders > 0,
     placedAt: order?.placed_at,
     now: loadedAt,
     placedHere: retryHref !== null,
@@ -350,29 +360,34 @@ export function OrderStatusPage({
   });
   const lateChecking = late === 'checking';
 
-  // The check begins: note when, once — a reload of this tab then takes the
-  // ladder up from there (`polls` above) instead of starting another.
+  // A ladder begins: note when, and which one it is — a reload of this tab
+  // then takes it up from there (`polls` above) instead of starting another.
   useEffect(() => {
     if (!lateChecking || lateStartedAt !== null) return;
     try {
-      sessionStorage.setItem(payLateCheckedKey(orderNumber), String(Date.now()));
+      sessionStorage.setItem(
+        payLateCheckedKey(orderNumber),
+        serializePayLateStamp({ at: Date.now(), n: lateLadder.ladders + 1 }),
+      );
     } catch {
       /* storage blocked — a reload checks again, the order's age still bounds it */
     }
-  }, [lateChecking, lateStartedAt, orderNumber]);
+  }, [lateChecking, lateStartedAt, lateLadder.ladders, orderNumber]);
 
-  // An online order of this shopper is no longer awaiting its payment — paid,
-  // or cancelled. The order forms' wait lock (usePayWait) only saves presses
-  // the API would answer "still being checked"; it would not any more, and
-  // "Try again" below may lead straight back to that form.
+  // The online order this browser took to the gateway is no longer awaiting
+  // its payment — paid, or cancelled. The wait lock of the form it was placed
+  // from (usePayWait) only saves presses the API would answer "still being
+  // checked"; it would not any more, and "Try again" below leads straight
+  // back to that form. Only that order and that form: any other order the
+  // tab shows says nothing about a hold that may still be running.
   useEffect(() => {
-    if (!order || !isOnline || awaitingPayment) return;
+    if (!order || !isOnline || awaitingPayment || retryHref === null) return;
     try {
-      clearPayWait(sessionStorage);
+      clearPayWait(sessionStorage, payWaitPageOfHref(retryHref));
     } catch {
       /* storage blocked */
     }
-  }, [order, isOnline, awaitingPayment]);
+  }, [order, isOnline, awaitingPayment, retryHref]);
 
   // "Back to Cart" is the retry by another name wherever the cart is still
   // full — so it goes while the gateway's return says the money was, or may
