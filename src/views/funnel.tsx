@@ -41,8 +41,11 @@ import {
   onlineAdvanceCoversOrder,
   orderSubmitSignature,
   PAY_PAUSE_BACK_LABEL,
+  PAY_WAIT_NOTE,
   payPauseCopy,
   payPauseFor,
+  payWaitClock,
+  payWaitSeconds,
   codOffered,
   isStockCodCopy,
   paymentMethodsForCart,
@@ -51,6 +54,7 @@ import {
   refusalEndsWithCart,
   refusalsForNewCart,
   resolvePaymentMethod,
+  usePayWait,
   withPaymentRefusal,
   type HeldPay,
   type PayPause,
@@ -979,6 +983,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The order button's lock after a 409 payment_unresolved (see usePayWait);
+  // `waitLeft`, below, is what is left of it for the method now selected.
+  const payWait = usePayWait();
   // The shopper's own payment pick (null until they choose); the method in
   // force is derived below so it is always one the store offers for this
   // order. Same contract as checkout.tsx.
@@ -1066,6 +1073,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const payMethods = paymentMethodsForCart(liveMeta, subtotal, total, refused);
   const payMethod = resolvePaymentMethod(pickedMethod, payMethods, onlineAdvanceCoversOrder(liveMeta, subtotal, total));
   const payOnline = isOnlineMethod(payMethod);
+  const waitLeft = payWait.leftFor(payMethod);
   const onlineAdvance = onlineAdvanceAmountFor(liveMeta, subtotal, total);
   const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
   // The builder's stock heading promises Cash on Delivery; on a store that
@@ -1183,6 +1191,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   async function onSubmit(values: FormData) {
     if (sizeMissing) return; // the button is disabled — belt and braces
     if (inflight.current) return;
+    if (waitLeft > 0) return; // locked — see usePayWait
     const sp = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null;
     const input: CreateOrderInput = {
       customer_name:  values.customer_name,
@@ -1408,6 +1417,17 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
           setSubmitting(false);
           return;
         }
+      }
+      // An earlier online payment for this order is still being checked (409
+      // payment_unresolved) — same handling as checkout.tsx: lock the button
+      // for as long as the API asks, for the refused method only, and say why
+      // under it. Never sent again from here.
+      const wait = e instanceof ApiError ? payWaitSeconds(e.code, e.retryAfter) : 0;
+      if (wait > 0) {
+        payWait.start(wait, payMethod);
+        inflight.current = false;
+        setSubmitting(false);
+        return;
       }
       setError(e instanceof Error ? e.message : 'Something went wrong. Please try again.');
       inflight.current = false;
@@ -1639,18 +1659,30 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             </Button>
           </>
         ) : (
-          <Button ref={orderBtn} type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} disabled={!inStock || submitting || sizeMissing}>
-            {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
-            {submitting
-              ? (payOnline ? 'Starting payment…' : 'Placing order…')
-              : !inStock
-                ? 'Out of stock'
-                : payNowAdvance
-                  ? `Pay Advance — ${formatBDT(onlineAdvance, { currency: product.currency })}`
-                  : payOnline
-                    ? `Pay Now — ${formatBDT(total, { currency: product.currency })}`
-                    : <RT html={config.button_label || 'Confirm Order'} />}
-          </Button>
+          <>
+            <Button ref={orderBtn} type="submit" variant="brand" size="lg" className={`w-full shadow-md${(btn.bg || btn.text) ? ' hover:opacity-90' : ''}`} style={ctaStyle(btn)} aria-describedby={inStock && waitLeft > 0 ? 'f-pay-wait' : undefined} disabled={!inStock || submitting || sizeMissing || waitLeft > 0}>
+              {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingBag className="h-4 w-4" />}
+              {submitting
+                ? (payOnline ? 'Starting payment…' : 'Placing order…')
+                : !inStock
+                  ? 'Out of stock'
+                  : waitLeft > 0
+                    ? `Try again in ${payWaitClock(waitLeft)}`
+                    : payNowAdvance
+                      ? `Pay Advance — ${formatBDT(onlineAdvance, { currency: product.currency })}`
+                      : payOnline
+                        ? `Pay Now — ${formatBDT(total, { currency: product.currency })}`
+                        : <RT html={config.button_label || 'Confirm Order'} />}
+            </Button>
+            {/* Why the button is locked (usePayWait) — also after a reload,
+                when the answer that locked it is gone. Not under "Out of
+                stock": that button shows no timer to wait for. */}
+            {inStock && waitLeft > 0 && (
+              <p id="f-pay-wait" role="alert" className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                {PAY_WAIT_NOTE}
+              </p>
+            )}
+          </>
         )}
       </form>
     </section>

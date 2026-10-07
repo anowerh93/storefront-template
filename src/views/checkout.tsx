@@ -26,15 +26,19 @@ import {
   onlineAdvanceCoversOrder,
   orderSubmitSignature,
   PAY_PAUSE_BACK_LABEL,
+  PAY_WAIT_NOTE,
   payCartKey,
   payPauseCopy,
   payPauseFor,
+  payWaitClock,
+  payWaitSeconds,
   paymentMethodsForCart,
   paymentRefusalNotice,
   paymentRetryHint,
   refusalEndsWithCart,
   refusalsForNewCart,
   resolvePaymentMethod,
+  usePayWait,
   withPaymentRefusal,
   type HeldPay,
   type PayPause,
@@ -142,6 +146,9 @@ export function CheckoutPage({
   const [expressQty, setExpressQty] = useState(Math.max(1, initialQty || 1));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The order button's lock after a 409 payment_unresolved (see usePayWait);
+  // `waitLeft`, below, is what is left of it for the method now selected.
+  const payWait = usePayWait();
   // Synchronous re-entrancy guard: `disabled={submitting}` alone can't stop a
   // rapid double-tap — react-hook-form's async zod validation resolves in a
   // microtask, so two taps both reach onSubmit before setSubmitting(true)
@@ -485,6 +492,7 @@ export function CheckoutPage({
   // 'online_advance' — the store's advance for this cart (the rest is paid on
   // delivery). Display only; the server stamps the real charge.
   const payOnline = isOnlineMethod(payMethod);
+  const waitLeft = payWait.leftFor(payMethod);
   const onlineAdvance = onlineAdvanceAmountFor(liveMeta, subtotal, total);
   const payNowAdvance = payMethod === 'online_advance' && onlineAdvance < total;
   const numItems = lines.reduce((n, l) => n + l.quantity, 0);
@@ -521,6 +529,9 @@ export function CheckoutPage({
   async function onSubmit(values: FormData) {
     if (lines.length === 0) return;
     if (inflight.current) return;
+    // Locked by the API's "still checking your earlier payment" — the button
+    // is disabled too; this is for a submit that does not come from it.
+    if (waitLeft > 0) return;
     const input: CreateOrderInput = {
       customer_name:  values.customer_name,
       customer_phone: values.customer_phone,
@@ -789,6 +800,21 @@ export function CheckoutPage({
       if (!isExpress) clearCart();
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Something went wrong. Please try again.';
+      // An earlier online payment for this cart is still being checked (409
+      // payment_unresolved): nothing was placed, nothing cancelled. Lock the
+      // button for as long as the API asks — until then every press is
+      // answered the same way and counts against the form's rate limit — and
+      // say why right under it (PAY_WAIT_NOTE). Only for the method that was
+      // refused: the one the shopper started with still goes through, to
+      // their own order. The order is never sent again from here: the
+      // shopper presses when the timer ends.
+      const wait = e instanceof ApiError ? payWaitSeconds(e.code, e.retryAfter) : 0;
+      if (wait > 0) {
+        payWait.start(wait, payMethod);
+        inflight.current = false;
+        setSubmitting(false);
+        return;
+      }
       // The store no longer offers this payment method (or, for an advance,
       // owes none on this cart): re-read its options from the browser, take
       // the refused method out of the picker and say what changed, right
@@ -1091,16 +1117,27 @@ export function CheckoutPage({
                     </Button>
                   </>
                 ) : (
-                  <Button ref={orderBtn} type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" disabled={submitting || lines.length === 0}>
-                    {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
-                    {submitting
-                      ? (payOnline ? 'Starting payment…' : 'Placing order…')
-                      : payNowAdvance
-                        ? `Pay Advance — ${formatBDT(onlineAdvance, { currency })}`
-                        : payOnline
-                          ? `Pay Now — ${formatBDT(total, { currency })}`
-                          : `Place Order — ${formatBDT(total, { currency })}`}
-                  </Button>
+                  <>
+                    <Button ref={orderBtn} type="submit" variant="brand" size="lg" className="mt-4 w-full shadow-md" aria-describedby={waitLeft > 0 ? 'co-pay-wait' : undefined} disabled={submitting || lines.length === 0 || waitLeft > 0}>
+                      {payOnline ? <CreditCard className="h-4 w-4" /> : <ShoppingCart className="h-4 w-4" />}
+                      {submitting
+                        ? (payOnline ? 'Starting payment…' : 'Placing order…')
+                        : waitLeft > 0
+                          ? `Try again in ${payWaitClock(waitLeft)}`
+                          : payNowAdvance
+                            ? `Pay Advance — ${formatBDT(onlineAdvance, { currency })}`
+                            : payOnline
+                              ? `Pay Now — ${formatBDT(total, { currency })}`
+                              : `Place Order — ${formatBDT(total, { currency })}`}
+                    </Button>
+                    {/* Why the button is locked (usePayWait) — also after a
+                        reload, when the answer that locked it is gone. */}
+                    {waitLeft > 0 && (
+                      <p id="co-pay-wait" role="alert" className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        {PAY_WAIT_NOTE}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             </div>

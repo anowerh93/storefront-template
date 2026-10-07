@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 import { CreditCard, Truck, Wallet } from 'lucide-react';
 import type { CreateOrderInput, PaymentMethod, StorefrontMeta } from '../../lib/types';
@@ -334,8 +335,10 @@ export const PAY_RETRY_FRESH_NOTE =
 /**
  * What the gateway return URL says happened (/order/{n}?payment=…): the four
  * values the API and the gateways send, else null. An UNTRUSTED hint — it
- * never decides what happened to the payment (the order data does that); it
- * only shapes the "Try again" offer, see payRetryOffer.
+ * never decides what happened to the payment (the order data does that). It
+ * shapes the "Try again" offer (payRetryOffer) and, on a cancelled unpaid
+ * order, whether the page looks for a late payment before it says "not
+ * charged" (payLateCheck).
  *  - 'success'  the gateway sent the shopper back as paid;
  *  - 'pending'  the API could not learn a verdict yet (the money may be taken);
  *  - 'fail' / 'cancel'  the gateway sent the shopper back unpaid.
@@ -354,10 +357,13 @@ export function payReturnHint(search: string): PayReturnHint | null {
 /**
  * Whether — and how — the order page offers the way back to the order form:
  *  - 'failed'      the order was cancelled unpaid. The primary action.
- *  - 'unfinished'  the order still awaits its payment and nothing says the
- *                  money was taken. A quiet link, worded for the shopper who
- *                  did NOT pay — a retry from here is a second payable order
- *                  once the API's 90s dedup window has passed.
+ *  - 'unfinished'  the order did not go through, but a payment for it cannot
+ *                  be ruled out: it still awaits its payment, or it was
+ *                  cancelled and the gateway's return says a payment may have
+ *                  been made (payLateCheck 'not_found'). A quiet link, worded
+ *                  for the shopper who did NOT pay — a retry from here is a
+ *                  second payable order (for an awaiting one, once the API's
+ *                  dedup window has passed).
  *  - null          no link.
  *
  * While the order is awaiting, the return hint is used in the safe direction
@@ -368,6 +374,11 @@ export function payReturnHint(search: string): PayReturnHint | null {
  * push-IPN gateway's fail / cancel return leaves the order awaiting, so
  * waiting for "cancelled" would strand that shopper on the spinner). With no
  * hint at all it appears once the status polls have run out.
+ *
+ * The same holds for an order that is already CANCELLED when such a return
+ * arrives (payLateCheck): no link while the page is looking for that payment,
+ * the quiet one once it has looked and found nothing — never the primary one
+ * on that return. Every other cancelled, unpaid order: 'failed'.
  */
 export function payRetryOffer(o: {
   /** A vetted return path exists (readPayReturnNote). */
@@ -376,13 +387,285 @@ export function payRetryOffer(o: {
   awaitingPayment: boolean;
   pollsExhausted: boolean;
   hint: PayReturnHint | null;
+  /** payLateCheck's answer for this order. */
+  late: PayLateState;
 }): 'failed' | 'unfinished' | null {
   if (!o.hasLink) return null;
-  if (o.paymentFailed) return 'failed';
+  if (o.paymentFailed) return o.late === null ? 'failed' : o.late === 'checking' ? null : 'unfinished';
   if (!o.awaitingPayment) return null;
   if (o.hint === 'success' || o.hint === 'pending') return null;
   if (o.hint === 'fail' || o.hint === 'cancel') return 'unfinished';
   return o.pollsExhausted ? 'unfinished' : null;
+}
+
+/**
+ * How old (from its placing) a cancelled order can be and still have been
+ * "just paid" on a gateway return — the API's own verify window at its
+ * default (replybd: PaymentManager::verifyWindowMinutes(), 48 h). Raise the
+ * two together. See payLateCheck.
+ */
+export const PAY_LATE_MAX_AGE_MS = 48 * 60 * 60 * 1000;
+
+export type PayLateState = 'checking' | 'not_found' | null;
+
+/**
+ * A cancelled, uncharged order whose gateway return says the money was — or
+ * may have been — taken ('success' / 'pending'). The shopper may have paid the
+ * gateway page AFTER the order was given up (it timed out, or they went back
+ * and chose another payment method) and reached this page before our
+ * confirmation did. Telling them "you have not been charged — try again" is
+ * wrong in the one way that costs money, so on that return the order page is
+ *  - 'checking'   refetching while the status polls last. One ladder per tab:
+ *                 the page notes when it began (payLateCheckedKey) and a
+ *                 reload picks the ladder up where the clock says it is
+ *                 (payPollsSpent) — it neither starts over (the guest lookup
+ *                 is limited per IP) nor gives up early;
+ *  - 'not_found'  done looking, nothing recorded: it says a payment is not
+ *                 confirmed — never "not charged" — and offers only the quiet
+ *                 way back (payRetryOffer).
+ * null = any other order, an ordinary cancelled one included.
+ *
+ * `toldInThisTab`: the tab has been on such a return for this order. It
+ * stands in for a hint the URL no longer carries (the order re-opened from
+ * "My Orders" or the tracking form) — never against a hint that is there: a
+ * later 'fail' / 'cancel' return is the API's newer word.
+ *
+ * The API answers 'pending' for such a return only while the order's gateway
+ * session can still be alive (its verify window). The URL outlives that — a
+ * bookmark, a restored tab — so the same bound is applied here to the order's
+ * own age. An order with no readable date is taken at the API's word, and so
+ * is one this browser placed within the day (`placedHere`, the return note):
+ * its age is then known by this device's own clock, and comparing that clock
+ * with the server's `placed_at` would only let a wrongly set phone switch the
+ * check off — on exactly the page that offers the primary "Try again".
+ */
+export function payLateCheck(o: {
+  paymentFailed: boolean;
+  hint: PayReturnHint | null;
+  /** This tab has already been told a payment may have been made on the order. */
+  toldInThisTab: boolean;
+  /** The order's `placed_at` (ISO 8601); null / unreadable = age unknown. */
+  placedAt: string | null | undefined;
+  /** Epoch ms. */
+  now: number;
+  /** This browser left for the gateway with the order within the day (a return note exists). */
+  placedHere: boolean;
+  pollsExhausted: boolean;
+}): PayLateState {
+  if (!o.paymentFailed) return null;
+  const mayBePaid = o.hint === 'success' || o.hint === 'pending' || (o.hint === null && o.toldInThisTab);
+  if (!mayBePaid) return null;
+  if (!o.placedHere) {
+    const placed = o.placedAt ? Date.parse(o.placedAt) : NaN;
+    if (Number.isFinite(placed) && o.now - placed > PAY_LATE_MAX_AGE_MS) return null;
+  }
+  return o.pollsExhausted ? 'not_found' : 'checking';
+}
+
+/** sessionStorage: when this tab began payLateCheck's ladder for the order (epoch ms). */
+export function payLateCheckedKey(orderNumber: string): string {
+  return `replybd:pay-latecheck:${orderNumber}`;
+}
+
+/** The stamp under payLateCheckedKey — null for none, or anything that is not one. */
+export function payLateStartedAt(raw: string | null): number | null {
+  if (raw === null || !/^\d{1,16}$/.test(raw)) return null;
+  const at = Number(raw);
+  return at > 0 ? at : null;
+}
+
+/**
+ * How many slots of a poll ladder (`delays`: ms before each poll) have gone
+ * by, `elapsedMs` after it began — where a reloaded page takes the ladder up
+ * again. A clock that went backwards starts it over (bounded all the same:
+ * one ladder is all a page ever runs).
+ */
+export function payPollsSpent(delays: readonly number[], elapsedMs: number): number {
+  if (!(elapsedMs > 0)) return 0;
+  let spent = 0;
+  let at = 0;
+  for (const delay of delays) {
+    at += delay;
+    if (at > elapsedMs) break;
+    spent++;
+  }
+  return spent;
+}
+
+/**
+ * The order API's 409 for a cart whose earlier ONLINE order may still be paid
+ * ("your earlier online payment is still being checked"), given to a submit
+ * with ANOTHER payment method: nothing was placed, nothing was cancelled, and
+ * the same press is answered the same way until the API has its verdict or
+ * its short hold runs out. Every press — a refused one too — counts against
+ * the order form's rate limit (five an hour per phone), so both forms lock
+ * the order button for as long as the API asks (`error.retry_after`, seconds)
+ * instead of letting a shopper spend their submits on a wait.
+ */
+export const PAY_UNRESOLVED_CODE = 'payment_unresolved';
+/** What an API that predates `retry_after` asked for in words: "a minute". */
+export const PAY_WAIT_DEFAULT_S = 60;
+/** The longest lock one response (or one stored value) can ask for. */
+export const PAY_WAIT_MAX_S = 300;
+export const PAY_WAIT_NOTE =
+  'Your earlier online payment for this order is still being checked, so no new order was placed. You can order this way when the timer ends — or choose the payment method you started with to finish paying.';
+
+/** Seconds to lock the order button after this refusal — 0 for any other. */
+export function payWaitSeconds(code: string | undefined, retryAfter: number | undefined): number {
+  if (code !== PAY_UNRESOLVED_CODE) return 0;
+  const asked =
+    typeof retryAfter === 'number' && Number.isFinite(retryAfter) && retryAfter > 0
+      ? Math.ceil(retryAfter)
+      : PAY_WAIT_DEFAULT_S;
+  return Math.min(asked, PAY_WAIT_MAX_S);
+}
+
+/**
+ * A lock: when it ends (epoch ms), the payment methods the API refused, and
+ * the page it was given on. It holds exactly the presses the API would refuse
+ * again — the SAME form with a refused method. The method the shopper started
+ * with stays live (that press is answered with their own order and a fresh
+ * pay link), and so does every other order form.
+ */
+export type PayWait = { until: number; methods: PaymentMethod[]; page: string };
+
+/** A form's identity for a lock: its path and query (the "Try again" link's hash is not part of it). */
+export function payWaitPage(loc: { pathname: string; search: string }): string {
+  return loc.pathname + loc.search;
+}
+
+export function serializePayWait(wait: PayWait): string {
+  return JSON.stringify({ u: wait.until, m: wait.methods, p: wait.page });
+}
+
+/**
+ * The stored lock, if it is this page's and still running — null for none,
+ * another page's, a past one, and anything this code could not have written
+ * (not that shape, or ending further off than the longest lock).
+ */
+export function readPayWait(raw: string | null, page: string, now: number): PayWait | null {
+  if (raw === null) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const { u, m, p } = v as { u?: unknown; m?: unknown; p?: unknown };
+  if (typeof u !== 'number' || !Number.isFinite(u) || p !== page || !Array.isArray(m)) return null;
+  const left = u - now;
+  if (!(left > 0 && left <= PAY_WAIT_MAX_S * 1000)) return null;
+  const methods = m.filter((x): x is PaymentMethod => x === 'cod' || x === 'online' || x === 'online_advance');
+  return methods.length > 0 ? { until: u, methods, page } : null;
+}
+
+/**
+ * The lock after one more refusal on `page`: the newest answer sets the end,
+ * and the refused methods add up (a lock from another page, or a spent one,
+ * is not carried over).
+ */
+export function payWaitWith(wait: PayWait | null, method: PaymentMethod, seconds: number, page: string, now: number): PayWait {
+  const methods = wait !== null && wait.page === page && wait.until > now ? wait.methods : [];
+  return {
+    until: now + seconds * 1000,
+    methods: methods.includes(method) ? methods : [...methods, method],
+    page,
+  };
+}
+
+/** 125 → "2:05". */
+export function payWaitClock(seconds: number): string {
+  const s = Math.max(0, Math.ceil(seconds));
+  return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
+}
+
+const PAY_WAIT_KEY = 'replybd:pay-wait';
+
+/**
+ * Lift the lock: the order page calls this once it shows an online order of
+ * this shopper that is no longer awaiting its payment — paid or cancelled,
+ * the API would not answer "still being checked" for it again, and the
+ * shopper may be on their way back to the form ("Try again").
+ */
+export function clearPayWait(storage: Pick<Storage, 'removeItem'>): void {
+  storage.removeItem(PAY_WAIT_KEY);
+}
+
+/**
+ * The lock itself. `leftFor(method)` = whole seconds until the order button
+ * is live again for that method (0 = live); `start(seconds, method)` locks it
+ * after a refusal. Kept per tab in sessionStorage, so a reload does not hand
+ * the button back early — and read again when the page comes back from the
+ * bfcache, where the order page may have lifted it meanwhile (clearPayWait).
+ * With storage blocked it simply lasts as long as the page.
+ */
+export function usePayWait(): {
+  leftFor: (method: PaymentMethod) => number;
+  start: (seconds: number, method: PaymentMethod) => void;
+} {
+  const [wait, setWait] = useState<PayWait | null>(null);
+  const [left, setLeft] = useState(0);
+
+  // After hydration (the server cannot know), and on a bfcache restore.
+  useEffect(() => {
+    const sync = () => {
+      try {
+        const now = Date.now();
+        const stored = readPayWait(sessionStorage.getItem(PAY_WAIT_KEY), payWaitPage(window.location), now);
+        setWait(stored);
+        setLeft(stored ? Math.ceil((stored.until - now) / 1000) : 0);
+      } catch {
+        /* storage blocked — what the page holds stands */
+      }
+    };
+    sync();
+    const onShow = (e: PageTransitionEvent) => {
+      if (e.persisted) sync();
+    };
+    window.addEventListener('pageshow', onShow);
+    return () => window.removeEventListener('pageshow', onShow);
+  }, []);
+
+  // Read off the clock on every tick, never counted down: a throttled
+  // (background) tab still ends on time. An end further off than any lock —
+  // the device clock was set back — ends it too.
+  useEffect(() => {
+    if (!wait) return;
+    const tick = () => {
+      const ms = wait.until - Date.now();
+      if (ms > 0 && ms <= PAY_WAIT_MAX_S * 1000) {
+        setLeft(Math.ceil(ms / 1000));
+        return;
+      }
+      setLeft(0);
+      setWait(null);
+      try {
+        sessionStorage.removeItem(PAY_WAIT_KEY);
+      } catch {
+        /* storage blocked */
+      }
+    };
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [wait]);
+
+  function start(seconds: number, method: PaymentMethod) {
+    if (!(seconds > 0)) return;
+    const next = payWaitWith(wait, method, seconds, payWaitPage(window.location), Date.now());
+    setWait(next);
+    setLeft(Math.ceil(seconds));
+    try {
+      sessionStorage.setItem(PAY_WAIT_KEY, serializePayWait(next));
+    } catch {
+      /* storage blocked */
+    }
+  }
+
+  return {
+    leftFor: (method) => (wait !== null && wait.methods.includes(method) ? left : 0),
+    start,
+  };
 }
 
 /**

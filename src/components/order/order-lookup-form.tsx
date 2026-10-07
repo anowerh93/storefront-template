@@ -12,8 +12,9 @@ export function OrderLookupForm({
   orderNumber?: string;
   /** The gateway's ?payment= hint the order page was opened with (a return
    *  that landed in a tab without the stashed last-4). Carried to the
-   *  looked-up page, where it still shapes the "Try again" offer — one of
-   *  four fixed words, never free text. Only for the order it came with. */
+   *  looked-up page, where it still shapes the "Try again" offer and the
+   *  late-payment check (payLateCheck) — one of four fixed words, never free
+   *  text. Only for the order it came with. */
   paymentHint?: PayReturnHint | null;
 }) {
   const [orderNumber, setOrderNumber] = useState(initialNumber);

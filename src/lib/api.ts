@@ -533,8 +533,16 @@ export async function submitOrder(input: CreateOrderInput, idempotencyKey?: stri
     // act on three codes — 'cod_unavailable' / 'online_unavailable' /
     // 'advance_unavailable' (the store's payment options changed under an
     // open page): they re-read the options (refreshPaymentMeta) and say what
-    // changed. Everything else is shown as the server's message.
-    throw new ApiError(msg, res.status, typeof json?.error?.code === 'string' ? json.error.code : undefined);
+    // changed — and on 'payment_unresolved' (an earlier online payment for
+    // this cart is still being checked): they lock the order button for the
+    // `retry_after` seconds that come with it (payWaitSeconds). Everything
+    // else is shown as the server's message.
+    throw new ApiError(
+      msg,
+      res.status,
+      typeof json?.error?.code === 'string' ? json.error.code : undefined,
+      typeof json?.error?.retry_after === 'number' ? json.error.retry_after : undefined,
+    );
   }
   if (!json) {
     throw new Error('Sorry, your order could not be placed. Please try again in a minute.');
@@ -804,11 +812,14 @@ async function authFetch<T>(
 export class ApiError extends Error {
   code?: string;
   status: number;
-  constructor(message: string, status: number, code?: string) {
+  /** `error.retry_after` (seconds), when the API sent one. */
+  retryAfter?: number;
+  constructor(message: string, status: number, code?: string, retryAfter?: number) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
