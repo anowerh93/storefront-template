@@ -5,6 +5,7 @@ import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { NotFoundPage } from './not-found';
+import { codOffered } from '../components/order/checkout-extras';
 import type { StorefrontMeta } from '../lib/types';
 
 /**
@@ -44,7 +45,11 @@ export function OrderLookupPage({ meta }: { meta: StorefrontMeta | null }) {
         {/* Trust strip */}
         <div className="mt-6 grid grid-cols-2 gap-3 text-center">
           <Trust icon={ShieldCheck} title="Secure" subtitle="Phone-verified lookup" />
-          <Trust icon={Truck} title="Cash on Delivery" subtitle="Pay when it arrives" />
+          {codOffered(meta) ? (
+            <Trust icon={Truck} title="Cash on Delivery" subtitle="Pay when it arrives" />
+          ) : (
+            <Trust icon={Truck} title="Home Delivery" subtitle="Delivered to your address" />
+          )}
         </div>
 
         {/* Need more help? */}

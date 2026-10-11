@@ -70,12 +70,28 @@ export type StorefrontMeta = {
   messenger: { url: string | null; handle: string | null } | null;
   turnstile: { site_key: string | null };
   /**
-   * Which payment methods checkout may offer: always ['cod'], plus 'online'
-   * when the tenant has a connected gateway (their own SSLCommerz / EPS /
-   * aamarPay account — the shopper never picks a gateway, just "pay online").
-   * Optional for cached payloads that predate the field.
+   * Which payment methods the order forms (checkout AND funnel) may offer, in
+   * display order — the tenant's own choice of 'cod' / 'online' (pay the full
+   * amount at their gateway) / 'online_advance' (pay an advance at the
+   * gateway, the rest on delivery). COD is NOT guaranteed to be present. The
+   * shopper never picks a gateway, just a method. Kept a loose string[] on
+   * purpose: read it through offeredPaymentMethods() (checkout-extras), which
+   * drops values this build doesn't know and falls back to ['cod'] for cached
+   * payloads that predate the field.
    */
   payment_methods?: string[];
+  /**
+   * Amount rule for 'online_advance' — non-null only when that method is
+   * offered. Same shape as the manual advance rule (flat amount + an extra at/
+   * over a subtotal threshold) but NO wallet numbers: the money goes through
+   * the gateway. Display config only — the server stamps the real charge at
+   * order create and returns it as `payment.amount`.
+   */
+  online_advance?: {
+    delivery_charge: number;
+    threshold: number | null;
+    extra_amount: number;
+  } | null;
   shipping: {
     enabled: boolean;
     free_shipping_threshold: number | null;
@@ -699,13 +715,19 @@ export type CreateOrderInput = {
   // error.code === 'password_required' comes back if it's missing.
   create_account?: boolean;
   password?: string;
-  // Online payment (BYO gateway). Omitted / 'cod' → Cash on Delivery
-  // (unchanged legacy behavior). 'online' is only accepted when the meta
-  // advertises it (payment_methods includes 'online') — the server 422s with
-  // error.code === 'online_unavailable' otherwise. On success the response
-  // carries `payment.redirect_url` to the gateway's hosted checkout.
-  payment_method?: 'cod' | 'online';
+  // How the shopper pays — ALWAYS sent explicitly by this build (an omitted
+  // field is how pre-picker builds said "COD", and the server treats it so).
+  // Only a method the meta advertises (payment_methods) is accepted: the
+  // server 422s with error.code 'cod_unavailable' / 'online_unavailable'
+  // otherwise and never silently switches method. For the two online methods
+  // the response carries `payment.redirect_url` to the gateway's hosted
+  // checkout and `payment.amount` (what it will charge).
+  payment_method?: PaymentMethod;
 };
+
+/** 'online' = full amount at the gateway; 'online_advance' = an advance at
+ *  the gateway, the rest on delivery. */
+export type PaymentMethod = 'cod' | 'online' | 'online_advance';
 
 export type OrderResponse = {
   order_number: string;
@@ -732,16 +754,32 @@ export type OrderResponse = {
       fallback push is gated on this being false, then consumes it via
       markPurchaseTracked(). */
   purchase_tracked?: boolean;
-  // Present when the order was placed with payment_method 'online' (also on a
-  // `duplicate` replay of an order still awaiting its payment — the same
+  // Present when the order was placed with an online payment method (also on
+  // a `duplicate` replay of an order still awaiting its payment — the same
   // gateway session is renewed, never a second payable one). Redirect the
-  // shopper's browser to `redirect_url` to complete payment.
-  payment?: { method: string; redirect_url: string };
+  // shopper's browser to `redirect_url` to complete payment. `amount` is
+  // what the gateway will charge (the advance for 'online_advance'); absent
+  // on an API that predates it.
+  payment?: { method: string; redirect_url: string; amount?: number };
   // From GET /orders/{number} — lets the tracking page show the payment state
   // and poll while an online order is still awaiting gateway confirmation.
-  // 'cod' | 'online' and 'unpaid' | 'paid' | 'failed' | 'refunded'.
+  // 'cod' | 'online' | 'online_advance' and
+  // 'unpaid' | 'paid' | 'partially_paid' | 'failed' | 'refunded'.
   payment_method?: string | null;
   payment_status?: string | null;
+  // From GET /orders/{number} — the money the gateway captured and what is
+  // left for the rider to collect (server-computed; never derive these from
+  // payment_status — a short or review-parked payment is 'paid' with a
+  // remainder). `online_charge_amount` = what the gateway is to collect for
+  // an online order (null for COD). All absent on an API that predates them.
+  online_paid_amount?: number;
+  due_on_delivery?: number;
+  online_charge_amount?: number | null;
+  // From GET /orders/{number} — a manual wallet advance (bKash / Nagad /
+  // Rocket) the store recorded on the order: money received OUTSIDE the
+  // gateway, so never part of `online_paid_amount`, and already taken off
+  // `due_on_delivery`. 0 when none; absent on an API that predates it.
+  advance_paid_amount?: number;
   // Phase 1: present when the order was placed with `create_account: true`.
   // `customer.token` → auto-login the new account. `account_exists: true` means
   // the phone already has an account (no token issued) — invite them to log in.

@@ -100,6 +100,28 @@ export function dealsLayout(
 }
 
 /**
+ * The homepage builder's STOCK service / trust cards were written when every
+ * store was Cash on Delivery ("Cash on Delivery means pay only on receipt").
+ * On a store that has switched COD off that stock line — and only it:
+ * anything the tenant wrote themselves is theirs to keep — is swapped for a
+ * neutral one. Shared by the live page and the dashboard preview. The live
+ * homepage is prerendered, so this takes effect at the store's next deploy.
+ */
+const STOCK_COD_BODIES: Record<string, string> = {
+  'cash on delivery means pay only on receipt': 'Pay securely online at checkout',
+  'cash on delivery — pay on receipt': 'Secure online payment',
+};
+
+export function homeItemsFor<T extends { body: string }>(items: T[] | null | undefined, takesCod: boolean): T[] {
+  const list = items ?? [];
+  if (takesCod) return list;
+  return list.map((item) => {
+    const swap = STOCK_COD_BODIES[(item.body ?? '').replace(/\s+/g, ' ').trim().toLowerCase()];
+    return swap ? { ...item, body: swap } : item;
+  });
+}
+
+/**
  * Join a homepage config against the fetched products + categories.
  * `home` may be null (API unreachable) — callers guard on `meta && home`.
  */

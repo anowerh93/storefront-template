@@ -3,8 +3,20 @@ import { Loader2 } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Button } from '../ui/button';
+import type { PayReturnHint } from './checkout-extras';
 
-export function OrderLookupForm({ orderNumber: initialNumber = '' }: { orderNumber?: string }) {
+export function OrderLookupForm({
+  orderNumber: initialNumber = '',
+  paymentHint = null,
+}: {
+  orderNumber?: string;
+  /** The gateway's ?payment= hint the order page was opened with (a return
+   *  that landed in a tab without the stashed last-4). Carried to the
+   *  looked-up page, where it still shapes the "Try again" offer and the
+   *  late-payment check (payLateCheck) — one of four fixed words, never free
+   *  text. Only for the order it came with. */
+  paymentHint?: PayReturnHint | null;
+}) {
   const [orderNumber, setOrderNumber] = useState(initialNumber);
   const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -20,7 +32,8 @@ export function OrderLookupForm({ orderNumber: initialNumber = '' }: { orderNumb
     // this is a React island, not a Next.js Server Component. The PRG
     // semantics are identical — full page load on a new URL, which gives
     // us the SSR'd /order/{number} page rendering on Cloudflare Workers.
-    window.location.href = `/order/${encodeURIComponent(num)}?phone=${encodeURIComponent(phone.slice(-4))}`;
+    const hint = initialNumber && paymentHint ? `&payment=${paymentHint}` : '';
+    window.location.href = `/order/${encodeURIComponent(num)}?phone=${encodeURIComponent(phone.slice(-4))}${hint}`;
   }
 
   return (

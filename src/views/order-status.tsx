@@ -1,16 +1,123 @@
 import { useEffect, useState } from 'react';
-import { Check, Loader2, X } from 'lucide-react';
+import { Check, Clock, Loader2, X } from 'lucide-react';
 import { lookupOrder, getToken, getMyOrder, markPurchaseTracked, ApiError, UnauthenticatedError } from '../lib/api';
 import { pixel } from '../lib/pixel';
 import { useCart } from '../stores/cart';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
-import { Button } from '../components/ui/button';
+import { Button, buttonVariants } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { OrderDetail } from '../components/order/order-detail';
+import {
+  PAY_RETRY_FRESH_NOTE,
+  clearPayReturnNote,
+  clearPayWait,
+  isOnlineMethod,
+  payLateCheck,
+  payArrival,
+  payLateCheckedKey,
+  payLateLadder,
+  payPollsSpent,
+  payWaitPageOfHref,
+  readPayLateStamp,
+  serializePayLateStamp,
+  payRetryHref,
+  payRetryOffer,
+  payReturnHint,
+  readPayReturnNote,
+  takePayCartNote,
+} from '../components/order/checkout-extras';
+import { formatBDT } from '../lib/format';
 import { NotFoundPage } from './not-found';
 import type { OrderResponse, StorefrontMeta } from '../lib/types';
+
+/**
+ * Online-payment status polling: the delay before each refetch.
+ *
+ * Backoff, not a fixed interval: the guest lookup endpoint is limited to
+ * 60/hour per IP, and BD mobile networks CGNAT many shoppers behind one IP.
+ * Browser-return gateways (EPS / aamarPay / shurjoPay) confirm BEFORE
+ * redirecting here, so this mostly covers SSLCommerz IPN latency (seconds) —
+ * poll quickly at first, then back off. Total budget: 12 refetches over
+ * ~3.5 minutes, one ladder per page.
+ */
+const POLL_DELAYS_MS = [3000, 4000, 5000, 7000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000];
+
+/**
+ * Where an order's ONLINE payment stands, from order data alone (the
+ * ?payment= hint on a gateway return URL is untrusted and never consulted).
+ * Pure, so the banner logic can be checked without rendering the page.
+ */
+export function orderPaymentState(order: OrderResponse | null) {
+  // Paid through the gateway — in full ('online') or as an advance with the
+  // rest on delivery ('online_advance'). A payload without the field is COD.
+  const isOnline = isOnlineMethod(order?.payment_method);
+  // Only an order the SERVER still holds for its payment is "confirming". One
+  // the store has already moved on (confirmed over the phone, shipped…) while
+  // unpaid is a live order whose payment simply hasn't been recorded — a
+  // spinner there would spin for the life of the order.
+  const awaitingPayment =
+    !!order && isOnline && order.payment_status === 'unpaid' && order.status === 'awaiting_payment';
+  // 'partially_paid' = the advance of an 'online_advance' order was captured;
+  // the remainder is cash on delivery.
+  const partlyPaid = isOnline && order?.payment_status === 'partially_paid';
+  const moneyCaptured =
+    isOnline &&
+    (order?.payment_status === 'paid' || order?.payment_status === 'refunded' || partlyPaid);
+  // Cancelled AFTER the money was captured (merchant cancel → manual refund)
+  // is a different message than a failed/abandoned payment — telling a
+  // charged customer "you have not been charged" is a dispute generator.
+  const paidThenCanceled = moneyCaptured && order?.status === 'canceled';
+  const paymentPaid =
+    isOnline && (order?.payment_status === 'paid' || partlyPaid) && order?.status !== 'canceled';
+  // "Cancelled, not charged" is about the ORDER being cancelled — never about
+  // payment_status alone: an order the store revived (or confirmed by phone)
+  // can carry a failed/unpaid payment while it is being fulfilled.
+  const paymentFailed = isOnline && !moneyCaptured && order?.status === 'canceled';
+  // Live order, online payment never recorded: say so plainly, no spinner.
+  // A DELIVERED one was settled at the door — there is nothing outstanding
+  // to announce, so it gets the neutral heading.
+  const paymentUnconfirmed =
+    isOnline &&
+    !moneyCaptured &&
+    !!order &&
+    order.status !== 'canceled' &&
+    order.status !== 'delivered' &&
+    !awaitingPayment;
+
+  return { isOnline, awaitingPayment, partlyPaid, moneyCaptured, paidThenCanceled, paymentPaid, paymentFailed, paymentUnconfirmed };
+}
+
+/**
+ * The line under "(Advance) payment received". Amounts arrive formatted;
+ * null = the API did not send them. Once the order has been delivered
+ * nothing is "due on delivery" or "being processed" any more.
+ */
+export function paymentReceivedLine(o: {
+  partlyPaid: boolean;
+  delivered: boolean;
+  paid: string | null;
+  due: string | null;
+  /** The gateway confirmed a payment the store could not credit in taka
+   *  (recorded as 0, held for review) — say it is being checked. */
+  unmatched?: boolean;
+}): string {
+  if (o.unmatched && !o.delivered) {
+    return 'Thank you. Your payment reached the store and is being checked — they will contact you if anything more is needed.';
+  }
+  if (!o.partlyPaid) {
+    return o.delivered
+      ? 'Thank you. Your payment is confirmed.'
+      : 'Thank you. Your payment is confirmed and your order is being processed.';
+  }
+  if (o.delivered) {
+    return o.paid ? `Thank you. Your advance of ${o.paid} was paid online.` : 'Thank you. Your advance was paid online.';
+  }
+  return o.paid && o.due
+    ? `Thank you. Your advance of ${o.paid} is confirmed — ${o.due} is due on delivery.`
+    : 'Thank you. Your advance is confirmed — the rest is due on delivery.';
+}
 
 /**
  * Astro+CF port: previously did its own `await getStorefront()` +
@@ -41,21 +148,17 @@ export function OrderStatusPage({
   meta: StorefrontMeta | null;
 }) {
   const [order, setOrder] = useState<OrderResponse | null>(null);
-  // Gateway return URLs (/order/{n}?payment=…) carry NO phone param — checkout
-  // stashed the last-4 in sessionStorage before redirecting to the gateway
-  // (same browser comes back; it's a redirect flow). Recover it so the shopper
-  // lands straight on their order instead of the lookup form.
-  const [phoneKey] = useState<string | undefined>(() => {
-    if (phone) return phone;
-    if (typeof window === 'undefined') return undefined;
-    try {
-      return sessionStorage.getItem(`replybd:pay-phone:${orderNumber}`) ?? undefined;
-    } catch {
-      return undefined;
-    }
-  });
-  // A logged-in customer can view the order WITHOUT a phone (the account
-  // session is the identity proof) — resolved on the client below.
+  // Who is asking, as far as the SERVER can know: the ?phone= last-4, nobody
+  // logged in. The two browser-only sources — the last-4 the order forms
+  // stash before a gateway redirect, and the account token — are read in the
+  // mount effect below, never during render: the first client render must be
+  // the very tree the server sent. Reading them in the initial state made a
+  // gateway return (no ?phone=, stash present) hydrate a loader over the
+  // server's lookup form — React #418, the whole island thrown away and
+  // rendered again. `ready` = that read has happened; until then the page
+  // shows the neutral loader on both sides.
+  const [phoneKey, setPhoneKey] = useState<string | undefined>(phone);
+  const [ready, setReady] = useState(false);
   // The "log in to track your orders" nudge: from the URL on the COD path,
   // from the sessionStorage stash on the online path (the gateway redirect
   // can't carry query flags of ours).
@@ -68,19 +171,98 @@ export function OrderStatusPage({
       return false;
     }
   });
-  const [authed, setAuthed] = useState<boolean>(typeof window !== 'undefined' && Boolean(getToken()));
-  const [loading, setLoading] = useState<boolean>(Boolean(phoneKey) || authed);
+  // "Try again" for a payment that did not go through: the order form this
+  // browser left for the gateway (the note both forms leave — see
+  // payReturnKey). Read, not consumed, and already vetted as a same-origin
+  // path; null in any other browser, after 24h, or with storage blocked — the
+  // page is then exactly what it was without the link. Read from the browser
+  // in the initial state, which the server cannot match — safe only because
+  // nothing derived from it (or from `returnHint` below) reaches the DOM
+  // before `order` has loaded, and the hydrating render never has an order.
+  const [retryHref] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    try {
+      const path = readPayReturnNote(orderNumber, window.location.origin, localStorage, Date.now());
+      return path ? payRetryHref(path) : null;
+    } catch {
+      return null;
+    }
+  });
+  // The gateway's own ?payment= on the return URL. Untrusted: it shapes the
+  // "Try again" offer (payRetryOffer) and, on a cancelled unpaid order,
+  // whether the page looks for a late payment before it says "not charged"
+  // (payLateCheck) — what happened to the payment is still read from the
+  // order alone.
+  const [returnHint] = useState(() =>
+    typeof window !== 'undefined' ? payReturnHint(window.location.search) : null,
+  );
+  // payLateCheck's two browser inputs, latched for the life of the page: where
+  // this load stands in the tab's check for the order (payLateLadder — the
+  // hint stays in the address bar, so a reload must take the poll ladder up
+  // where it was, while the gateway sending the shopper back AGAIN gets a
+  // ladder of its own), and the moment the page loaded. Same hydration rule
+  // as `retryHref` above.
+  const [lateLadder] = useState<{ startedAt: number | null; ladders: number }>(() => {
+    if (typeof window === 'undefined') return { startedAt: null, ladders: 0 };
+    try {
+      return payLateLadder({
+        stamp: readPayLateStamp(sessionStorage.getItem(payLateCheckedKey(orderNumber))),
+        hint: returnHint,
+        arrival: payArrival(window.performance),
+      });
+    } catch {
+      return { startedAt: null, ladders: 0 };
+    }
+  });
+  const lateStartedAt = lateLadder.startedAt;
+  const [loadedAt] = useState(() => Date.now());
+  // A logged-in customer can view the order WITHOUT a phone (the account
+  // session is the identity proof) — resolved in the mount effect below.
+  const [authed, setAuthed] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(Boolean(phone));
   const [notFound, setNotFound] = useState<boolean>(false);
   // Lookup refused for a reason OTHER than 404 (throttled, transient 5xx) —
   // rendered as a soft "try again" screen, never as "order not found".
   const [loadFailed, setLoadFailed] = useState<boolean>(false);
   const [retryTick, setRetryTick] = useState(0);
-  // How many payment-status refetches we've done for a still-unpaid online
-  // order (capped so an abandoned tab doesn't poll forever).
-  const [polls, setPolls] = useState(0);
+  // How many payment-status refetches we've done — for an online order still
+  // awaiting its payment, or a cancelled one a payment may just have been
+  // made on (payLateCheck). Capped so an abandoned tab doesn't poll forever;
+  // a tab that already began a late-payment check starts where that ladder
+  // has got to by now.
+  const [polls, setPolls] = useState(() =>
+    lateStartedAt === null ? 0 : payPollsSpent(POLL_DELAYS_MS, loadedAt - lateStartedAt),
+  );
   const clearCart = useCart((s) => s.clear);
 
+  // After hydration: recover who is asking from this browser. Gateway return
+  // URLs (/order/{n}?payment=…) carry NO phone param — the order forms stash
+  // the last-4 in sessionStorage before the redirect (same tab comes back),
+  // so the shopper lands straight on their order instead of the lookup form.
+  // One batch with `ready`, so the lookup below starts exactly once, with the
+  // final identity, and an identity found here goes loader → order with no
+  // lookup form (or "not found") in between.
   useEffect(() => {
+    let stashedPhone: string | undefined;
+    if (!phone) {
+      try {
+        stashedPhone = sessionStorage.getItem(`replybd:pay-phone:${orderNumber}`) ?? undefined;
+      } catch {
+        /* storage blocked — the lookup form asks for the last-4 */
+      }
+    }
+    const hasToken = Boolean(getToken());
+    if (stashedPhone) setPhoneKey(stashedPhone);
+    if (hasToken) setAuthed(true);
+    if (stashedPhone || hasToken) setLoading(true);
+    setReady(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Not before the mount effect above has said who is asking — otherwise a
+    // logged-in customer on a ?phone= URL would fire the lookup twice.
+    if (!ready) return;
     let cancelled = false;
 
     // Guest path: look up by phone last-4. Account path: a logged-in customer
@@ -115,58 +297,117 @@ export function OrderStatusPage({
     }
 
     return () => { cancelled = true; };
-  }, [orderNumber, phoneKey, authed, retryTick]);
+  }, [ready, orderNumber, phoneKey, authed, retryTick]);
 
   // ── Online-payment status polling ──
   // An online order sits `unpaid` until the gateway confirmation lands
   // (browser-return verify or the SSLCommerz IPN). While it's in that window,
-  // refetch on a BACKOFF schedule so the banner flips to paid/failed by
-  // itself — the server is the source of truth, never the ?payment= URL hint.
-  //
-  // Backoff, not a fixed interval: the guest lookup endpoint is limited to
-  // 60/hour per IP, and BD mobile networks CGNAT many shoppers behind one IP.
-  // Browser-return gateways (EPS/aamarPay) confirm BEFORE redirecting here, so
-  // this mostly covers SSLCommerz IPN latency (seconds) — poll quickly at
-  // first, then back off. Total budget: 12 refetches over ~3 minutes.
-  const POLL_DELAYS_MS = [3000, 4000, 5000, 7000, 10000, 15000, 20000, 30000, 30000, 30000, 30000, 30000];
-  const awaitingPayment =
-    !!order &&
-    order.payment_method === 'online' &&
-    order.payment_status === 'unpaid' &&
-    order.status !== 'canceled';
+  // refetch on a BACKOFF schedule (POLL_DELAYS_MS) so the banner flips to
+  // paid/failed by itself — what happened to the payment is read from the
+  // order, never from the ?payment= URL hint. The hint decides one thing
+  // here: whether a CANCELLED, unpaid order is polled too, because a payment
+  // may just have been made on it (payLateCheck, below).
+  const { isOnline, awaitingPayment, partlyPaid, paidThenCanceled, paymentPaid, paymentFailed, paymentUnconfirmed } =
+    orderPaymentState(order);
   const pollsExhausted = polls >= POLL_DELAYS_MS.length;
 
-  // Online-payment outcome, derived from ORDER DATA only (the ?payment= URL
-  // hint from the gateway return is untrusted and deliberately ignored — the
-  // polled payment_status is the truth).
-  const isOnline = order?.payment_method === 'online';
-  const moneyCaptured =
-    isOnline && (order?.payment_status === 'paid' || order?.payment_status === 'refunded');
-  // Cancelled AFTER the money was captured (merchant cancel → manual refund)
-  // is a different message than a failed/abandoned payment — telling a
-  // charged customer "you have not been charged" is a dispute generator.
-  const paidThenCanceled = moneyCaptured && order?.status === 'canceled';
-  const paymentPaid = isOnline && order?.payment_status === 'paid' && order?.status !== 'canceled';
-  const paymentFailed =
-    isOnline && !moneyCaptured && (order?.payment_status === 'failed' || order?.status === 'canceled');
+  // What the gateway captured / what the rider collects — server figures,
+  // absent on an API that predates them (the copy then stays generic).
+  const paidOnline = typeof order?.online_paid_amount === 'number' ? order.online_paid_amount : null;
+  const dueOnDelivery = typeof order?.due_on_delivery === 'number' ? order.due_on_delivery : null;
 
   // The checkout deliberately does NOT clear the cart before the gateway
   // redirect (the cart is the shopper's resume path if they back out). Once
-  // the payment is confirmed the sale is done — clear it here, exactly once
-  // per order (localStorage flag), so a later revisit of the paid order can't
-  // wipe a NEW cart the shopper has since built.
+  // the payment is confirmed the sale is done — clear it here, exactly once:
+  // only when THIS browser's cart built the order (the cart checkout's
+  // localStorage note, consumed here). A funnel / buy-now order, or one
+  // looked up from another browser, has no note — confirming it must not
+  // empty an unrelated cart, and a later revisit can't wipe a NEW one.
   useEffect(() => {
     if (!paymentPaid) return;
     try {
-      const k = `replybd:cart-cleared:${orderNumber}`;
-      if (!localStorage.getItem(k)) {
-        clearCart();
-        localStorage.setItem(k, '1');
-      }
+      if (takePayCartNote(orderNumber, localStorage)) clearCart();
     } catch {
       /* storage blocked — worst case the cart badge lingers */
     }
   }, [paymentPaid, orderNumber, clearCart]);
+
+  // The money arrived (even on an order cancelled afterwards) — there is
+  // nothing left to try again, so the return note has no further use. Never
+  // dropped on a click of the link itself: Back from the retry must find it.
+  useEffect(() => {
+    if (!paymentPaid && !paidThenCanceled) return;
+    try {
+      clearPayReturnNote(orderNumber, localStorage);
+    } catch {
+      /* storage blocked */
+    }
+  }, [paymentPaid, paidThenCanceled, orderNumber]);
+
+  // Cancelled and unpaid as far as the order says — but the gateway sent the
+  // shopper back as paid (or the API could not tell): they may have paid after
+  // the order was given up. 'checking' while the polls last, one ladder per
+  // tab; then 'not_found' — never "you have not been charged" on such a
+  // return. See payLateCheck. Derived, never state.
+  const late = payLateCheck({
+    paymentFailed,
+    hint: returnHint,
+    toldInThisTab: lateLadder.ladders > 0,
+    placedAt: order?.placed_at,
+    now: loadedAt,
+    placedHere: retryHref !== null,
+    pollsExhausted,
+  });
+  const lateChecking = late === 'checking';
+
+  // A ladder begins: note when, and which one it is — a reload of this tab
+  // then takes it up from there (`polls` above) instead of starting another.
+  useEffect(() => {
+    if (!lateChecking || lateStartedAt !== null) return;
+    try {
+      sessionStorage.setItem(
+        payLateCheckedKey(orderNumber),
+        serializePayLateStamp({ at: Date.now(), n: lateLadder.ladders + 1 }),
+      );
+    } catch {
+      /* storage blocked — a reload checks again, the order's age still bounds it */
+    }
+  }, [lateChecking, lateStartedAt, lateLadder.ladders, orderNumber]);
+
+  // The online order this browser took to the gateway is no longer awaiting
+  // its payment — paid, or cancelled. The wait lock of the form it was placed
+  // from (usePayWait) only saves presses the API would answer "still being
+  // checked"; it would not any more, and "Try again" below leads straight
+  // back to that form. Only that order and that form: any other order the
+  // tab shows says nothing about a hold that may still be running.
+  useEffect(() => {
+    if (!order || !isOnline || awaitingPayment || retryHref === null) return;
+    try {
+      clearPayWait(sessionStorage, payWaitPageOfHref(retryHref));
+    } catch {
+      /* storage blocked */
+    }
+  }, [order, isOnline, awaitingPayment, retryHref]);
+
+  // "Back to Cart" is the retry by another name wherever the cart is still
+  // full — so it goes while the gateway's return says the money was, or may
+  // have been, taken and the page is still waiting to hear.
+  const mayHavePaid =
+    lateChecking || (awaitingPayment && (returnHint === 'success' || returnHint === 'pending'));
+
+  // The way back to the order form: 'failed' once the order was cancelled
+  // unpaid; 'unfinished' (the quiet link) while it still awaits its payment or
+  // after a late-payment check found nothing — and never while the gateway's
+  // return says the money was (or may have been) taken and the page is still
+  // looking. See payRetryOffer. Derived, never state.
+  const retryOffer = payRetryOffer({
+    hasLink: !!retryHref,
+    paymentFailed,
+    awaitingPayment,
+    pollsExhausted,
+    hint: returnHint,
+    late,
+  });
 
   // ── Purchase pixel for ONLINE orders ──
   // Fired HERE (payment confirmed), never at checkout submit, so abandoned
@@ -284,7 +525,10 @@ export function OrderStatusPage({
   }, [paymentPaid, paymentFailed, orderNumber, order, meta, phoneKey]);
 
   useEffect(() => {
-    if (!awaitingPayment || pollsExhausted) return;
+    // Also for a cancelled order a payment may just have been made on
+    // (lateChecking): the money, once recorded, turns this page into "Order
+    // cancelled — payment received".
+    if (pollsExhausted || !(awaitingPayment || lateChecking)) return;
     const t = setTimeout(() => {
       const refetch = phoneKey
         ? lookupOrder(orderNumber, phoneKey)
@@ -299,27 +543,35 @@ export function OrderStatusPage({
     }, POLL_DELAYS_MS[polls]);
     return () => clearTimeout(t);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [awaitingPayment, pollsExhausted, polls, orderNumber, phoneKey, authed]);
+  }, [awaitingPayment, lateChecking, pollsExhausted, polls, orderNumber, phoneKey, authed]);
 
   if (!meta) return <NotFoundPage />;
 
   // Guest with no phone → render the lookup form (identity verification).
   // A logged-in customer skips this (handled by the authed fetch above).
-  if (!phoneKey && !authed) {
+  // Only once `ready`: before the mount effect has read this browser's stash
+  // / token, neither the server nor the hydrating render can know whether to
+  // ask for the last-4 — both show the loader below.
+  if (ready && !phoneKey && !authed) {
     return (
       <>
         <Header meta={meta} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-10">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Track order #{orderNumber}</h1>
           <p className="text-sm text-slate-500 mb-6">Enter the last 4 digits of the phone number you used to place the order.</p>
-          <OrderLookupForm orderNumber={orderNumber} />
+          {/* The gateway's ?payment= hint rides along to the looked-up page:
+              a return that landed in another tab (no stashed last-4) comes
+              through this form, and the hint must still shape "Try again"
+              there — above all still hide it after a 'success' return — and
+              still start the late-payment check on a cancelled order. */}
+          <OrderLookupForm orderNumber={orderNumber} paymentHint={returnHint} />
         </main>
         <Footer meta={meta} />
       </>
     );
   }
 
-  if (loading) {
+  if (!ready || loading) {
     return (
       <>
         <Header meta={meta} />
@@ -379,8 +631,57 @@ export function OrderStatusPage({
                 <p className="mt-0.5 text-sm text-slate-500">
                   {order.payment_status === 'refunded'
                     ? 'This order was cancelled and your payment has been refunded.'
-                    : 'This order was cancelled after your payment was received. The store will refund you — contact them with your order number if you haven’t heard from them.'}
+                    : 'This order was cancelled, and your payment for it was received. The store will refund you — contact them with your order number if you haven’t heard from them.'}
                 </p>
+              </div>
+            </div>
+          ) : lateChecking ? (
+            <div className="flex items-center gap-4 rounded-2xl bg-white ring-1 ring-amber-200 p-5 sm:p-6 shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white">
+                <Loader2 className="h-6 w-6 animate-spin" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Checking your payment…</h1>
+                {/* No "you have not been charged" and no "Try again" here: the
+                    gateway sent this shopper back as paid, or could not say.
+                    If the money is recorded the page says so itself
+                    (paidThenCanceled); if the polls run out it becomes the
+                    banner below. */}
+                <p className="mt-0.5 text-sm text-slate-500">
+                  This order was cancelled before a payment for it was confirmed. If you have just
+                  paid, keep this page open — it updates automatically as soon as your payment is
+                  confirmed.
+                </p>
+              </div>
+            </div>
+          ) : late === 'not_found' ? (
+            <div className="flex items-center gap-4 rounded-2xl bg-white ring-1 ring-amber-200 p-5 sm:p-6 shadow-sm">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-400 text-white">
+                <Clock className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Payment not confirmed</h1>
+                {/* The page has looked and found no payment — on a return that
+                    said there may be one. So not "you have not been charged",
+                    and the way back is the quiet link, worded for the shopper
+                    who did not pay: paying again is the last thing to suggest
+                    to one who did. */}
+                <p className="mt-0.5 text-sm text-slate-500">
+                  This order was cancelled, and no payment for it has reached us. If you did pay, it
+                  will show here once it is confirmed — check this page again later, or contact the
+                  store with your order number before you pay again.
+                </p>
+                {retryOffer === 'unfinished' && retryHref && (
+                  <>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Didn’t complete the payment?{' '}
+                      <a href={retryHref} className="whitespace-nowrap font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
+                        Try again
+                      </a>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{PAY_RETRY_FRESH_NOTE}</p>
+                  </>
+                )}
               </div>
             </div>
           ) : paymentFailed ? (
@@ -394,6 +695,19 @@ export function OrderStatusPage({
                   This order was cancelled and you have not been charged. If money did leave your
                   account, it will be confirmed automatically — or contact the store with your order number.
                 </p>
+                {/* The way back, right where the failure is announced — the
+                    actions row is a whole order card further down. Same link,
+                    same vetted href (retryHref), same condition (retryOffer).
+                    With it, what the link is: a fresh form, so a new order to
+                    look over — not a second go at this one. */}
+                {retryOffer === 'failed' && retryHref && (
+                  <>
+                    <a href={retryHref} className={buttonVariants({ variant: 'brand', className: 'mt-3' })}>
+                      Try again
+                    </a>
+                    <p className="mt-2 text-xs text-slate-500">{PAY_RETRY_FRESH_NOTE}</p>
+                  </>
+                )}
               </div>
             </div>
           ) : paymentPaid ? (
@@ -402,8 +716,18 @@ export function OrderStatusPage({
                 <Check className="h-7 w-7" strokeWidth={3} />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Payment received</h1>
-                <p className="mt-0.5 text-sm text-slate-500">Thank you. Your payment is confirmed and your order is being processed.</p>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                  {partlyPaid ? 'Advance payment received' : 'Payment received'}
+                </h1>
+                <p className="mt-0.5 text-sm text-slate-500">
+                  {paymentReceivedLine({
+                    partlyPaid,
+                    delivered: order.status === 'delivered',
+                    paid: paidOnline !== null && paidOnline > 0 ? formatBDT(paidOnline, { currency: order.currency }) : null,
+                    due: dueOnDelivery !== null ? formatBDT(dueOnDelivery, { currency: order.currency }) : null,
+                    unmatched: paidOnline === 0,
+                  })}
+                </p>
               </div>
             </div>
           ) : awaitingPayment ? (
@@ -418,7 +742,32 @@ export function OrderStatusPage({
                     ? 'This is taking longer than usual. If you completed the payment, this page will update once it’s confirmed — you can also refresh in a few minutes.'
                     : 'This usually takes a few seconds. Keep this page open — it updates automatically.'}
                 </p>
+                {/* Only once payRetryOffer allows it — never while the return
+                    says the money was (or may have been) taken. A text link:
+                    it must not look like the next step to a shopper who paid. */}
+                {retryOffer === 'unfinished' && retryHref && (
+                  <>
+                    <p className="mt-2 text-sm text-slate-600">
+                      Didn’t complete the payment?{' '}
+                      <a href={retryHref} className="whitespace-nowrap font-semibold text-brand-600 underline underline-offset-2 hover:text-brand-700">
+                        Try again
+                      </a>
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{PAY_RETRY_FRESH_NOTE}</p>
+                  </>
+                )}
               </div>
+            </div>
+          ) : paymentUnconfirmed ? (
+            <div className="rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6 shadow-sm">
+              <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Order #{order.order_number}</h1>
+              <p className="mt-1 text-sm text-slate-500">
+                Your order is active, but we have not received an online payment for it
+                {dueOnDelivery !== null && dueOnDelivery > 0
+                  ? ` — ${formatBDT(dueOnDelivery, { currency: order.currency })} is due on delivery.`
+                  : '.'}{' '}
+                If you did pay online, it will show here once it is confirmed — or contact the store with your order number.
+              </p>
             </div>
           ) : placed ? (
             <div className="flex items-center gap-4 rounded-2xl bg-white ring-1 ring-slate-200 p-5 sm:p-6 shadow-sm">
@@ -444,19 +793,46 @@ export function OrderStatusPage({
 
           <OrderDetail order={order} meta={meta} phoneLast4={phoneKey} />
 
-          <div className="flex flex-col gap-3 pt-2 sm:flex-row sm:justify-end">
-            <a href="/products">
-              <Button variant="brand" className="w-full sm:w-auto">Continue Shopping</Button>
-            </a>
-            {authed ? (
-              <a href="/account">
-                <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
-              </a>
-            ) : (
-              <a href="/cart">
-                <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
-              </a>
+          {/* After a FAILED payment "Try again" is the primary action and
+              "Continue Shopping" steps back to outline. While the order still
+              awaits its payment — or was cancelled on a return that says a
+              payment may have been made — the link is the quiet one, and says
+              who it is for: the shopper who paid must not read it as the next
+              step. Either way "Back to Cart" goes (a cart checkout's retry
+              link already leads back to that cart), and it goes while the
+              page is still waiting to hear about a payment the return says
+              may have been made (`mayHavePaid`). The line over the row says
+              what the link opens — the banner that says it too is a whole
+              order card further up. */}
+          <div className="space-y-3 pt-2">
+            {retryOffer && retryHref && (
+              <p className="text-xs text-slate-500 sm:text-right">{PAY_RETRY_FRESH_NOTE}</p>
             )}
+            <div className="flex flex-col gap-3 sm:flex-row sm:justify-end">
+              {retryOffer && retryHref && (
+                <a href={retryHref}>
+                  {retryOffer === 'failed' ? (
+                    <Button variant="brand" className="w-full sm:w-auto">Try again</Button>
+                  ) : (
+                    <Button variant="outline" className="h-auto min-h-10 w-full whitespace-normal sm:w-auto">
+                      Didn’t complete the payment? Try again
+                    </Button>
+                  )}
+                </a>
+              )}
+              <a href="/products">
+                <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
+              </a>
+              {authed ? (
+                <a href="/account">
+                  <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
+                </a>
+              ) : !retryOffer && !mayHavePaid ? (
+                <a href="/cart">
+                  <Button variant="outline" className="w-full sm:w-auto">Back to Cart</Button>
+                </a>
+              ) : null}
+            </div>
           </div>
         </div>
       </main>

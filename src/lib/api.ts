@@ -528,12 +528,75 @@ export async function submitOrder(input: CreateOrderInput, idempotencyKey?: stri
       json?.error?.message ??
       (typeof json?.error === 'string' ? json.error : undefined) ??
       'Sorry, your order could not be placed. Please try again in a minute.';
-    throw new Error(msg);
+    // ApiError (an Error — existing `e.message` callers are unaffected), so
+    // the status and the server's error code travel with it. The order forms
+    // act on three codes — 'cod_unavailable' / 'online_unavailable' /
+    // 'advance_unavailable' (the store's payment options changed under an
+    // open page): they re-read the options (refreshPaymentMeta) and say what
+    // changed — and on 'payment_unresolved' (an earlier online payment for
+    // this cart is still being checked): they lock the order button for the
+    // `retry_after` seconds that come with it (payWaitSeconds). Everything
+    // else is shown as the server's message.
+    throw new ApiError(
+      msg,
+      res.status,
+      typeof json?.error?.code === 'string' ? json.error.code : undefined,
+      typeof json?.error?.retry_after === 'number' ? json.error.retry_after : undefined,
+    );
   }
   if (!json) {
     throw new Error('Sorry, your order could not be placed. Please try again in a minute.');
   }
   return (json.data ?? json) as OrderResponse;
+}
+
+/** How long the order forms wait for the re-read below before falling back
+ *  to the server's own message — the order button is held meanwhile. */
+const PAYMENT_META_TIMEOUT_MS = 8000;
+
+/**
+ * The payment part of the storefront meta, re-read from the BROWSER after the
+ * order API refused a payment method. The page's own copy came through the
+ * SSR edge cache (60s, keyed by URL, not bumped by a settings save), so the
+ * "refresh the page" the server advises can serve the same stale picker.
+ *
+ * The API marks this route `public, s-maxage=60, stale-while-revalidate=300`
+ * for a CDN, and `cache: 'no-store'` only skips the BROWSER's cache. A shared
+ * copy of the bare URL would be minutes old — and, having been filled by the
+ * SSR worker (which sends no Origin), would carry no CORS header at all, so
+ * this fetch would simply fail. Hence the one-off `fresh` query: a URL no
+ * cache has seen (the API ignores the parameter). What it cannot skip is the
+ * API's own 60s payload cache — the caller's refusal list covers that.
+ *
+ * Never throws: null means "could not find out" (network, throttle, timeout,
+ * a payload without the field) and the caller keeps what it has.
+ */
+export async function refreshPaymentMeta(): Promise<Pick<
+  StorefrontMeta,
+  'payment_methods' | 'online_advance' | 'advance_payment'
+> | null> {
+  const abort = typeof AbortController !== 'undefined' ? new AbortController() : null;
+  const timer = abort ? setTimeout(() => abort.abort(), PAYMENT_META_TIMEOUT_MS) : null;
+  try {
+    const res = await fetch(buildUrl('', { fresh: Date.now() }), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+      signal: abort?.signal,
+    });
+    if (!res.ok) return null;
+    const json = await res.json();
+    const data = json?.data ?? json;
+    if (!data || !Array.isArray(data.payment_methods)) return null;
+    return {
+      payment_methods: data.payment_methods,
+      online_advance: data.online_advance ?? null,
+      advance_payment: data.advance_payment ?? null,
+    };
+  } catch {
+    return null;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 }
 
 // ──────────────────────────────────────────────────────────────
@@ -749,11 +812,14 @@ async function authFetch<T>(
 export class ApiError extends Error {
   code?: string;
   status: number;
-  constructor(message: string, status: number, code?: string) {
+  /** `error.retry_after` (seconds), when the API sent one. */
+  retryAfter?: number;
+  constructor(message: string, status: number, code?: string, retryAfter?: number) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
+    this.retryAfter = retryAfter;
   }
 }
 
