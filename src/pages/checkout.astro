@@ -13,8 +13,12 @@ export const prerender = false;
 import Base from '../layouts/Base.astro';
 import { getProduct, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { CheckoutPage } from '../views/checkout';
+import { visitorCountry } from '../lib/geo';
 import type { ProductDetail } from '../lib/types';
 
+// Opens the প্রবাসী WhatsApp field for a visitor abroad. Per request: this
+// page's HTML must never be cached across visitors (see src/lib/geo.ts).
+const country = visitorCountry(Astro.request);
 const params = Astro.url.searchParams;
 const slug = params.get('p') ?? '';
 // `?p=` present = an express "buy now" attempt. We pass this intent through so
@@ -43,5 +47,5 @@ const meta = gate.meta;
 
 {/* noindex like cart/account: thin utility shell, reachable from every PDP */}
 <Base title="Checkout" description="Secure checkout" noindex={true} gate={gate}>
-  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} />
+  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} visitorCountry={country} />
 </Base>

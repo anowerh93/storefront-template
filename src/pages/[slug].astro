@@ -19,9 +19,13 @@ export const prerender = false;
 import Base from '../layouts/Base.astro';
 import { getFunnel, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { FunnelPage } from '../views/funnel';
+import { visitorCountry } from '../lib/geo';
 import type { FunnelPayload } from '../lib/types';
 
 const slug = Astro.params.slug as string;
+// Opens the প্রবাসী WhatsApp field for a visitor abroad. Per request: this
+// page's HTML must never be cached across visitors (see src/lib/geo.ts).
+const country = visitorCountry(Astro.request);
 
 // Parallel fetches — sequential awaits cost an extra origin round-trip.
 // Each fails soft on its own: getFunnel 402s on the same plan gate, and
@@ -43,5 +47,5 @@ if (!funnel && !gate.closed) { Astro.response.status = 404; }
 ---
 
 <Base title={funnel?.name ?? 'Not found'} description={funnel?.config?.hero?.subheadline} noindex={true} gate={gate} bengaliFont={funnel?.config?.font === 'bengali'}>
-  <FunnelPage client:load funnel={funnel} meta={meta} />
+  <FunnelPage client:load funnel={funnel} meta={meta} visitorCountry={country} />
 </Base>

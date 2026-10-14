@@ -97,9 +97,10 @@ export type StorefrontMeta = {
     free_shipping_threshold: number | null;
     zones: ShippingZone[];
   };
-  /** Checkout form extras — tenant-opt-in জেলা/থানা fields. Optional for
-   *  cached payloads that predate the field (treat absent as disabled). */
-  checkout?: { district_enabled: boolean };
+  /** Checkout form extras — tenant-opt-in জেলা/থানা fields, and the optional
+   *  প্রবাসী WhatsApp number. Optional for cached payloads that predate a
+   *  field (treat absent as disabled). */
+  checkout?: { district_enabled: boolean; whatsapp_enabled?: boolean };
   /** Manual bKash/Nagad/Rocket advance policy — null/absent when inactive.
    *  The numbers are rendered VERBATIM (never re-typed or reformatted); the
    *  authoritative amount is stamped server-side at order create, these
@@ -689,6 +690,10 @@ export type CreateOrderInput = {
   customer_city?: string | null;
   /** থানা (sub-district) — sent only when meta.checkout.district_enabled. */
   thana?: string | null;
+  /** প্রবাসী shopper's WhatsApp, as typed (the API normalizes it) — sent
+   *  only when meta.checkout.whatsapp_enabled and filled. Never a substitute
+   *  for customer_phone: delivery, courier and SMS stay on that. */
+  customer_whatsapp?: string | null;
   /** Advance flow: last 4 digits of the wallet number the customer sent —
    *  or will send — money from. Optional; Bengali numerals fine (the server
    *  normalizes, and reduces a pasted full number to its last 4). */
