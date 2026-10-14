@@ -29,6 +29,7 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import {
   AdvancePaymentBox,
   DistrictThanaFields,
+  ExpatWhatsAppField,
   PaymentMethodPicker,
   advanceAmountFor,
   heldPauseFor,
@@ -61,6 +62,7 @@ import {
   type PaymentRefusal,
   type PlacedOrder,
 } from '../components/order/checkout-extras';
+import { WHATSAPP_INVALID, isBlankWhatsApp, normalizeWhatsApp } from '../lib/whatsapp';
 
 /**
  * Ad funnel landing page (/{slug}). Renders the tenant's block config in
@@ -99,6 +101,11 @@ function makeOrderSchema(requireZone: boolean) {
     // Tenant-opt-in জেলা/থানা — free text (the datalist only suggests).
     customer_city:    z.string().max(120).optional(),
     thana:            z.string().max(120).optional(),
+    // প্রবাসী WhatsApp — optional; when filled, the API's own rule.
+    customer_whatsapp: z.string().max(64).optional().refine(
+      (v) => isBlankWhatsApp(v) || normalizeWhatsApp(v) !== null,
+      WHATSAPP_INVALID,
+    ),
     // Advance sender last-4 — optional; ≥4 digits when filled (Bengali ok).
     advance_sender_last4: z.string().max(32).optional().refine(
       (v) => !v || (v.match(/[0-9০-৯]/g) ?? []).length >= 4,
@@ -137,7 +144,16 @@ function Reveal({ enabled, children }: { enabled: boolean; children: ReactNode }
   );
 }
 
-export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: StorefrontMeta | null }) {
+export function FunnelPage({
+  funnel,
+  meta,
+  visitorCountry = null,
+}: {
+  funnel: FunnelData | null;
+  meta: StorefrontMeta | null;
+  /** Cloudflare's country for this visitor (src/lib/geo.ts), null = unknown. */
+  visitorCountry?: string | null;
+}) {
   useEffect(() => {
     if (funnel?.product) {
       pixel.viewContent({ id: funnel.product.id, name: funnel.product.name, price: funnel.product.price });
@@ -166,7 +182,7 @@ export function FunnelPage({ funnel, meta }: { funnel: FunnelData | null; meta: 
       case 'urgency':
         return config.urgency.visible ? <Urgency config={config.urgency} /> : null;
       case 'order_form':
-        return config.order_form.visible ? <OrderForm config={config.order_form} product={product} meta={meta} btn={btn} /> : null;
+        return config.order_form.visible ? <OrderForm config={config.order_form} product={product} meta={meta} btn={btn} visitorCountry={visitorCountry} /> : null;
       case 'why_us':
         return config.why_us.visible && config.why_us.items.length ? <WhyUs config={config.why_us} /> : null;
       case 'reviews': {
@@ -974,7 +990,7 @@ function RelatedProducts({ heading, products, btn }: { heading: string; products
 }
 
 /* ── Order form — reuses the checkout schema, payment picker + submitOrder ── */
-function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta; btn: BtnTheme }) {
+function OrderForm({ config, product, meta, btn, visitorCountry }: { config: FunnelBlockConfig['order_form']; product: FunnelProduct; meta: StorefrontMeta; btn: BtnTheme; visitorCountry: string | null }) {
   const [qty, setQty] = useState(1);
   // Open on the merchant's pre-selected "default pack" (e.g. 3KG) when one is
   // flagged; otherwise fall back to the first variant (old products, none set).
@@ -1096,6 +1112,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
   const advancePolicy = payMethod === 'cod' ? liveMeta.advance_payment ?? null : null;
   const advance = advancePolicy && advanceAmountFor(advancePolicy, subtotal) > 0 ? advancePolicy : null;
   const districtEnabled = !!meta.checkout?.district_enabled;
+  const whatsappEnabled = !!meta.checkout?.whatsapp_enabled;
 
   // An advance refused for one order can be right for another (the rule did
   // not owe one at that subtotal), so THAT refusal — and the line about it —
@@ -1199,6 +1216,9 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       address:        values.customer_address,
       customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
       thana:          districtEnabled ? values.thana || undefined : undefined,
+      customer_whatsapp: whatsappEnabled && !isBlankWhatsApp(values.customer_whatsapp)
+        ? values.customer_whatsapp?.trim()
+        : undefined,
       advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
       shipping_zone:  values.shipping_zone || undefined,
       notes:          values.notes,
@@ -1460,6 +1480,7 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
       customer_phone:   'phone number',
       customer_city:    'জেলা',
       thana:            'থানা',
+      customer_whatsapp: 'হোয়াটসঅ্যাপ নাম্বার',
       advance_sender_last4: 'অগ্রিম পেমেন্টের শেষ ৪ ডিজিট',
       shipping_zone:    'delivery area',
       notes:            'order notes',
@@ -1559,6 +1580,14 @@ function OrderForm({ config, product, meta, btn }: { config: FunnelBlockConfig['
             idPrefix="f"
             districtField={form.register('customer_city')}
             thanaField={form.register('thana')}
+          />
+        )}
+        {whatsappEnabled && (
+          <ExpatWhatsAppField
+            idPrefix="f"
+            field={form.register('customer_whatsapp')}
+            error={form.formState.errors.customer_whatsapp?.message}
+            abroad={visitorCountry !== null && visitorCountry !== 'BD'}
           />
         )}
         <div>

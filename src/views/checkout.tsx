@@ -14,6 +14,7 @@ import { Footer } from '../components/layout/footer';
 import {
   AdvancePaymentBox,
   DistrictThanaFields,
+  ExpatWhatsAppField,
   PaymentMethodPicker,
   advanceAmountFor,
   heldPauseFor,
@@ -45,6 +46,7 @@ import {
   type PaymentRefusal,
   type PlacedOrder,
 } from '../components/order/checkout-extras';
+import { WHATSAPP_INVALID, isBlankWhatsApp, normalizeWhatsApp } from '../lib/whatsapp';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
@@ -88,6 +90,11 @@ function makeCheckoutSchema(requireZone: boolean) {
     // Tenant-opt-in জেলা/থানা — free text (the datalist only suggests).
     customer_city:    z.string().max(120).optional(),
     thana:            z.string().max(120).optional(),
+    // প্রবাসী WhatsApp — optional; when filled, the API's own rule.
+    customer_whatsapp: z.string().max(64).optional().refine(
+      (v) => isBlankWhatsApp(v) || normalizeWhatsApp(v) !== null,
+      WHATSAPP_INVALID,
+    ),
     // Advance flow sender last-4 — optional; when filled it must carry at
     // least 4 digits (Bengali numerals count; the server keeps the last 4).
     advance_sender_last4: z.string().max(32).optional().refine(
@@ -125,11 +132,14 @@ export function CheckoutPage({
   variantIndex,
   qty: initialQty,
   expressAttempt = false,
+  visitorCountry = null,
 }: {
   product: ProductDetail | null;
   meta: StorefrontMeta | null;
   variantIndex: number | null;
   qty: number;
+  /** Cloudflare's country for this visitor (src/lib/geo.ts), null = unknown. */
+  visitorCountry?: string | null;
   /** True when the URL carried ?p= (a "buy now"), even if the product fetch
    *  failed — lets us show "Nothing to check out" instead of silently showing
    *  the persisted cart for an express click. */
@@ -481,6 +491,7 @@ export function CheckoutPage({
   const codAdvancePolicy = liveMeta?.advance_payment ?? null;
   const codHasAdvance = !!(codAdvancePolicy && advanceAmountFor(codAdvancePolicy, subtotal) > 0);
   const districtEnabled = !!meta.checkout?.district_enabled;
+  const whatsappEnabled = !!meta.checkout?.whatsapp_enabled;
   const threshold = meta.shipping?.free_shipping_threshold ?? null;
   const shippingFee = !meta.shipping?.enabled
     ? 0
@@ -539,6 +550,9 @@ export function CheckoutPage({
       address:        values.customer_address,
       customer_city:  districtEnabled ? values.customer_city || undefined : undefined,
       thana:          districtEnabled ? values.thana || undefined : undefined,
+      customer_whatsapp: whatsappEnabled && !isBlankWhatsApp(values.customer_whatsapp)
+        ? values.customer_whatsapp?.trim()
+        : undefined,
       // Only when the advance box was actually on screen (COD + policy).
       advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
       shipping_zone:  values.shipping_zone || undefined,
@@ -876,6 +890,7 @@ export function CheckoutPage({
       customer_email:   'email address',
       customer_city:    'জেলা',
       thana:            'থানা',
+      customer_whatsapp: 'হোয়াটসঅ্যাপ নাম্বার',
       advance_sender_last4: 'অগ্রিম পেমেন্টের শেষ ৪ ডিজিট',
       shipping_zone:    'delivery area',
       password:         'password',
@@ -937,6 +952,15 @@ export function CheckoutPage({
                   <Input id="co-email" type="email" placeholder="you@example.com" inputMode="email" autoComplete="email" {...form.register('customer_email')} className="mt-1.5" />
                   {form.formState.errors.customer_email && <p className="mt-1 text-xs text-rose-600">{form.formState.errors.customer_email.message}</p>}
                 </div>
+                {/* After the Bangladeshi phone it sits beside, before the notes. */}
+                {whatsappEnabled && (
+                  <ExpatWhatsAppField
+                    idPrefix="co"
+                    field={form.register('customer_whatsapp')}
+                    error={form.formState.errors.customer_whatsapp?.message}
+                    abroad={visitorCountry !== null && visitorCountry !== 'BD'}
+                  />
+                )}
                 <div>
                   <Label htmlFor="co-notes">Order Notes <span className="font-normal text-slate-400">(optional)</span></Label>
                   <Textarea id="co-notes" placeholder="Special notes for delivery, etc." {...form.register('notes')} className="mt-1.5" />

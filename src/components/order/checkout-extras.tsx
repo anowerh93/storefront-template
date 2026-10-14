@@ -6,6 +6,7 @@ import { BD_DISTRICTS } from '../../lib/districts';
 import { formatBDT } from '../../lib/format';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
+import { WhatsAppIcon } from '../layout/messenger-cta';
 
 /**
  * Shared checkout extras used by BOTH the storefront checkout and the funnel
@@ -14,6 +15,8 @@ import { Label } from '../ui/label';
  *  - জেলা (district, native <datalist> type-ahead — free text allowed) +
  *    থানা fields, rendered only when the tenant opted in
  *    (meta.checkout.district_enabled);
+ *  - the প্রবাসী shopper's optional WhatsApp number
+ *    (meta.checkout.whatsapp_enabled) — ExpatWhatsAppField;
  *  - the advance-payment box: amount to send now, the tenant's wallet
  *    numbers VERBATIM from the API (never reformatted), and the optional
  *    "sender last-4" field. COD only — the caller hides it for the online
@@ -784,6 +787,7 @@ export function orderSubmitSignature(input: CreateOrderInput): string {
     s(input.address),
     s(input.customer_city),
     s(input.thana),
+    s(input.customer_whatsapp),
     s(input.advance_sender_last4),
     s(input.shipping_zone),
     s(input.notes),
@@ -1190,6 +1194,76 @@ export function PaymentMethodPicker({
           </label>
         );
       })}
+    </div>
+  );
+}
+
+/**
+ * The প্রবাসী (expat) shopper's optional WhatsApp number — beside the
+ * Bangladeshi phone (the parcel, the courier and SMS stay on that), never
+ * instead of it. Rendered when the store asks for it
+ * (meta.checkout.whatsapp_enabled): already open for a visitor Cloudflare
+ * places outside Bangladesh, one tappable line for everyone else — a visitor
+ * in Bangladesh, or one whose country is unknown. Never gated on the country:
+ * an expat on a VPN, roaming or home on leave, and a relative ordering for
+ * them, all see a Bangladeshi address. Once open it stays open, so nothing
+ * typed into it can block the order button out of sight. The value is read
+ * by src/lib/whatsapp.ts, which mirrors the API's rule.
+ */
+export function ExpatWhatsAppField({
+  idPrefix,
+  field,
+  error,
+  abroad,
+}: {
+  idPrefix: string;
+  field: UseFormRegisterReturn;
+  error?: string;
+  /** The visitor is outside Bangladesh (known), so the field starts open. */
+  abroad: boolean;
+}) {
+  const [open, setOpen] = useState(abroad);
+  const id = `${idPrefix}-whatsapp`;
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => setOpen(true)}
+        aria-expanded={false}
+        className="inline-flex items-center gap-1.5 text-sm font-medium text-emerald-700 hover:text-emerald-800"
+      >
+        <WhatsAppIcon className="h-4 w-4" />
+        প্রবাসী? হোয়াটসঅ্যাপ নাম্বার দিন
+      </button>
+    );
+  }
+
+  return (
+    <div>
+      <Label htmlFor={id} className="flex items-center gap-1.5">
+        <WhatsAppIcon className="h-4 w-4 text-emerald-600" />
+        <span>
+          প্রবাসী? হোয়াটসঅ্যাপ নাম্বার <span className="font-normal text-slate-400">(ঐচ্ছিক)</span>
+        </span>
+      </Label>
+      <Input
+        id={id}
+        type="tel"
+        inputMode="tel"
+        // Not "tel": a browser would fill the Bangladeshi phone in here.
+        autoComplete="off"
+        placeholder="+971 50 123 4567"
+        // Opened by a tap: the cursor goes where the shopper is about to type.
+        autoFocus={!abroad}
+        {...field}
+        className="mt-1.5"
+      />
+      {error ? (
+        <p className="mt-1 text-xs text-rose-600">{error}</p>
+      ) : (
+        <p className="mt-1 text-xs text-slate-500">দেশের কোডসহ লিখুন। ডেলিভারি হবে উপরের বাংলাদেশি নাম্বারে।</p>
+      )}
     </div>
   );
 }
