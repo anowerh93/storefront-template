@@ -2,7 +2,8 @@ import { ArrowRight } from 'lucide-react';
 import type { ProductCard, HomepageConfig } from '../../lib/types';
 import { formatBDT, discountPct } from '../../lib/format';
 import { FitImage } from '../ui/fit-image';
-import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES, TILE_SIZES } from '../../lib/img';
+import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES, TILE_SIZES, PHONE_BANNER_MEDIA } from '../../lib/img';
+import { heroBannerFiles, isSingleHero } from '../../lib/hero-banner';
 
 /**
  * Hero — big banner on the left + two tiles stacked on the right (Shopwise
@@ -18,6 +19,11 @@ import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES, TILE_SIZES } from '../../lib/im
  *
  * Each slot falls back independently, so a merchant can mix a designed banner
  * with product tiles, or vice-versa.
+ *
+ * hero.layout === 'single' draws the banner ALONE across the whole hero (no
+ * tiles, no tile products): the uploaded art at its own shape, else the
+ * first featured product full width, else the placeholder. Either layout
+ * swaps in hero.mobile_image_url below 640px (lib/hero-banner.ts).
  */
 export function HeroGrid({
   featured,
@@ -34,6 +40,16 @@ export function HeroGrid({
   const big           = featured[0];
   const tileProducts  = featured.slice(1, 3);
   const heroTiles     = hero?.tiles ?? [];
+
+  if (isSingleHero(hero)) {
+    return (
+      <section className="mx-auto max-w-[1280px] px-4 sm:px-6 mt-5">
+        {hero?.image_url
+          ? <SingleBanner hero={hero} priority={priority} />
+          : (big ? <ProductBigBanner product={big} eyebrow={hero?.eyebrow} priority={priority} wide /> : <BannerPlaceholder />)}
+      </section>
+    );
+  }
 
   const renderTile = (i: number) => {
     const configured = heroTiles[i];
@@ -76,7 +92,6 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
   // headline / buttons / dots competing with their design. The whole banner is
   // one click target: button 1's link, then button 2's, then /products.
   const href = hero.button1?.url || hero.button2?.url || '/products';
-  const srcSet = cdnSrcSet(hero.image_url!, BANNER_WIDTHS);
 
   // Sizing, two modes (no FitImage blur-fill in either — that letterboxed the
   // artwork with blurred bands):
@@ -97,18 +112,56 @@ function ConfiguredBigBanner({ hero, priority = false }: { hero: HomepageConfig[
         className="group block overflow-hidden rounded-2xl lg:absolute lg:inset-0"
         aria-label={hero.headline || 'Shop now'}
       >
-        <img
-          src={hero.image_url!}
-          srcSet={srcSet}
-          sizes={srcSet ? BANNER_SIZES : undefined}
-          alt={hero.headline || 'Featured offer'}
-          loading="eager"
-          decoding="async"
-          fetchPriority={priority ? 'high' : undefined}
-          className="block w-full h-auto lg:h-full lg:w-full lg:object-cover"
-        />
+        <BannerImage hero={hero} priority={priority} className="block w-full h-auto lg:h-full lg:w-full lg:object-cover" />
       </a>
     </div>
+  );
+}
+
+function SingleBanner({ hero, priority = false }: { hero: HomepageConfig['hero']; priority?: boolean }) {
+  // The single-image layout: the merchant's artwork alone across the whole
+  // hero, CLEAN (their text + CTA are baked in) and at its OWN shape on
+  // every screen — never cropped, never letterboxed. One click target, the
+  // same link rule as the grid's banner.
+  const href = hero.button1?.url || hero.button2?.url || '/products';
+  return (
+    <a href={href} className="group block overflow-hidden rounded-2xl" aria-label={hero.headline || 'Shop now'}>
+      <BannerImage hero={hero} priority={priority} className="block w-full h-auto" />
+    </a>
+  );
+}
+
+/**
+ * The uploaded banner as an <img>, or a <picture> when a phone image is set
+ * (that file below 640px, the banner from 640px up). Files and sizes come
+ * from heroBannerFiles(), which index.astro's head preload reads too.
+ * `display: contents` keeps the <picture> out of the layout, so the <img>'s
+ * classes (the grid's lg:h-full fill) size it against the link as before.
+ */
+function BannerImage({ hero, priority, className }: { hero: HomepageConfig['hero']; priority: boolean; className: string }) {
+  const files = heroBannerFiles(hero);
+  if (!files) return null;
+
+  const img = (
+    <img
+      src={files.wide.src}
+      srcSet={files.wide.srcSet}
+      sizes={files.wide.sizes}
+      alt={hero.headline || 'Featured offer'}
+      loading="eager"
+      decoding="async"
+      fetchPriority={priority ? 'high' : undefined}
+      className={className}
+    />
+  );
+  if (!files.phone) return img;
+
+  return (
+    <picture className="contents">
+      {/* A <source> without srcset is skipped — with resizing off, the file itself. */}
+      <source media={PHONE_BANNER_MEDIA} srcSet={files.phone.srcSet ?? files.phone.src} sizes={files.phone.sizes} />
+      {img}
+    </picture>
   );
 }
 
@@ -148,21 +201,36 @@ function ConfiguredTile({ tile }: { tile: HomepageConfig['hero']['tiles'][number
 
 /* ── Product-driven default (same full-bleed style, no upload needed) ─────── */
 
-function ProductBigBanner({ product, eyebrow, priority = false }: { product: ProductCard; eyebrow?: string; priority?: boolean }) {
+function ProductBigBanner({ product, eyebrow, priority = false, wide = false }: {
+  product: ProductCard;
+  eyebrow?: string;
+  priority?: boolean;
+  /** The single-image layout: the card spans the whole hero. From lg up the
+   *  photo keeps to the RIGHT half (fitted, blurred fill behind it) and the
+   *  copy to the left half — a square product photo centred across 1232px
+   *  would sit under the copy. Below lg it is the same card as in the grid. */
+  wide?: boolean;
+}) {
   const off = discountPct(Number(product.price), product.compare_at_price ? Number(product.compare_at_price) : null);
   const badge = off ? `Get ${off}% Off` : (eyebrow || 'Featured');
 
   return (
     <a
       href={`/products/${product.slug}`}
-      className="group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900"
+      className={`group relative block overflow-hidden rounded-2xl min-h-[300px] sm:min-h-[420px] bg-slate-900${wide ? ' lg:min-h-[460px]' : ''}`}
     >
       {product.image_url && (
-        <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} sizes={BANNER_SIZES} widths={BANNER_WIDTHS} />
+        wide ? (
+          <div className="absolute inset-0 lg:left-1/2">
+            <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} sizes={BANNER_SIZES} widths={BANNER_WIDTHS} />
+          </div>
+        ) : (
+          <FitImage src={product.image_url} alt={product.name} eager fetchPriority={priority ? 'high' : undefined} sizes={BANNER_SIZES} widths={BANNER_WIDTHS} />
+        )
       )}
       <div className={BANNER_GRADIENT} />
 
-      <div className="relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white">
+      <div className={`relative z-10 flex h-full flex-col justify-center p-6 sm:p-10 max-w-[82%] sm:max-w-[60%] text-white${wide ? ' lg:max-w-[50%]' : ''}`}>
         <span className="inline-block w-fit text-[11px] sm:text-xs uppercase tracking-wider font-bold bg-white/20 px-3 py-1 rounded-full backdrop-blur-sm">
           {badge}
         </span>

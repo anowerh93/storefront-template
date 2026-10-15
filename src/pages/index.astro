@@ -33,7 +33,8 @@ import { DealsOfDay } from '../components/home/deals-of-day';
 import { ServicesRow } from '../components/home/services-row';
 import { TrustBadges } from '../components/home/trust-badges';
 import type { HomepageSectionKey } from '../lib/types';
-import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES } from '../lib/img';
+import { cdnSrcSet, BANNER_WIDTHS, BANNER_SIZES, PHONE_BANNER_MEDIA, WIDE_BANNER_MEDIA } from '../lib/img';
+import { heroBannerFiles, type BannerFile } from '../lib/hero-banner';
 
 // Build-time fetch — same shape as views/home.tsx's async function. Three
 // API calls in parallel since the homepage is the most-hit route; we want
@@ -96,13 +97,22 @@ const {
 const heroIsFirst = !isServiceSite
   && !!home?.hero?.visible
   && sectionOrder[0] === "hero";
-const lcpImage = heroIsFirst
-  ? (home!.hero.image_url || heroProducts[0]?.image_url || null)
-  : null;
-// Responsive preload — MUST use the same ladder + sizes as the hero <img>
-// (BANNER_WIDTHS/BANNER_SIZES), or the browser preloads one candidate and
-// renders another = double download. undefined when resizing is disabled.
-const lcpSrcSet = lcpImage ? cdnSrcSet(lcpImage, BANNER_WIDTHS) : undefined;
+// Responsive preload — MUST use the same files, srcset, sizes and media as
+// the hero renders, or the browser preloads one candidate and renders
+// another = double download. An uploaded banner reads heroBannerFiles() (the
+// one answer hero-grid renders from: per layout, plus the phone image below
+// 640px when set — two media-split preloads then, so a phone fetches only
+// its own file); the product fallback keeps BANNER_WIDTHS/BANNER_SIZES like
+// its FitImage. srcSet undefined when resizing is disabled → plain href.
+const bannerFiles = heroIsFirst ? heroBannerFiles(home!.hero) : null;
+const productLcp = heroIsFirst && !bannerFiles ? (heroProducts[0]?.image_url || null) : null;
+const lcpPreloads: (BannerFile & { media?: string })[] = bannerFiles
+  ? (bannerFiles.phone
+      ? [{ ...bannerFiles.phone, media: PHONE_BANNER_MEDIA }, { ...bannerFiles.wide, media: WIDE_BANNER_MEDIA }]
+      : [bannerFiles.wide])
+  : productLcp
+    ? [{ src: productLcp, srcSet: cdnSrcSet(productLcp, BANNER_WIDTHS), sizes: BANNER_SIZES }]
+    : [];
 
 // JSON-LD. This page is PRERENDERED, so the request origin is meaningless
 // at build time — schemas only render once the tenant has a public_url
@@ -128,7 +138,7 @@ const schemas: Record<string, unknown>[] =
     seo.description fallback chain (passing meta.about here used to override
     the tenant's Site description with the footer summary). */}
 <Base schema={schemas} gate={gate}>
-  {lcpImage && <link slot="head" rel="preload" as="image" href={lcpSrcSet ? undefined : lcpImage} imagesrcset={lcpSrcSet} imagesizes={lcpSrcSet ? BANNER_SIZES : undefined} fetchpriority="high" />}
+  {lcpPreloads.map((p) => <link slot="head" rel="preload" as="image" href={p.srcSet ? undefined : p.src} imagesrcset={p.srcSet} imagesizes={p.srcSet ? p.sizes : undefined} media={p.media} fetchpriority="high" />)}
 
   {/* Service tenants: block-based service website with its own anchor-nav
       header — the product Header/sections below never render for them. */}

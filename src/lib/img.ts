@@ -39,6 +39,8 @@ export const CDN_HOST = (import.meta.env.PUBLIC_IMAGE_CDN_HOST as string | undef
  *
  * Do not add a new width or quality without counting it against this
  * budget — one new shape multiplies across every image on every tenant.
+ * (The single-image hero's 1920w candidate is the untransformed original,
+ * not a shape — see singleBannerSrcSet.)
  */
 
 /** Default srcset width ladder for fluid images (FitImage etc.). */
@@ -53,6 +55,16 @@ export const BANNER_SIZES = '(min-width: 1024px) 800px, 100vw';
  *  right column on desktop — MUST mirror hero-grid's tile wrapper
  *  (grid-cols-1 sm:grid-cols-2 lg:grid-cols-1) or phones fetch half-size. */
 export const TILE_SIZES = '(min-width: 1024px) 420px, (min-width: 640px) 50vw, 100vw';
+/** The single-image hero (hero.layout 'single'): the uploaded banner spans
+ *  the whole homepage container (max-w-[1280px] px-6 = 1232px of content).
+ *  Read through lib/hero-banner.ts — the <img> and the head preload MUST
+ *  agree, like BANNER_*. Its srcset is singleBannerSrcSet() below. */
+export const SINGLE_BANNER_SIZES = '(min-width: 1280px) 1232px, 100vw';
+/** The hero's optional phone image: below 640px, the full row width. */
+export const PHONE_BANNER_MEDIA = '(max-width: 639px)';
+/** Complement of PHONE_BANNER_MEDIA — the wide file's preload when a phone image exists. */
+export const WIDE_BANNER_MEDIA = '(min-width: 640px)';
+export const PHONE_BANNER_SIZES = '100vw';
 /** Funnel + PDP main image — the LCP of ad landing pages.
  *  The middle band caps at 672px because the centred funnel hero is
  *  max-w-2xl — a bare 100vw made ~1000px tablets fetch the biggest
@@ -93,6 +105,19 @@ export function cdnImage(url: string, width: number, quality = 85): string {
 export function cdnSrcSet(url: string, widths: readonly number[] = DEFAULT_WIDTHS): string | undefined {
   if (!transformable(url)) return undefined;
   return widths.map((w) => `${cdnImage(url, w)} ${w}w`).join(', ');
+}
+
+/** srcset for the single-image hero: the BANNER_WIDTHS rungs plus the stored
+ *  ORIGINAL as a 1920w candidate, so a 2× screen gets more than 1440px across
+ *  1232 CSS px. myapp re-encodes every upload to WebP of at most 1920px
+ *  (ImageStorage::MAX_DIM), so the original already IS that rung — and it is
+ *  not a /cdn-cgi/ transformation, so the shape budget above stays at four.
+ *  undefined when resizing is off (the <img> then carries the original only). */
+export function singleBannerSrcSet(url: string): string | undefined {
+  const ladder = cdnSrcSet(url, BANNER_WIDTHS);
+  // A comma would end the candidate early; R2 keys never carry one, but the
+  // srcset grammar is not the place to find out.
+  return ladder ? `${ladder}, ${url.replace(/,/g, '%2C')} 1920w` : undefined;
 }
 
 /** FitImage's blurred backdrop layer. Behind blur-2xl any small size looks
