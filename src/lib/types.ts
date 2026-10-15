@@ -336,6 +336,13 @@ export type HomepageConfig = {
     button2: { label: string; url: string };
     tiles: { image_url: string | null; url: string }[];
     product_ids: number[];
+    /** 'grid' = banner + two side tiles; 'single' = the banner alone, full
+     *  width. Optional: an API from before it existed sends nothing, and
+     *  anything but 'single' draws the grid (lib/hero-banner.ts). */
+    layout?: 'grid' | 'single' | null;
+    /** Phone version of the banner (below 640px), both layouts. Used only
+     *  while image_url is set. */
+    mobile_image_url?: string | null;
   };
   categories: {
     visible: boolean;
