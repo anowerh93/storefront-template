@@ -17,7 +17,7 @@ import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
-import { deviceId } from '../lib/device';
+import { deviceHint, deviceId } from '../lib/device';
 import { FitImage } from '../components/ui/fit-image';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { CertSlider } from '../components/ui/cert-slider';
@@ -1221,6 +1221,7 @@ function OrderForm({ config, product, meta, btn, visitorCountry }: { config: Fun
         ? values.customer_whatsapp?.trim()
         : undefined,
       device_id:      deviceId() || undefined,
+      device_hint:    deviceHint(),
       advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
       shipping_zone:  values.shipping_zone || undefined,
       notes:          values.notes,

@@ -63,3 +63,41 @@ export function deviceId(): string {
   if (readCookie() !== id) writeCookie(id);
   return id;
 }
+
+/**
+ * What every browser on one phone reports alike — the screen, its pixel
+ * ratio, colour depth, touch points, CPU cores and timezone (never the model
+ * or user agent: those differ between two browsers on one phone). The API
+ * hashes it with the order's IP into a "probably the same phone in another
+ * browser" key (OrderDeviceGuard::matchKey) — a LABEL on the shop's orders
+ * list, never a refusal: thousands of identical cheap phones share one IP.
+ * Nothing is stored here. Undefined on the server or where the screen is
+ * unknown.
+ */
+export type DeviceHint = { sw: number; sh: number; dpr: number; cd?: number; touch?: number; cores?: number; tz?: string };
+
+export function deviceHint(): DeviceHint | undefined {
+  if (typeof window === 'undefined') return undefined;
+  try {
+    const sw = Math.round(window.screen?.width ?? 0);
+    const sh = Math.round(window.screen?.height ?? 0);
+    if (!sw || !sh) return undefined;
+    let tz: string | undefined;
+    try {
+      tz = Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+    } catch {
+      /* no Intl */
+    }
+    return {
+      sw,
+      sh,
+      dpr: Math.round((window.devicePixelRatio || 1) * 100) / 100,
+      cd: window.screen?.colorDepth || undefined,
+      touch: navigator.maxTouchPoints ?? undefined,
+      cores: navigator.hardwareConcurrency || undefined,
+      tz,
+    };
+  } catch {
+    return undefined;
+  }
+}

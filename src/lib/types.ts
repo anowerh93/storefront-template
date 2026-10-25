@@ -705,6 +705,9 @@ export type CreateOrderInput = {
    *  one order per device until the store handles it, and "Block device".
    *  Always sent; the API ignores it while the store's switch is off. */
   device_id?: string;
+  /** Screen / cores / timezone (lib/device deviceHint) — the API's
+   *  "probably the same phone in another browser" label, never a refusal. */
+  device_hint?: import('./device').DeviceHint;
   /** Advance flow: last 4 digits of the wallet number the customer sent —
    *  or will send — money from. Optional; Bengali numerals fine (the server
    *  normalizes, and reduces a pasted full number to its last 4). */
