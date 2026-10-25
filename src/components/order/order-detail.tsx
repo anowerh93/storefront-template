@@ -1,7 +1,7 @@
-import { Check, X } from 'lucide-react';
 import { formatBDT } from '../../lib/format';
 import { customerStatus } from '../../lib/order-status';
 import { Badge } from '../ui/badge';
+import { OrderProgress } from './order-progress';
 import type { OrderResponse, StorefrontMeta } from '../../lib/types';
 
 /**
@@ -11,20 +11,11 @@ import type { OrderResponse, StorefrontMeta } from '../../lib/types';
  * receives an already-fetched OrderResponse so the two surfaces can fetch it
  * however they need (guest lookup vs. authed).
  *
- * Layout: a vertical status Timeline (Order placed → recorded milestones), then
- * an "Order Details" + "Customer Details" pair, then an "Ordered Products" table
- * with a totals footer.
+ * Layout: the order's progress as milestones with icons (<OrderProgress>:
+ * Order placed → Confirmed → Shipped → Delivered), then an "Order Details" +
+ * "Customer Details" pair, then an "Ordered Products" table with a totals
+ * footer.
  */
-
-// Customer-facing copy for each timeline milestone. The API only ever sends
-// these post-placement statuses (it filters internal verification states out),
-// but we still guard by looking each one up so an unknown status is skipped.
-const STEP_COPY: Record<string, { title: string; description: string; canceled?: boolean }> = {
-  confirmed: { title: 'Confirmed', description: 'We’ve confirmed your order.' },
-  shipped:   { title: 'Shipped',   description: 'Your order is on the way.' },
-  delivered: { title: 'Delivered', description: 'You have received your order.' },
-  canceled:  { title: 'Canceled',  description: 'Your order has been canceled.', canceled: true },
-};
 
 /**
  * Variant → display string. The API sends `variant` as a string|null, but
@@ -69,14 +60,6 @@ function formatDate(iso?: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-}
-
-/** ISO → "9:18 AM" (time only). Empty string when unusable. */
-function formatTime(iso?: string): string {
-  if (!iso) return '';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
 }
 
 export function OrderDetail({
@@ -136,45 +119,11 @@ export function OrderDetail({
 
   const placedDate = formatDate(order.placed_at);
 
-  // Timeline rows: placement (always, from placed_at) + recorded milestones.
-  const timelineRows: { at?: string; title: string; description: string; canceled?: boolean }[] = [
-    { at: order.placed_at, title: 'Order Placed', description: 'Your order has been placed successfully.' },
-    ...(order.timeline ?? [])
-      .filter((t) => STEP_COPY[t.status])
-      .map((t) => ({ at: t.at, ...STEP_COPY[t.status] })),
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Status timeline */}
-      <Card title="Timeline">
-        <ol>
-          {timelineRows.map((row, i) => {
-            const last = i === timelineRows.length - 1;
-            const time = formatTime(row.at);
-            return (
-              <li key={i} className="flex gap-3 sm:gap-4">
-                {/* Date / time */}
-                <div className="w-20 shrink-0 text-right sm:w-24">
-                  <p className="text-xs font-medium text-slate-600">{formatDate(row.at) || '—'}</p>
-                  {time && <p className="text-xs text-slate-400">{time}</p>}
-                </div>
-                {/* Marker + connector */}
-                <div className="flex flex-col items-center">
-                  <span className={`z-10 flex h-6 w-6 items-center justify-center rounded-full text-white ${row.canceled ? 'bg-rose-500' : 'bg-emerald-500'}`}>
-                    {row.canceled ? <X className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" focusable="false" /> : <Check className="h-3.5 w-3.5" strokeWidth={3} aria-hidden="true" focusable="false" />}
-                  </span>
-                  {!last && <span className="w-px flex-1 bg-slate-200" />}
-                </div>
-                {/* Title + description */}
-                <div className={`flex-1 ${last ? 'pb-0.5' : 'pb-6'}`}>
-                  <p className="font-semibold text-slate-900">{row.title}</p>
-                  <p className="mt-0.5 text-sm text-slate-500">{row.description}</p>
-                </div>
-              </li>
-            );
-          })}
-        </ol>
+      {/* Where the order stands — milestones with icons (order-progress.tsx). */}
+      <Card title="Order Progress">
+        <OrderProgress order={order} />
       </Card>
 
       {/* Order Details + Customer Details */}
