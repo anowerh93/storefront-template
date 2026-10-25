@@ -701,6 +701,10 @@ export type CreateOrderInput = {
    *  only when meta.checkout.whatsapp_enabled and filled. Never a substitute
    *  for customer_phone: delivery, courier and SMS stay on that. */
   customer_whatsapp?: string | null;
+  /** This browser's device id (lib/device) — the store's fake-order guard:
+   *  one order per device until the store handles it, and "Block device".
+   *  Always sent; the API ignores it while the store's switch is off. */
+  device_id?: string;
   /** Advance flow: last 4 digits of the wallet number the customer sent —
    *  or will send — money from. Optional; Bengali numerals fine (the server
    *  normalizes, and reduces a pasted full number to its last 4). */
