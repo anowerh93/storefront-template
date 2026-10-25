@@ -9,6 +9,7 @@ import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
 import { mintEventId, pixel } from '../lib/pixel';
+import { deviceHint, deviceId } from '../lib/device';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import {
@@ -553,6 +554,8 @@ export function CheckoutPage({
       customer_whatsapp: whatsappEnabled && !isBlankWhatsApp(values.customer_whatsapp)
         ? values.customer_whatsapp?.trim()
         : undefined,
+      device_id:      deviceId() || undefined,
+      device_hint:    deviceHint(),
       // Only when the advance box was actually on screen (COD + policy).
       advance_sender_last4: advance ? values.advance_sender_last4 || undefined : undefined,
       shipping_zone:  values.shipping_zone || undefined,
