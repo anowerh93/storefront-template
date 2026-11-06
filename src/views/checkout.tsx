@@ -8,6 +8,7 @@ import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToke
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
+import { cartShipsFree, deliveryFee } from '../lib/free-delivery';
 import { mintEventId, pixel } from '../lib/pixel';
 import { deviceHint, deviceId } from '../lib/device';
 import { Header } from '../components/layout/header';
@@ -260,6 +261,7 @@ export function CheckoutPage({
       quantity:      expressQty,
       max_stock:     variant ? variant.stock : null,
       currency:      product.currency,
+      free_delivery: product.free_delivery ?? null,
     };
   }, [product, variantIndex, expressQty]);
 
@@ -306,12 +308,9 @@ export function CheckoutPage({
   // no fee) — only so an advance that would equal the whole order is not
   // shown as a second "Pay Online" next to the real one.
   const zoneLive = zones.find((z) => z.code === form.watch('shipping_zone'));
-  const freeFromLive = meta?.shipping?.free_shipping_threshold ?? null;
-  const shippingLive = !meta?.shipping?.enabled
-    ? 0
-    : freeFromLive && advanceSubtotalLive >= freeFromLive
-    ? 0
-    : zoneLive?.fee ?? 0;
+  // Free when every line is free to the zone (lib/free-delivery), else the
+  // zone's fee unless the threshold is reached.
+  const shippingLive = deliveryFee(meta?.shipping, lines, zoneLive, advanceSubtotalLive);
   // The page's meta with its payment part as last re-read (see payMeta), and
   // the picker minus whatever the order API has refused.
   const liveMeta = meta && payMeta ? { ...meta, ...payMeta } : meta;
@@ -493,12 +492,9 @@ export function CheckoutPage({
   const codHasAdvance = !!(codAdvancePolicy && advanceAmountFor(codAdvancePolicy, subtotal) > 0);
   const districtEnabled = !!meta.checkout?.district_enabled;
   const whatsappEnabled = !!meta.checkout?.whatsapp_enabled;
-  const threshold = meta.shipping?.free_shipping_threshold ?? null;
-  const shippingFee = !meta.shipping?.enabled
-    ? 0
-    : threshold && subtotal >= threshold
-    ? 0
-    : zone?.fee ?? 0;
+  // The same rule the order API applies: free when every line is free to the
+  // zone, else the zone's fee unless the threshold is reached.
+  const shippingFee = deliveryFee(meta.shipping, lines, zone, subtotal);
   const total = subtotal + shippingFee;
   // Gateway money for the two online methods: the full total, or — for
   // 'online_advance' — the store's advance for this cart (the rest is paid on
@@ -1060,6 +1056,9 @@ export function CheckoutPage({
                         <label key={z.code} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                           <RadioGroupItem value={z.code} />
                           <span className="text-sm font-medium text-slate-900">{z.label}</span>
+                          {cartShipsFree(lines, z.code) && (
+                            <span data-free-zone className="ml-auto text-xs font-semibold text-brand-600">Free</span>
+                          )}
                         </label>
                       ))}
                     </RadioGroup>

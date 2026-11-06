@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
-import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus } from 'lucide-react';
+import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus, Truck } from 'lucide-react';
+import { freeDeliveryLabel } from '../lib/free-delivery';
 import { formatBDT, discountPct } from '../lib/format';
 import { getIcon } from '../lib/icons';
 import { Header } from '../components/layout/header';
@@ -203,6 +204,7 @@ function BuyBox({
   const discount = discountPct(unitPrice, compareAt);
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
+  const freeDelivery = freeDeliveryLabel(product.free_delivery, meta.shipping);
 
   // Write the selected variant + quantity into the cart store — shared by
   // both CTAs below.
@@ -219,6 +221,7 @@ function BuyBox({
         unit_price: unitPrice,
         max_stock: maxStock,
         currency: product.currency,
+        free_delivery: product.free_delivery ?? null,
       },
       qty,
     );
@@ -305,6 +308,12 @@ function BuyBox({
         <p className="text-sm text-slate-700">
           Status: <span className={inStock ? 'font-semibold text-emerald-600' : 'font-semibold text-rose-600'}>{inStock ? 'In Stock' : 'Out of Stock'}</span>
         </p>
+        {freeDelivery && (
+          <p data-free-delivery className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            <Truck className="h-3.5 w-3.5" aria-hidden="true" />
+            {freeDelivery}
+          </p>
+        )}
       </div>
 
       {/* Variant picker (only if the product has variants). Each button
