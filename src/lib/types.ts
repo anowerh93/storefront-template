@@ -472,6 +472,9 @@ export type ProductDetail = ProductCard & {
   /** Parent stock for SIMPLE products (PDP qty clamp). Null = untracked /
    *  unlimited; products with variants clamp per-variant instead. */
   stock?: number | null;
+  /** Free delivery, the product's own or one of its categories' ('all' /
+   *  'inside_city'); null/absent = the ordinary charge (lib/free-delivery). */
+  free_delivery?: 'all' | 'inside_city' | null;
   reviews: { count: number; average: number | null; items: ProductReview[] };
   related_products: ProductCard[];
   funnel: FunnelPayload | null;
@@ -564,6 +567,8 @@ export type FunnelProduct = {
   variants: ProductVariant[];
   in_stock: boolean;
   stock_badge?: string | null;
+  /** Free delivery ('all' / 'inside_city'); null/absent = the ordinary charge. */
+  free_delivery?: 'all' | 'inside_city' | null;
   reviews: { count: number; average: number | null; items: FunnelReview[] };
 };
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { create } from 'zustand';
 import { persist, createJSONStorage, type StateStorage } from 'zustand/middleware';
 import { STOREFRONT_SLUG } from '../lib/api';
+import type { FreeDelivery } from '../lib/free-delivery';
 
 /**
  * Client-side multi-product cart (Phase 2).
@@ -38,6 +39,10 @@ export type CartLine = {
   /** null = unlimited stock; a number caps the quantity. */
   max_stock: number | null;
   currency: string;
+  /** The product's free delivery when it was added ('all' / 'inside_city').
+   *  null/undefined (a line saved before this field) = the ordinary charge;
+   *  the server decides the order's total either way (lib/free-delivery). */
+  free_delivery?: FreeDelivery;
 };
 
 /** Everything needed to add a line except its quantity. */
