@@ -4,11 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
 import type { CreateOrderInput, PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
-import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToken } from '../lib/api';
+import { ApiError, getFreeDelivery, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToken } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
-import { cartShipsFree, deliveryFee } from '../lib/free-delivery';
+import { cartShipsFree, deliveryFee, type FreeDelivery } from '../lib/free-delivery';
 import { mintEventId, pixel } from '../lib/pixel';
 import { deviceHint, deviceId } from '../lib/device';
 import { Header } from '../components/layout/header';
@@ -267,6 +267,25 @@ export function CheckoutPage({
 
   const lines: CartLine[] = isExpress ? (expressLine ? [expressLine] : []) : cartItems;
 
+  // Each line's free delivery as it is NOW, read from the API (a cart line
+  // keeps the value it had when it was added; the shop may have turned it off
+  // since). Until the answer arrives, or if it cannot be read, every line
+  // counts as ordinary: the checkout shows the ordinary charge, never "Free"
+  // for an order the server charges. Above the early returns (hook count).
+  const [freeNow, setFreeNow] = useState<Map<number, FreeDelivery> | null>(null);
+  const freeIds = Array.from(new Set(lines.map((l) => l.product_id))).sort((a, b) => a - b).join(',');
+  const shippingOn = !!meta?.shipping?.enabled;
+  useEffect(() => {
+    setFreeNow(null);
+    if (!shippingOn || freeIds === '') return;
+    let live = true;
+    getFreeDelivery(freeIds.split(',').map(Number))
+      .then((map) => { if (live) setFreeNow(map); })
+      .catch(() => { /* stays ordinary */ });
+    return () => { live = false; };
+  }, [freeIds, shippingOn]);
+  const freeLines = lines.map((l) => ({ free_delivery: freeNow?.get(l.product_id) ?? null }));
+
   // GA4 begin_checkout / Meta InitiateCheckout — once per checkout ENTRY (the
   // standard funnel step), not per Place-Order click. MUST sit above every
   // early return below: cart-mode's "!hydrated" loading return otherwise
@@ -310,7 +329,7 @@ export function CheckoutPage({
   const zoneLive = zones.find((z) => z.code === form.watch('shipping_zone'));
   // Free when every line is free to the zone (lib/free-delivery), else the
   // zone's fee unless the threshold is reached.
-  const shippingLive = deliveryFee(meta?.shipping, lines, zoneLive, advanceSubtotalLive);
+  const shippingLive = deliveryFee(meta?.shipping, freeLines, zoneLive, advanceSubtotalLive);
   // The page's meta with its payment part as last re-read (see payMeta), and
   // the picker minus whatever the order API has refused.
   const liveMeta = meta && payMeta ? { ...meta, ...payMeta } : meta;
@@ -494,7 +513,7 @@ export function CheckoutPage({
   const whatsappEnabled = !!meta.checkout?.whatsapp_enabled;
   // The same rule the order API applies: free when every line is free to the
   // zone, else the zone's fee unless the threshold is reached.
-  const shippingFee = deliveryFee(meta.shipping, lines, zone, subtotal);
+  const shippingFee = deliveryFee(meta.shipping, freeLines, zone, subtotal);
   const total = subtotal + shippingFee;
   // Gateway money for the two online methods: the full total, or — for
   // 'online_advance' — the store's advance for this cart (the rest is paid on
@@ -1056,7 +1075,7 @@ export function CheckoutPage({
                         <label key={z.code} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                           <RadioGroupItem value={z.code} />
                           <span className="text-sm font-medium text-slate-900">{z.label}</span>
-                          {cartShipsFree(lines, z.code) && (
+                          {cartShipsFree(freeLines, z.code) && (
                             <span data-free-zone className="ml-auto text-xs font-semibold text-brand-600">Free</span>
                           )}
                         </label>
