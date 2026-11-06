@@ -61,6 +61,7 @@ import type {
   TeamMember,
 } from './types';
 import { homepageProductIds } from './home-data';
+import type { FreeDelivery } from './free-delivery';
 
 const API_BASE = (import.meta.env.PUBLIC_API_BASE ?? '').replace(/\/$/, '');
 export const STOREFRONT_SLUG = import.meta.env.PUBLIC_STOREFRONT_SLUG ?? '';
@@ -194,6 +195,24 @@ export async function getStorefrontGated(): Promise<StorefrontGate> {
     if (!closed) console.warn('[api] getStorefront() failed (outage, not plan gate):', err);
     return { meta: null, closed };
   }
+}
+
+/**
+ * Each product's free delivery as it is NOW (GET /free-delivery?ids=…). A
+ * cart line keeps the value it had when it was added and the shop may have
+ * changed it since, so the checkout reads it again for its lines. An id the
+ * answer leaves out (not this shop's, not on the website) is ordinary. Throws
+ * on any failure: the caller then keeps the ordinary charge, which is never
+ * wrong to show (the server decides the total).
+ */
+export async function getFreeDelivery(ids: number[]): Promise<Map<number, FreeDelivery>> {
+  const rows = await apiFetch<{ product_id: number; free_delivery: FreeDelivery }[]>('/free-delivery', {
+    params: { ids: ids.join(',') },
+    cache: false,
+  });
+  if (!Array.isArray(rows)) throw new Error('free-delivery: bad payload');
+
+  return new Map(rows.map((r) => [Number(r.product_id), r.free_delivery ?? null]));
 }
 
 export type ProductSort = 'newest' | 'price_asc' | 'price_desc' | 'name_asc';
