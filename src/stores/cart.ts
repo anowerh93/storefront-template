@@ -39,8 +39,9 @@ export type CartLine = {
   /** null = unlimited stock; a number caps the quantity. */
   max_stock: number | null;
   currency: string;
-  /** The product's free delivery when it was added ('all' / 'inside_city').
-   *  The checkout does NOT price from it: it re-reads every line's value
+  /** The line's free delivery when it was added ('all' / 'inside_city'): its
+   *  variant's, else its product's. The checkout does NOT price from it: it
+   *  re-reads every line's value
    *  (getFreeDelivery), since the shop may have changed it since. The server
    *  decides the order's total either way (lib/free-delivery). */
   free_delivery?: FreeDelivery;

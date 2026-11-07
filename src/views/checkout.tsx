@@ -8,7 +8,13 @@ import { ApiError, getFreeDelivery, orderIdempotencyKey, refreshPaymentMeta, sub
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
 import { formatBDT } from '../lib/format';
-import { cartShipsFree, deliveryFee, type FreeDelivery } from '../lib/free-delivery';
+import {
+  cartShipsFree,
+  deliveryFee,
+  lineFreeDelivery,
+  variantFreeDelivery,
+  type FreeDeliveryNow,
+} from '../lib/free-delivery';
 import { mintEventId, pixel } from '../lib/pixel';
 import { deviceHint, deviceId } from '../lib/device';
 import { Header } from '../components/layout/header';
@@ -261,7 +267,7 @@ export function CheckoutPage({
       quantity:      expressQty,
       max_stock:     variant ? variant.stock : null,
       currency:      product.currency,
-      free_delivery: product.free_delivery ?? null,
+      free_delivery: variantFreeDelivery(variant, product.free_delivery),
     };
   }, [product, variantIndex, expressQty]);
 
@@ -269,10 +275,11 @@ export function CheckoutPage({
 
   // Each line's free delivery as it is NOW, read from the API (a cart line
   // keeps the value it had when it was added; the shop may have turned it off
-  // since). Until the answer arrives, or if it cannot be read, every line
-  // counts as ordinary: the checkout shows the ordinary charge, never "Free"
-  // for an order the server charges. Above the early returns (hook count).
-  const [freeNow, setFreeNow] = useState<Map<number, FreeDelivery> | null>(null);
+  // since): its variant's when it is on one, else its product's. Until the
+  // answer arrives, or if it cannot be read, every line counts as ordinary:
+  // the checkout shows the ordinary charge, never "Free" for an order the
+  // server charges. Above the early returns (hook count).
+  const [freeNow, setFreeNow] = useState<Map<number, FreeDeliveryNow> | null>(null);
   const freeIds = Array.from(new Set(lines.map((l) => l.product_id))).sort((a, b) => a - b).join(',');
   const shippingOn = !!meta?.shipping?.enabled;
   useEffect(() => {
@@ -284,7 +291,9 @@ export function CheckoutPage({
       .catch(() => { /* stays ordinary */ });
     return () => { live = false; };
   }, [freeIds, shippingOn]);
-  const freeLines = lines.map((l) => ({ free_delivery: freeNow?.get(l.product_id) ?? null }));
+  const freeLines = lines.map((l) => ({
+    free_delivery: lineFreeDelivery(freeNow?.get(l.product_id), l.variant_index),
+  }));
 
   // GA4 begin_checkout / Meta InitiateCheckout — once per checkout ENTRY (the
   // standard funnel step), not per Place-Order click. MUST sit above every

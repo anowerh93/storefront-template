@@ -1,14 +1,17 @@
 import type { ShippingZone, StorefrontMeta } from './types';
 
 /**
- * Free delivery on chosen products and categories — the template's copy of
- * myapp's App\Support\FreeDelivery rule.
+ * Free delivery on chosen products, categories and variants — the template's
+ * copy of myapp's App\Support\FreeDelivery rule.
  *
  * A product's `free_delivery` (from the product detail / the funnel's product,
  * its own setting or one of its categories') is:
  *   'all'          — free to every zone
  *   'inside_city'  — free to the inside-city zone only
  *   null           — the shop's ordinary charge
+ * A variant's `free_delivery` is its own effective value (its own setting or
+ * its product's, the better of the two): a line on a variant reads the
+ * variant's, and an API without it reads the product's.
  *
  * A cart ships free to a zone only when EVERY line is free there; one ordinary
  * line brings the ordinary charge back (the threshold included). A line with
@@ -17,6 +20,38 @@ import type { ShippingZone, StorefrontMeta } from './types';
  * server would charge. The server decides the order's total either way.
  */
 export type FreeDelivery = 'all' | 'inside_city' | null;
+
+/** One product's values as the checkout re-read them (getFreeDelivery). */
+export type FreeDeliveryNow = {
+  value: FreeDelivery;
+  /** Each variant row's effective value, in row order; null = none sent. */
+  variants: FreeDelivery[] | null;
+};
+
+/**
+ * A cart line's value from the re-read answer: its variant's when the line is
+ * on one and the answer names it, else its product's. No answer = ordinary.
+ */
+export function lineFreeDelivery(
+  now: FreeDeliveryNow | undefined,
+  variantIndex: number | null | undefined,
+): FreeDelivery {
+  if (!now) return null;
+  if (variantIndex != null && now.variants) {
+    const v = now.variants[variantIndex];
+    if (v !== undefined) return v ?? null;
+  }
+  return now.value ?? null;
+}
+
+/** A variant's value from the product detail / funnel API, else its product's. */
+export function variantFreeDelivery(
+  variant: { free_delivery?: FreeDelivery } | null | undefined,
+  productValue: FreeDelivery | undefined,
+): FreeDelivery {
+  if (variant && variant.free_delivery !== undefined) return variant.free_delivery ?? null;
+  return productValue ?? null;
+}
 
 /** Does this setting make delivery to `zone` free? */
 export function coversZone(value: FreeDelivery | undefined, zone: string | undefined): boolean {
