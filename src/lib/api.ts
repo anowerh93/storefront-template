@@ -737,6 +737,63 @@ export async function submitContact(input: CreateContactInput): Promise<{ ok: bo
 }
 
 // ──────────────────────────────────────────────────────────────
+// Product reviews (POST /storefronts/{slug}/products/{productSlug}/reviews)
+// ──────────────────────────────────────────────────────────────
+
+/**
+ * Submit a shopper's review of a product. Multipart, because the reviewer may
+ * attach their own profile photo (`avatar`); the caller builds the FormData
+ * (`author_name`, `customer_phone`, `rating`, `body`, optional `avatar`, the
+ * `company` honeypot, `turnstile_token`). The Turnstile token also rides the
+ * `cf-turnstile-response` header, like every other public form here. No
+ * Content-Type header: the browser writes the multipart boundary itself.
+ *
+ * The review waits for the shop's approval: a 201 is `{ status: 'pending' }`,
+ * never a published review. Every refusal is thrown as an ApiError carrying
+ * the status, the error code (`already_reviewed`, `reviews_disabled`,
+ * `reviews_pending_full`, `turnstile_failed` … — a bare string or the
+ * `{ error: { code } }` envelope, both read) and Laravel's 422 field errors,
+ * so the form can say exactly what to fix. A network failure is the fetch's
+ * own TypeError.
+ */
+export async function submitReview(
+  productSlug: string,
+  formData: FormData,
+): Promise<{ ok: true; status: string }> {
+  const url = buildUrl(`/products/${encodeURIComponent(productSlug)}/reviews`);
+  const token = formData.get('turnstile_token');
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      ...(typeof token === 'string' && token ? { 'cf-turnstile-response': token } : {}),
+    },
+    body: formData,
+    cache: 'no-store',
+  });
+  const json = await res.json().catch(() => null);
+  if (!res.ok) {
+    const code =
+      typeof json?.error === 'string'
+        ? json.error
+        : typeof json?.error?.code === 'string'
+          ? json.error.code
+          : undefined;
+    const msg =
+      json?.error?.message ??
+      json?.message ??
+      code ??
+      'Sorry, your review could not be sent. Please try again in a minute.';
+    const fields =
+      json?.errors && typeof json.errors === 'object' && !Array.isArray(json.errors)
+        ? (json.errors as Record<string, string[]>)
+        : undefined;
+    throw new ApiError(String(msg), res.status, code, undefined, fields);
+  }
+  return { ok: true, status: typeof json?.data?.status === 'string' ? json.data.status : 'pending' };
+}
+
+// ──────────────────────────────────────────────────────────────
 // Customer accounts (Phase 1) — bearer-token auth, browser-only
 // ──────────────────────────────────────────────────────────────
 
@@ -839,12 +896,15 @@ export class ApiError extends Error {
   status: number;
   /** `error.retry_after` (seconds), when the API sent one. */
   retryAfter?: number;
-  constructor(message: string, status: number, code?: string, retryAfter?: number) {
+  /** Laravel's 422 `errors` ({ field: [message, …] }), when the API sent them. */
+  fields?: Record<string, string[]>;
+  constructor(message: string, status: number, code?: string, retryAfter?: number, fields?: Record<string, string[]>) {
     super(message);
     this.name = 'ApiError';
     this.status = status;
     this.code = code;
     this.retryAfter = retryAfter;
+    this.fields = fields;
   }
 }
 

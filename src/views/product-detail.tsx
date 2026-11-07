@@ -7,6 +7,7 @@ import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { FitImage } from '../components/ui/fit-image';
+import { ProductReviews } from '../components/product/product-reviews';
 import { cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
@@ -208,6 +209,11 @@ function BuyBox({
   // that alone ships free says so only while it is picked.
   const selectedFree = variantFreeDelivery(selected, product.free_delivery);
   const freeDelivery = freeDeliveryLabel(selectedFree, meta.shipping);
+  // The approved-review aggregate (product-level, absent on an older API).
+  // Number(): a decimal average can arrive as a JSON string, and .toFixed on
+  // a string would throw and take the whole buy box down.
+  const ratingCount = Number(product.rating_count) || 0;
+  const ratingAvg = product.rating_avg == null ? NaN : Number(product.rating_avg);
 
   // Write the selected variant + quantity into the cart store — shared by
   // both CTAs below.
@@ -255,15 +261,15 @@ function BuyBox({
     <div className="min-w-0 space-y-5">
       <h1 className="text-2xl font-bold leading-tight text-slate-900 sm:text-3xl">{product.name}</h1>
 
-      {(product.rating_count ?? 0) > 0 && product.rating_avg != null && (
+      {ratingCount > 0 && Number.isFinite(ratingAvg) && (
         <div className="flex items-center gap-2 text-sm">
           <div className="flex items-center gap-0.5">
             {[1, 2, 3, 4, 5].map((n) => (
-              <Star key={n} className={`h-4 w-4 ${n <= Math.round(product.rating_avg!) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
+              <Star key={n} className={`h-4 w-4 ${n <= Math.round(ratingAvg) ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
             ))}
           </div>
-          <span className="font-semibold text-slate-900">{product.rating_avg.toFixed(1)}</span>
-          <span className="text-slate-500">({product.rating_count} reviews)</span>
+          <span className="font-semibold text-slate-900">{ratingAvg.toFixed(1)}</span>
+          <span className="text-slate-500">({ratingCount} {ratingCount === 1 ? 'review' : 'reviews'})</span>
         </div>
       )}
 
@@ -503,6 +509,10 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
   // photos live in the buy-box gallery (ProductGallery, via gallery_urls).
   const customerGalleryUrls = (product.customer_gallery_urls ?? []).filter(Boolean);
   const reviews = product.reviews?.items ?? [];
+  // The tab also shows with no review yet when the shop takes reviews, so the
+  // first shopper can write one.
+  const canWriteReview = product.reviews?.write_enabled === true;
+  const reviewCount = Number(product.reviews?.count) || 0;
   const faq = product.funnel?.faq ?? [];
 
   const phone = meta.whatsapp?.trim() || null;
@@ -515,7 +525,9 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
     product.specifications_html ? { key: 'specs', label: 'Specifications' } : null,
     customerGalleryUrls.length ? { key: 'galleries', label: 'Galleries' } : null,
     video ? { key: 'video', label: 'Video' } : null,
-    reviews.length ? { key: 'reviews', label: 'Reviews' } : null,
+    reviews.length || canWriteReview
+      ? { key: 'reviews', label: reviewCount > 0 ? `Reviews (${reviewCount})` : 'Reviews' }
+      : null,
     faq.length ? { key: 'faq', label: 'FAQ' } : null,
     product.support_info_html ? { key: 'support', label: 'Support' } : null,
   ].filter(Boolean) as { key: string; label: string }[];
@@ -544,8 +556,14 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
       {/* Height-capped, internally-scrolling content (desktop) so a long
           description/spec table doesn't stretch the whole page — mirrors the
           reference's organized box. key={active} resets scroll on tab switch.
-          On mobile it flows naturally (no nested scroll trap). */}
-      <div key={active} className="p-5 sm:p-6 lg:max-h-[70vh] lg:min-h-[360px] lg:overflow-y-auto">
+          On mobile it flows naturally (no nested scroll trap). The Reviews tab
+          is left uncapped: it holds the write form (a form inside a scroll box
+          hides its own errors and the Turnstile widget), and its list grows
+          only ten at a time, by the shopper's own "Show more". */}
+      <div
+        key={active}
+        className={`p-5 sm:p-6 lg:min-h-[360px] ${active === 'reviews' ? '' : 'lg:max-h-[70vh] lg:overflow-y-auto'}`}
+      >
         {active === 'description' && product.description_html && (
           <div
             className="prose prose-sm max-w-none text-slate-600 prose-headings:text-slate-900 prose-a:text-brand-600 prose-table:text-sm"
@@ -597,21 +615,7 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
         )}
 
         {active === 'reviews' && (
-          <div className="space-y-4">
-            {reviews.slice(0, 10).map((r) => (
-              <article key={r.id} className="border-b border-slate-100 pb-4 last:border-0 last:pb-0">
-                <div className="mb-1 flex items-center gap-2">
-                  <div className="flex items-center gap-0.5">
-                    {[1, 2, 3, 4, 5].map((n) => (
-                      <Star key={n} className={`h-3.5 w-3.5 ${n <= r.rating ? 'fill-amber-400 text-amber-400' : 'text-slate-300'}`} />
-                    ))}
-                  </div>
-                  <span className="text-sm font-medium text-slate-900">{r.author_name}</span>
-                </div>
-                <p className="text-sm leading-relaxed text-slate-600">{r.body}</p>
-              </article>
-            ))}
-          </div>
+          <ProductReviews product={product} siteKey={meta.turnstile?.site_key ?? null} />
         )}
 
         {active === 'faq' && (
