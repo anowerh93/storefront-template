@@ -34,6 +34,14 @@ export type StorefrontMeta = {
   footer_logo_url?: string | null;
   /** Dedicated site icon; API falls back to the logo when unset. */
   favicon_url?: string | null;
+  /**
+   * PNG favicon set made from that icon (192 first, then 512). The upload
+   * itself is WebP, which is not one of Google's favicon formats. Empty or
+   * absent (an older API, a shop with no set yet) = use favicon_url.
+   */
+  icons?: { src: string; sizes: string; type: string }[];
+  /** 180 px Apple touch icon of that set; null while there is none. */
+  touch_icon_url?: string | null;
   theme_color: string | null;
   /** Plain-text excerpt of the About article (meta-description fallbacks only). */
   about: string | null;
@@ -116,6 +124,9 @@ export type StorefrontMeta = {
     title: string | null;
     description: string | null;
     og_image: string | null;
+    /** The share image's size in pixels, when the API knows it. */
+    og_image_width?: number | null;
+    og_image_height?: number | null;
     /** WordPress-style "discourage search engines" (build/demo mode). */
     discourage?: boolean;
   };
@@ -494,6 +505,9 @@ export type ProductDetail = ProductCard & {
     title: string | null;
     description: string | null;
     og_image: string | null;
+    /** The share image's size in pixels, when the API knows it. */
+    og_image_width?: number | null;
+    og_image_height?: number | null;
     /** Per-product "Hide from search results" — render robots noindex. */
     noindex?: boolean;
   };
