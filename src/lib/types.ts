@@ -445,8 +445,9 @@ export type ProductCard = {
   stock_badge?: string | null;
   has_variants?: boolean;
   in_stock: boolean;
-  // Optional — most callers should read ratings from ProductDetail.reviews
-  // instead. Card endpoints don't currently return these.
+  // The product's approved-review aggregate. The product DETAIL payload sends
+  // it (the same figures as ProductDetail.reviews.average / .count); card
+  // endpoints don't. Absent on an API older than customer reviews.
   rating_avg?: number | null;
   rating_count?: number;
   categories?: { slug: string; name: string }[];
@@ -475,7 +476,16 @@ export type ProductDetail = ProductCard & {
   /** Free delivery, the product's own or one of its categories' ('all' /
    *  'inside_city'); null/absent = the ordinary charge (lib/free-delivery). */
   free_delivery?: 'all' | 'inside_city' | null;
-  reviews: { count: number; average: number | null; items: ProductReview[] };
+  reviews: {
+    /** Approved reviews in all, and their average — true aggregates, not the
+     *  length of `items` (which is only the reviews the API chose to send). */
+    count: number;
+    average: number | null;
+    items: ProductReview[];
+    /** The shop takes reviews from shoppers: show the write form. Absent on an
+     *  API older than customer reviews = false. */
+    write_enabled?: boolean;
+  };
   related_products: ProductCard[];
   funnel: FunnelPayload | null;
   messenger_deep_link: string | null;
@@ -523,8 +533,12 @@ export type ProductReview = {
   avatar_url: string | null;
   rating: number;
   body: string;
+  /** Owner-uploaded photos (a shopper uploads only their own avatar). */
   images: string[];
   is_featured: boolean;
+  /** The reviewer's phone has a delivered order of this product (worked out
+   *  by the API). Absent on an older API = false. */
+  verified_purchase?: boolean;
   created_at: string;
 };
 
