@@ -507,6 +507,10 @@ export type ProductVariant = {
   // of the first. At most one variant is flagged; none flagged = use the first.
   is_default: boolean;
   image_url: string | null;
+  // Free delivery on THIS variant: its own setting or its product's (own or a
+  // category's), the better of the two (myapp FreeDelivery::variantValue).
+  // Absent from an API older than the per-variant setting: read the product's.
+  free_delivery?: 'all' | 'inside_city' | null;
 };
 
 // Matches StorefrontController::reviewPayload() exactly — the previous

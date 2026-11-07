@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus, Truck } from 'lucide-react';
-import { freeDeliveryLabel } from '../lib/free-delivery';
+import { freeDeliveryLabel, variantFreeDelivery } from '../lib/free-delivery';
 import { formatBDT, discountPct } from '../lib/format';
 import { getIcon } from '../lib/icons';
 import { Header } from '../components/layout/header';
@@ -204,7 +204,10 @@ function BuyBox({
   const discount = discountPct(unitPrice, compareAt);
   const benefits = product.funnel?.benefits ?? [];
   const phone = meta.whatsapp?.trim() || null;
-  const freeDelivery = freeDeliveryLabel(product.free_delivery, meta.shipping);
+  // The SELECTED variant's free delivery (its own or its product's), so a pack
+  // that alone ships free says so only while it is picked.
+  const selectedFree = variantFreeDelivery(selected, product.free_delivery);
+  const freeDelivery = freeDeliveryLabel(selectedFree, meta.shipping);
 
   // Write the selected variant + quantity into the cart store — shared by
   // both CTAs below.
@@ -221,7 +224,7 @@ function BuyBox({
         unit_price: unitPrice,
         max_stock: maxStock,
         currency: product.currency,
-        free_delivery: product.free_delivery ?? null,
+        free_delivery: selectedFree,
       },
       qty,
     );

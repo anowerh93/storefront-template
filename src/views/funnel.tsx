@@ -16,7 +16,7 @@ import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder } from '
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { sizeOptions, optionNames } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
-import { cartShipsFree, deliveryFee } from '../lib/free-delivery';
+import { cartShipsFree, deliveryFee, variantFreeDelivery } from '../lib/free-delivery';
 import { mintEventId, pixel } from '../lib/pixel';
 import { deviceHint, deviceId } from '../lib/device';
 import { FitImage } from '../components/ui/fit-image';
@@ -1079,9 +1079,10 @@ function OrderForm({ config, product, meta, btn, visitorCountry }: { config: Fun
   const selectedZone = form.watch('shipping_zone');
   const zone = zones.find((z) => z.code === selectedZone);
   const subtotal = unitPrice * qty;
-  // The funnel's one product: free when it is free to the zone
-  // (lib/free-delivery), else the zone's fee unless the threshold is reached.
-  const freeLines = [{ free_delivery: product.free_delivery ?? null }];
+  // The funnel's one product, on the picked pack: free when that pack (or its
+  // product) is free to the zone (lib/free-delivery), else the zone's fee
+  // unless the threshold is reached.
+  const freeLines = [{ free_delivery: variantFreeDelivery(variant, product.free_delivery) }];
   const shippingFee = deliveryFee(meta.shipping, freeLines, zone, subtotal);
   const total = subtotal + shippingFee;
   // How this order is paid: whichever of COD / pay online / pay an advance
