@@ -22,6 +22,10 @@ export interface Props {
   title?: string;
   description?: string;
   ogImage?: string;
+  /** That image's size and alt text, when the page knows them (og:image:width / height / alt). */
+  ogImageWidth?: number | null;
+  ogImageHeight?: number | null;
+  ogImageAlt?: string;
   /** Funnel/landing pages set this so they don't compete with the catalog in search. */
   noindex?: boolean;
   /** JSON-LD objects (lib/schema.ts builders) rendered as ld+json scripts. */
@@ -98,6 +102,18 @@ const finalDescription = description
 
 const finalOgImage = ogImage ?? meta?.seo.og_image ?? null;
 
+// Size and alt text describe ONE image: a page's own image brings its own
+// (alt = the page's title: the product, the post, the service), the shop's
+// share image takes the meta's. A size goes out only as two positive
+// integers — a wrong size is worse than none (Facebook lays the card out
+// from it before it has fetched the picture).
+const ownOgImage = ogImage != null;
+const sizeOf = (n: number | null | undefined) => (typeof n === 'number' && Number.isInteger(n) && n > 0 ? n : null);
+const ogWidth = sizeOf(ownOgImage ? Astro.props.ogImageWidth : meta?.seo.og_image_width);
+const ogHeight = sizeOf(ownOgImage ? Astro.props.ogImageHeight : meta?.seo.og_image_height);
+const ogSize = ogWidth && ogHeight ? { width: ogWidth, height: ogHeight } : null;
+const ogAlt = (ownOgImage ? (Astro.props.ogImageAlt ?? title) : meta?.name) || null;
+
 const brandStyle = meta ? brandCssVars(meta.theme_color) : '';
 const pixelId = tracking ? (meta?.pixel?.id ?? null) : null;
 const gtmId = tracking ? (meta?.gtm?.id ?? null) : null;
@@ -128,6 +144,11 @@ const pixelSnippet = pixelId
   : null;
 const siteName = meta?.name ?? '';
 const favicon = meta?.favicon_url ?? meta?.logo_url ?? null;
+// The PNG set (192 first) wins over that link, never beside it: the upload
+// behind favicon_url is WebP, which Google does not take as a favicon. An
+// API without the set keeps the old single link exactly as before.
+const pngIcons = (meta?.icons ?? []).filter((i) => i && typeof i.src === 'string' && i.src !== '');
+const touchIcon = pngIcons.length > 0 ? (meta?.touch_icon_url || null) : null;
 
 // Canonical — always the tenant's PUBLIC origin (custom domain when
 // verified), never this request's host, so the pages.dev mirror points
@@ -149,10 +170,18 @@ if (mirror) {
   } catch { /* prerendered context — the meta tag / runtime check covers it */ }
 }
 
+const canonicalPath = Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, '');
 const canonical =
   canonicalBase && !hideFromSearch && !meta?.seo?.discourage && !mirror
-    ? canonicalBase + (Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, ''))
+    ? canonicalBase + canonicalPath
     : null;
+
+// og:url — the shared link's own address on the PUBLIC origin, on every page
+// that has one (a share card is not a search signal, so noindex, discourage
+// and a mirror host do not drop it the way they drop the canonical). Only the
+// pathname comes from Astro.url: prerendered pages render with a localhost
+// origin at build time.
+const ogUrl = canonicalBase ? canonicalBase + canonicalPath : null;
 
 // Runtime mirror check for PRERENDERED pages: the static HTML is byte-equal
 // on every host, so the noindex decision must happen in the browser (Google
@@ -198,14 +227,27 @@ const ldJson = schema.map((s) => JSON.stringify(s).replace(/</g, '\\u003c'));
       <script type="application/ld+json" set:html={json} is:inline />
     ))}
 
-    {/* OpenGraph + Twitter — built-in defaults so social shares look right */}
+    {/* OpenGraph + Twitter — built-in defaults so social shares look right.
+        og:type stays "website" on every page: Meta documents no product
+        type for the share card today. */}
+    <meta property="og:type" content="website" />
+    {ogUrl && <meta property="og:url" content={ogUrl} />}
     <meta property="og:title" content={finalTitle} />
     {finalDescription && <meta property="og:description" content={finalDescription} />}
     {siteName && <meta property="og:site_name" content={siteName} />}
     {finalOgImage && <meta property="og:image" content={finalOgImage} />}
+    {finalOgImage && ogSize && <meta property="og:image:width" content={String(ogSize.width)} />}
+    {finalOgImage && ogSize && <meta property="og:image:height" content={String(ogSize.height)} />}
+    {finalOgImage && ogAlt && <meta property="og:image:alt" content={ogAlt} />}
     <meta name="twitter:card" content={finalOgImage ? 'summary_large_image' : 'summary'} />
+    <meta name="twitter:title" content={finalTitle} />
+    {finalDescription && <meta name="twitter:description" content={finalDescription} />}
+    {finalOgImage && <meta name="twitter:image" content={finalOgImage} />}
 
-    {favicon && <link rel="icon" href={favicon} />}
+    {pngIcons.length > 0
+      ? pngIcons.map((icon) => <link rel="icon" type={icon.type || 'image/png'} sizes={icon.sizes || undefined} href={icon.src} />)
+      : favicon && <link rel="icon" href={favicon} />}
+    {touchIcon && <link rel="apple-touch-icon" sizes="180x180" href={touchIcon} />}
 
     {/* Warm the image-CDN connection early — the LCP hero lives on this host,
         and without a preconnect the browser pays DNS+TCP+TLS for it only after

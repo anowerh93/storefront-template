@@ -73,12 +73,20 @@ const schemas = product
       ...(product.funnel?.faq?.length ? [faqSchema(product.funnel.faq)] : []),
     ].filter((s): s is Record<string, unknown> => s !== null)
   : [];
+
+// Share card image: the product's own share image (product form → SEO),
+// else its photo — the API's seo.og_image already falls back that way; the
+// `image_url` keeps a payload without it working. Its size goes out only
+// when the API sends one. Title and description are unchanged on purpose:
+// they are the search snippet of every product page.
 ---
 
 <Base
   title={product?.name}
   description={product?.short_description ?? product?.name}
-  ogImage={product?.image_url ?? undefined}
+  ogImage={product?.seo?.og_image || product?.image_url || undefined}
+  ogImageWidth={product?.seo?.og_image_width}
+  ogImageHeight={product?.seo?.og_image_height}
   noindex={product?.seo?.noindex}
   schema={schemas}
   gate={gate}
