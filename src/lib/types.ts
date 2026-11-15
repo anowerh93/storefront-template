@@ -103,6 +103,10 @@ export type StorefrontMeta = {
   shipping: {
     enabled: boolean;
     free_shipping_threshold: number | null;
+    /** How a cart mixing free-delivery and ordinary products is charged:
+     *  'every' (every line must be free — absent on an older API) or 'any'
+     *  (one free line frees the cart). lib/free-delivery. */
+    free_delivery_rule?: 'every' | 'any';
     zones: ShippingZone[];
   };
   /** Checkout form extras — tenant-opt-in জেলা/থানা fields, and the optional
