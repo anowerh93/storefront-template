@@ -12,13 +12,15 @@
  * with PRIORITY over this dynamic [slug] route, and the dashboard refuses to
  * mint a funnel slug that collides with a reserved root path
  * (Funnel::RESERVED_SLUGS), so this route only ever catches genuine funnel
- * slugs. Anything else is a real 404.
+ * slugs — or the old link of a landing page whose owner changed its link
+ * (forwarded below). Anything else is a real 404.
  */
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getFunnel, getStorefrontGated, type StorefrontGate } from '../lib/api';
+import { ApiError, getFunnel, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { FunnelPage } from '../views/funnel';
+import { isLocalForward, withQuery } from '../lib/funnel-forward';
 import { visitorCountry } from '../lib/geo';
 import type { FunnelPayload } from '../lib/types';
 
@@ -27,19 +29,39 @@ const slug = Astro.params.slug as string;
 // page's HTML must never be cached across visitors (see src/lib/geo.ts).
 const country = visitorCountry(Astro.request);
 
+// A landing page's owner may change its link; the API's 404 for the old link
+// then carries the forward (no second request: a separate redirect lookup per
+// root miss would spend a throttled endpoint on every scanner probe).
+let forward: { to: string; status: number } | undefined;
+
 // Parallel fetches — sequential awaits cost an extra origin round-trip.
 // Each fails soft on its own: getFunnel 402s on the same plan gate, and
 // its rejection must not discard the gate verdict.
 const [funnel, gate]: [FunnelPayload | null, StorefrontGate] = await Promise.all([
   slug
     ? getFunnel(slug).catch((err) => {
-        console.warn(`[[slug].astro] getFunnel(${slug}) failed:`, err);
+        if (err instanceof ApiError && err.status === 404) {
+          forward = err.redirect;
+        } else {
+          console.warn(`[[slug].astro] getFunnel(${slug}) failed:`, err);
+        }
         return null;
       })
     : Promise.resolve(null),
   getStorefrontGated(),
 ]);
 const meta = gate.meta;
+
+// Follow the forward: local paths only, never back to itself, the ad's query
+// string along (src/lib/funnel-forward.ts — the checks live there, not here:
+// the live builder's Astro compiler misreads a regex with "/" in a character
+// class in this frontmatter). A link change forwards with a 302 (browsers keep
+// a 301 for good); a redirect the owner added by hand keeps its own status.
+// Skipped on a closed shop: the honest render there is Base's ShopClosed.
+const to = forward?.to;
+if (!funnel && !gate.closed && isLocalForward(to, slug)) {
+  return Astro.redirect(withQuery(to, Astro.url.search.slice(1)), forward?.status === 301 ? 301 : 302);
+}
 
 // Closed shop: the missing funnel is the plan gate 402ing — an ad click
 // still deserves the honest ShopClosed render (Base), not a bare 404.

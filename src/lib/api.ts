@@ -135,7 +135,14 @@ async function apiFetch<T>(
     // unlike the { error: { code } } envelope elsewhere — so accept both.
     const body = await res.json().catch(() => null);
     const code = typeof body?.error === 'string' ? body.error : body?.error?.code;
-    throw new ApiError(`API ${path} failed: ${res.status} ${res.statusText}`, res.status, code);
+    const err = new ApiError(`API ${path} failed: ${res.status} ${res.statusText}`, res.status, code);
+    // A landing page's 404 may carry a forward: its owner changed the link
+    // and this path is the old one (the API's funnelNotFound).
+    const fwd = body?.redirect;
+    if (res.status === 404 && typeof fwd?.to === 'string' && typeof fwd?.status === 'number') {
+      err.redirect = { to: fwd.to, status: fwd.status };
+    }
+    throw err;
   }
   // Read as text so the same body can be parsed AND stored: the Laravel API
   // sends `Cache-Control: no-cache, private` (correct for direct browser
@@ -898,6 +905,8 @@ export class ApiError extends Error {
   retryAfter?: number;
   /** Laravel's 422 `errors` ({ field: [message, …] }), when the API sent them. */
   fields?: Record<string, string[]>;
+  /** A 404's forward (`redirect: { to, status }`), when the API sent one. */
+  redirect?: { to: string; status: number };
   constructor(message: string, status: number, code?: string, retryAfter?: number, fields?: Record<string, string[]>) {
     super(message);
     this.name = 'ApiError';
