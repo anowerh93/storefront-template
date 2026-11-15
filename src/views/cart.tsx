@@ -8,7 +8,7 @@ import { Footer } from '../components/layout/footer';
 import { Button } from '../components/ui/button';
 import { FitImage } from '../components/ui/fit-image';
 import { NotFoundPage } from './not-found';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 /**
  * The cart page — review lines, change quantities, remove, then proceed to a
@@ -17,7 +17,7 @@ import type { StorefrontMeta } from '../lib/types';
  * client agree. "Proceed to Checkout" goes to /checkout with NO query params —
  * that's the signal for checkout's cart-mode (vs. the express ?p&v&q buy-now).
  */
-export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
+export function CartPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const hydrated = useCartHydrated();
   const items = useCart((s) => s.items);
   const setQty = useCart((s) => s.setQty);
@@ -44,7 +44,7 @@ export function CartPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-8 sm:py-12">
         <h1 className="mb-6 flex items-center gap-2 text-2xl font-bold text-slate-900">

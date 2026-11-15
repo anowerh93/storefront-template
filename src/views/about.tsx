@@ -5,17 +5,20 @@ import { Button } from '../components/ui/button';
 import { NotFoundPage } from './not-found';
 import { cdnImage, cdnSrcSet } from '../lib/img';
 import { CertSlider } from '../components/ui/cert-slider';
-import type { StorefrontMeta, TeamMember, Certification } from '../lib/types';
+import type { Category, StorefrontMeta, TeamMember, Certification } from '../lib/types';
 
 // Astro+CF port: meta + team + certifications arrive as props (fetched in
 // src/pages/about.astro). Pure content page → rendered as static HTML, but the
 // cert slider hydrates as a client island (client:load on the page).
 export function AboutPage({
   meta,
+  categories = [],
   team = [],
   certifications = [],
 }: {
   meta: StorefrontMeta | null;
+  /** Feeds the header's category menus. */
+  categories?: Category[];
   team?: TeamMember[];
   certifications?: Certification[];
 }) {
@@ -30,7 +33,7 @@ export function AboutPage({
         : [];
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
       <main className="mx-auto max-w-3xl px-4 sm:px-6 py-10 sm:py-16">
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">{meta.about_title || meta.name}</h1>
         {meta.about_html ? (

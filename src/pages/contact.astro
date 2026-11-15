@@ -7,12 +7,19 @@
  * from the meta payload at build time. Indexable (a real contact surface).
  */
 import Base from '../layouts/Base.astro';
-import { getStorefrontGated } from '../lib/api';
+import type { Category } from '../lib/types';
+import { getCategories, getStorefrontGated } from '../lib/api';
 import { breadcrumbSchema } from '../lib/schema';
 import { ContactPage } from '../views/contact';
 
 // Gated: a plan-gated tenant (402) bakes Base's ShopClosed at build time.
-const gate = await getStorefrontGated();
+// The header's category menus (the search box's "All Categories" and
+// "Browse All Categories") need the list on every page, not only the
+// catalogue's. Fetched in parallel; a failure is an empty menu, never the page.
+const [gate, categories] = await Promise.all([
+  getStorefrontGated(),
+  getCategories().catch((): Category[] => []),
+]);
 const meta = gate.meta;
 
 // Prerendered page — breadcrumb only once a public origin exists.
@@ -23,5 +30,5 @@ const schemas = origin
 ---
 
 <Base title={meta ? `Contact ${meta.name}` : 'Contact'} gate={gate} schema={schemas}>
-  <ContactPage meta={meta} client:load />
+  <ContactPage categories={categories} meta={meta} client:load />
 </Base>

@@ -21,10 +21,10 @@
 export const prerender = false;
 
 import Base from '../../layouts/Base.astro';
-import { getProduct, getStorefrontGated, resolvePath, type StorefrontGate } from '../../lib/api';
+import { getCategories, getProduct, getStorefrontGated, resolvePath, type StorefrontGate } from '../../lib/api';
 import { breadcrumbSchema, faqSchema, productSchema } from '../../lib/schema';
 import { ProductDetailPage } from '../../views/product-detail';
-import type { ProductDetail } from '../../lib/types';
+import type { Category, ProductDetail } from '../../lib/types';
 
 const slug = Astro.params.slug as string;
 
@@ -33,12 +33,15 @@ const slug = Astro.params.slug as string;
 // want meta for the layout/branding on the rendered NotFoundPage. Each
 // fails soft on its own: getProduct 402s on the same plan gate, and its
 // rejection must not discard the gate verdict.
-const [product, gate]: [ProductDetail | null, StorefrontGate] = await Promise.all([
+// The categories feed the header's category menus (the search box's "All
+// Categories" and "Browse All Categories"); a failure is an empty menu.
+const [product, gate, categories]: [ProductDetail | null, StorefrontGate, Category[]] = await Promise.all([
   getProduct(slug).catch((err) => {
     console.warn(`[products/[slug].astro] getProduct(${slug}) failed:`, err);
     return null;
   }),
   getStorefrontGated(),
+  getCategories().catch((): Category[] => []),
 ]);
 const meta = gate.meta;
 
@@ -91,5 +94,5 @@ const schemas = product
   schema={schemas}
   gate={gate}
 >
-  <ProductDetailPage client:load product={product} meta={meta} />
+  <ProductDetailPage client:load product={product} meta={meta} categories={categories} />
 </Base>

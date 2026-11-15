@@ -14,7 +14,7 @@ import { Button } from '../components/ui/button';
 import { Badge } from '../components/ui/badge';
 import { customerStatus } from '../lib/order-status';
 import { NotFoundPage } from './not-found';
-import type { AccountOrderSummary, Customer, StorefrontMeta } from '../lib/types';
+import type { Category, AccountOrderSummary, Customer, StorefrontMeta } from '../lib/types';
 
 /**
  * The customer account page — order history + "track without typing". On mount
@@ -23,7 +23,7 @@ import type { AccountOrderSummary, Customer, StorefrontMeta } from '../lib/types
  * (/order/{number}) which, for a logged-in customer, renders without asking for
  * a phone (the account session is the identity proof).
  */
-export function AccountPage({ meta }: { meta: StorefrontMeta | null }) {
+export function AccountPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [orders, setOrders] = useState<AccountOrderSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,7 +65,7 @@ export function AccountPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-2xl px-4 sm:px-6 py-8 sm:py-12">
         {loading ? (
