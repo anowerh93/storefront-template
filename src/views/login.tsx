@@ -8,14 +8,14 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { TurnstileWidget } from '../components/auth/turnstile';
 import { NotFoundPage } from './not-found';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 /**
  * Customer login. Phone OR email + password. On success the bearer token is
  * stored (slug-scoped localStorage) and we redirect to /account. Accounts are
  * OPT-IN — guest checkout + guest order lookup stay fully usable without one.
  */
-export function LoginPage({ meta }: { meta: StorefrontMeta | null }) {
+export function LoginPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -57,7 +57,7 @@ export function LoginPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-md px-4 sm:px-6 py-10 sm:py-14">
         <div className="mx-auto h-14 w-14 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center mb-5">

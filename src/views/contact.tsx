@@ -10,7 +10,7 @@ import { Button } from '../components/ui/button';
 import { TurnstileWidget } from '../components/auth/turnstile';
 import { NotFoundPage } from './not-found';
 import { submitContact } from '../lib/api';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 /**
  * Contact page (meta fetched in src/pages/contact.astro). Shows the shop's
@@ -19,7 +19,7 @@ import type { StorefrontMeta } from '../lib/types';
  * + Turnstile discipline as the auth forms; the honeypot is read from the live
  * DOM via a ref (a controlled input would never see a bot's programmatic fill).
  */
-export function ContactPage({ meta }: { meta: StorefrontMeta | null }) {
+export function ContactPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const [form, setForm] = useState({ name: '', phone: '', email: '', message: '' });
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -61,7 +61,7 @@ export function ContactPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-5xl px-4 sm:px-6 py-10 sm:py-16">
         <h1 className="text-3xl sm:text-4xl font-bold text-slate-900 mb-2">

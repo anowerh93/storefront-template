@@ -11,10 +11,10 @@
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getProduct, getStorefrontGated, type StorefrontGate } from '../lib/api';
+import { getCategories, getProduct, getStorefrontGated, type StorefrontGate } from '../lib/api';
 import { CheckoutPage } from '../views/checkout';
 import { visitorCountry } from '../lib/geo';
-import type { ProductDetail } from '../lib/types';
+import type { Category, ProductDetail } from '../lib/types';
 
 // Opens the প্রবাসী WhatsApp field for a visitor abroad. Per request: this
 // page's HTML must never be cached across visitors (see src/lib/geo.ts).
@@ -33,7 +33,8 @@ const qty = Math.max(1, parseInt(params.get('q') ?? '1', 10) || 1);
 // Parallel fetches — sequential awaits cost an extra origin round-trip.
 // Each fails soft on its own: getProduct 402s on the same plan gate, and
 // its rejection must not discard the gate verdict.
-const [product, gate]: [ProductDetail | null, StorefrontGate] = await Promise.all([
+// The categories feed the header's category menus.
+const [product, gate, categories]: [ProductDetail | null, StorefrontGate, Category[]] = await Promise.all([
   slug
     ? getProduct(slug).catch((err) => {
         console.warn(`[checkout.astro] getProduct(${slug}) failed:`, err);
@@ -41,11 +42,12 @@ const [product, gate]: [ProductDetail | null, StorefrontGate] = await Promise.al
       })
     : Promise.resolve(null),
   getStorefrontGated(),
+  getCategories().catch((): Category[] => []),
 ]);
 const meta = gate.meta;
 ---
 
 {/* noindex like cart/account: thin utility shell, reachable from every PDP */}
 <Base title="Checkout" description="Secure checkout" noindex={true} gate={gate}>
-  <CheckoutPage client:load product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} visitorCountry={country} />
+  <CheckoutPage client:load categories={categories} product={product} meta={meta} variantIndex={variantIndex} qty={qty} expressAttempt={expressAttempt} visitorCountry={country} />
 </Base>

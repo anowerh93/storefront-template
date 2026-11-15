@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useRef } from 'react';
 import { Star, Phone, Facebook, MessageCircle, Mail, Link2, Check, ShoppingBag, ShoppingCart, Minus, Plus, Truck } from 'lucide-react';
 import { freeDeliveryLabel, variantFreeDelivery } from '../lib/free-delivery';
 import { formatBDT, discountPct } from '../lib/format';
@@ -13,7 +13,12 @@ import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
 import { sizeOptions, lineLabel, optionNames } from '../lib/variants';
 import { pixel } from '../lib/pixel';
-import type { ProductDetail, StorefrontMeta } from '../lib/types';
+import type { Category, ProductDetail, StorefrontMeta } from '../lib/types';
+
+/** The buy box's "(N reviews)" asks the tabs below to open Reviews and
+ *  scroll to them. The two sit far apart in the tree, so a window event is
+ *  the whole wiring; `#reviews` in the URL does the same on load. */
+const OPEN_REVIEWS_EVENT = 'rbd:open-reviews';
 
 /**
  * Product detail page — single catalog-style layout for every product
@@ -28,9 +33,12 @@ import type { ProductDetail, StorefrontMeta } from '../lib/types';
 export function ProductDetailPage({
   product,
   meta,
+  categories = [],
 }: {
   product: ProductDetail | null;
   meta: StorefrontMeta | null;
+  /** Feeds the header's category menus. */
+  categories?: Category[];
 }) {
   // GA4 view_item / Meta ViewContent on product view — before this, the
   // catalog product pages fired nothing until add-to-cart, so the GA4
@@ -48,7 +56,7 @@ export function ProductDetailPage({
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-[1280px] px-4 sm:px-6 pt-5 pb-16">
         {/* Breadcrumb */}
@@ -269,7 +277,16 @@ function BuyBox({
             ))}
           </div>
           <span className="font-semibold text-slate-900">{ratingAvg.toFixed(1)}</span>
-          <span className="text-slate-500">({ratingCount} {ratingCount === 1 ? 'review' : 'reviews'})</span>
+          <a
+            href="#reviews"
+            onClick={(e) => {
+              e.preventDefault();
+              window.dispatchEvent(new Event(OPEN_REVIEWS_EVENT));
+            }}
+            className="text-slate-500 underline-offset-2 hover:text-slate-900 hover:underline"
+          >
+            ({ratingCount} {ratingCount === 1 ? 'review' : 'reviews'})
+          </a>
         </div>
       )}
 
@@ -533,13 +550,34 @@ function ProductTabs({ product, meta }: { product: ProductDetail; meta: Storefro
   ].filter(Boolean) as { key: string; label: string }[];
 
   const [active, setActive] = useState(tabs[0]?.key ?? 'description');
+  const boxRef = useRef<HTMLDivElement>(null);
+  const hasReviewsTab = tabs.some((t) => t.key === 'reviews');
+  useEffect(() => {
+    if (!hasReviewsTab) return;
+    const open = () => {
+      setActive('reviews');
+      // After the tab has rendered, so the scroll lands on its real height.
+      requestAnimationFrame(() => boxRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
+    const onHash = () => {
+      if (window.location.hash === '#reviews') open();
+    };
+    onHash();
+    window.addEventListener(OPEN_REVIEWS_EVENT, open);
+    window.addEventListener('hashchange', onHash);
+    return () => {
+      window.removeEventListener(OPEN_REVIEWS_EVENT, open);
+      window.removeEventListener('hashchange', onHash);
+    };
+  }, [hasReviewsTab]);
   if (tabs.length === 0) return <div />;
 
   return (
     // min-w-0: this is a grid/flex cell whose default min-width:auto would let a
     // wide spec table (long unbreakable token) push the whole page sideways on
     // mobile. min-w-0 lets it shrink to the column so the table wraps/scrolls.
-    <div className="min-w-0 rounded-2xl bg-white ring-1 ring-slate-200">
+    // id + scroll-mt: "(N reviews)" lands here below the sticky header.
+    <div id="reviews" ref={boxRef} className="min-w-0 scroll-mt-32 rounded-2xl bg-white ring-1 ring-slate-200">
       <div className="flex flex-wrap gap-1 border-b border-slate-100 p-2">
         {tabs.map((t) => (
           <button

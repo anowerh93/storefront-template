@@ -6,19 +6,19 @@ import { Button } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
 import { NotFoundPage } from './not-found';
 import { codOffered } from '../components/order/checkout-extras';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 /**
  * Astro+CF port: previously async-fetched its own storefront meta.
  * Now receives `meta` as a prop from the Astro page wrapper so the
  * component itself can hydrate as a sync client island.
  */
-export function OrderLookupPage({ meta }: { meta: StorefrontMeta | null }) {
+export function OrderLookupPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   if (!meta) return <NotFoundPage />;
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-md px-4 sm:px-6 py-10 sm:py-14">
         <div className="mx-auto h-14 w-14 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center mb-5">

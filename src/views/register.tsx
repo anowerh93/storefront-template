@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { TurnstileWidget } from '../components/auth/turnstile';
 import { NotFoundPage } from './not-found';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 /**
  * Customer registration. name + phone + optional email + password (min 6). On
@@ -19,7 +19,7 @@ import type { StorefrontMeta } from '../lib/types';
  * generic message plus a login pointer instead of a dead-end error.
  * account_exists is the pre-hardening code, kept for rollout overlap.
  */
-export function RegisterPage({ meta }: { meta: StorefrontMeta | null }) {
+export function RegisterPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
@@ -75,7 +75,7 @@ export function RegisterPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-md px-4 sm:px-6 py-10 sm:py-14">
         <div className="mx-auto h-14 w-14 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center mb-5">

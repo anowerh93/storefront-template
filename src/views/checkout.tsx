@@ -3,7 +3,7 @@ import { useForm, type FieldErrors } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { ShoppingCart, Truck, Minus, Plus, UserPlus, Trash2, Loader2, ShoppingBag, CreditCard } from 'lucide-react';
-import type { CreateOrderInput, PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
+import type { Category, CreateOrderInput, PaymentMethod, ProductDetail, StorefrontMeta } from '../lib/types';
 import { ApiError, getFreeDelivery, orderIdempotencyKey, refreshPaymentMeta, submitOrder, setToken } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
 import { useCart, useCartHydrated, lineCeiling, type CartLine } from '../stores/cart';
@@ -137,6 +137,7 @@ type FormData = z.infer<ReturnType<typeof makeCheckoutSchema>>;
 export function CheckoutPage({
   product,
   meta,
+  categories = [],
   variantIndex,
   qty: initialQty,
   expressAttempt = false,
@@ -144,6 +145,8 @@ export function CheckoutPage({
 }: {
   product: ProductDetail | null;
   meta: StorefrontMeta | null;
+  /** Feeds the header's category menus. */
+  categories?: Category[];
   variantIndex: number | null;
   qty: number;
   /** Cloudflare's country for this visitor (src/lib/geo.ts), null = unknown. */
@@ -461,7 +464,7 @@ export function CheckoutPage({
   if (!meta || (expressAttempt && !product)) {
     return (
       <>
-        {meta && <Header meta={meta} />}
+        {meta && <Header meta={meta} categories={categories} />}
         <main className="mx-auto max-w-xl px-4 py-24 text-center">
           <h1 className="text-2xl font-bold text-slate-900">Nothing to check out</h1>
           <p className="mt-2 text-slate-600">We couldn't find that product. It may have been removed.</p>
@@ -477,7 +480,7 @@ export function CheckoutPage({
   if (!isExpress && !hydrated) {
     return (
       <>
-        <Header meta={meta} />
+        <Header meta={meta} categories={categories} />
         <main className="mx-auto max-w-5xl px-4 py-24 text-center">
           <Loader2 className="mx-auto h-8 w-8 animate-spin text-slate-400" />
           <p className="mt-4 text-sm text-slate-500">Loading your cart…</p>
@@ -490,7 +493,7 @@ export function CheckoutPage({
   if (!isExpress && lines.length === 0) {
     return (
       <>
-        <Header meta={meta} />
+        <Header meta={meta} categories={categories} />
         <main className="mx-auto max-w-xl px-4 py-24 text-center">
           <ShoppingBag className="mx-auto h-10 w-10 text-slate-300" />
           <h1 className="mt-3 text-2xl font-bold text-slate-900">Your cart is empty</h1>
@@ -933,7 +936,7 @@ export function CheckoutPage({
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
       <main className="bg-slate-50 py-8">
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           {/* Secure Checkout banner */}

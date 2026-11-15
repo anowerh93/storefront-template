@@ -8,7 +8,7 @@ import { Label } from '../components/ui/label';
 import { Button } from '../components/ui/button';
 import { TurnstileWidget } from '../components/auth/turnstile';
 import { NotFoundPage } from './not-found';
-import type { StorefrontMeta } from '../lib/types';
+import type { Category, StorefrontMeta } from '../lib/types';
 
 type Channel = 'sms' | 'email';
 type Step = 'request' | 'verify';
@@ -25,7 +25,7 @@ type Step = 'request' | 'verify';
  * account exists), so we advance to step 2 on any resolved request. A shopper
  * who already has a code (e.g. came back later) can jump straight to step 2.
  */
-export function ResetPasswordPage({ meta }: { meta: StorefrontMeta | null }) {
+export function ResetPasswordPage({ meta, categories = [] }: { meta: StorefrontMeta | null; categories?: Category[] }) {
   const [step, setStep] = useState<Step>('request');
   const [channel, setChannel] = useState<Channel>('sms');
   const [identifier, setIdentifier] = useState('');
@@ -123,7 +123,7 @@ export function ResetPasswordPage({ meta }: { meta: StorefrontMeta | null }) {
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="mx-auto max-w-md px-4 sm:px-6 py-10 sm:py-14">
         <div className="mx-auto h-14 w-14 rounded-2xl bg-brand-100 text-brand-700 flex items-center justify-center mb-5">

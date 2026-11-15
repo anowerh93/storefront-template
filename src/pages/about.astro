@@ -4,15 +4,21 @@
  * HTML at build time. Renders the tenant's `about` text from storefront meta.
  */
 import Base from '../layouts/Base.astro';
-import { getStorefrontGated, getTeam, getCertifications } from '../lib/api';
+import { getCategories, getStorefrontGated, getTeam, getCertifications } from '../lib/api';
 import { breadcrumbSchema } from '../lib/schema';
 import { AboutPage } from '../views/about';
 import { ServiceAboutPage } from '../views/service-about';
-import type { TeamMember, Certification } from '../lib/types';
+import type { Category, TeamMember, Certification } from '../lib/types';
 
 // Gated: a plan-gated tenant (402) bakes Base's ShopClosed at build time —
 // same staleness caveat as the homepage (nothing rebuilds on plan renewal).
-const gate = await getStorefrontGated();
+// The header's category menus (the search box's "All Categories" and
+// "Browse All Categories") need the list on every page, not only the
+// catalogue's. Fetched in parallel; a failure is an empty menu, never the page.
+const [gate, categories] = await Promise.all([
+  getStorefrontGated(),
+  getCategories().catch((): Category[] => []),
+]);
 const meta = gate.meta;
 
 // Service tenants get a service-appropriate About (built from the
@@ -44,5 +50,5 @@ const schemas = origin
 <Base title={aboutTitle} schema={schemas} gate={gate}>
   {/* client:load is required — the shared header inside each view carries the
       mobile hamburger / cart badge; without hydration they render but do nothing. */}
-  {isService ? <ServiceAboutPage client:load meta={meta} /> : <AboutPage client:load meta={meta} team={team} certifications={certifications} />}
+  {isService ? <ServiceAboutPage client:load meta={meta} /> : <AboutPage categories={categories} client:load meta={meta} team={team} certifications={certifications} />}
 </Base>

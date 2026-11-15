@@ -6,14 +6,21 @@
 export const prerender = false;
 
 import Base from '../layouts/Base.astro';
-import { getStorefrontGated } from '../lib/api';
+import type { Category } from '../lib/types';
+import { getCategories, getStorefrontGated } from '../lib/api';
 import { RegisterPage } from '../views/register';
 
 // Gated: a plan-gated tenant (402) renders Base's ShopClosed, not the form.
-const gate = await getStorefrontGated();
+// The header's category menus (the search box's "All Categories" and
+// "Browse All Categories") need the list on every page, not only the
+// catalogue's. Fetched in parallel; a failure is an empty menu, never the page.
+const [gate, categories] = await Promise.all([
+  getStorefrontGated(),
+  getCategories().catch((): Category[] => []),
+]);
 const meta = gate.meta;
 ---
 
 <Base title="Create an account" gate={gate} noindex={true}>
-  <RegisterPage client:load meta={meta} />
+  <RegisterPage categories={categories} client:load meta={meta} />
 </Base>

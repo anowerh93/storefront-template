@@ -30,7 +30,7 @@ import {
 } from '../components/order/checkout-extras';
 import { formatBDT } from '../lib/format';
 import { NotFoundPage } from './not-found';
-import type { OrderResponse, StorefrontMeta } from '../lib/types';
+import type { Category, OrderResponse, StorefrontMeta } from '../lib/types';
 
 /**
  * Online-payment status polling: the delay before each refetch.
@@ -143,6 +143,7 @@ export function OrderStatusPage({
   placed,
   accountExists,
   meta,
+  categories = [],
 }: {
   orderNumber: string;
   phone?: string;
@@ -151,6 +152,8 @@ export function OrderStatusPage({
    *  had one — show a subtle "log in to track all your orders" nudge. */
   accountExists?: boolean;
   meta: StorefrontMeta | null;
+  /** Feeds the header's category menus. */
+  categories?: Category[];
 }) {
   const [order, setOrder] = useState<OrderResponse | null>(null);
   // Who is asking, as far as the SERVER can know: the ?phone= last-4, nobody
@@ -560,7 +563,7 @@ export function OrderStatusPage({
   if (ready && !phoneKey && !authed) {
     return (
       <>
-        <Header meta={meta} />
+        <Header meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-10">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Track order #{orderNumber}</h1>
           <p className="text-sm text-slate-500 mb-6">Enter the last 4 digits of the phone number you used to place the order.</p>
@@ -579,7 +582,7 @@ export function OrderStatusPage({
   if (!ready || loading) {
     return (
       <>
-        <Header meta={meta} />
+        <Header meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-20 text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-400" />
           <p className="mt-4 text-sm text-slate-500">Looking up your order…</p>
@@ -594,7 +597,7 @@ export function OrderStatusPage({
   if (loadFailed && !order) {
     return (
       <>
-        <Header meta={meta} />
+        <Header meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-20 text-center">
           <Loader2 className="mx-auto h-8 w-8 text-slate-400" />
           <h1 className="mt-4 text-xl font-bold text-slate-900">We couldn't load your order right now</h1>
@@ -620,7 +623,7 @@ export function OrderStatusPage({
 
   return (
     <>
-      <Header meta={meta} />
+      <Header meta={meta} categories={categories} />
 
       <main className="bg-slate-50">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12 space-y-6">
