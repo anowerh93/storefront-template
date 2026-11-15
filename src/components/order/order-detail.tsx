@@ -85,11 +85,13 @@ export function OrderDetail({
   // review-parked payment is "paid" with a remainder). Both keys are absent
   // on an API that predates them, which simply hides the rows. "Due on
   // delivery" is only worth a row when it differs from the total (something
-  // was prepaid) and the order is still going out — not cancelled, and not
-  // already delivered (the rider collected it; nothing is due any more).
+  // was prepaid) and the order is still going out — not cancelled, not
+  // returned to the store, and not already delivered (the rider collected
+  // it; nothing is due any more).
   const paidOnline = typeof order.online_paid_amount === 'number' ? order.online_paid_amount : 0;
   const dueOnDelivery =
     order.status !== 'canceled' &&
+    order.status !== 'returned' &&
     order.status !== 'delivered' &&
     typeof order.due_on_delivery === 'number' &&
     Math.abs(order.due_on_delivery - order.total) >= 0.01

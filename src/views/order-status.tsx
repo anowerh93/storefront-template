@@ -65,12 +65,16 @@ export function orderPaymentState(order: OrderResponse | null) {
   const moneyCaptured =
     isOnline &&
     (order?.payment_status === 'paid' || order?.payment_status === 'refunded' || partlyPaid);
-  // Cancelled AFTER the money was captured (merchant cancel → manual refund)
-  // is a different message than a failed/abandoned payment — telling a
-  // charged customer "you have not been charged" is a dispute generator.
-  const paidThenCanceled = moneyCaptured && order?.status === 'canceled';
+  // A parcel that came back to the shop ('returned') reads like a cancelled
+  // order for the money: nothing is being processed, a payment is refunded.
+  const closed = order?.status === 'canceled' || order?.status === 'returned';
+  // Cancelled (or returned) AFTER the money was captured (merchant cancel →
+  // manual refund) is a different message than a failed/abandoned payment —
+  // telling a charged customer "you have not been charged" is a dispute
+  // generator.
+  const paidThenCanceled = moneyCaptured && closed;
   const paymentPaid =
-    isOnline && (order?.payment_status === 'paid' || partlyPaid) && order?.status !== 'canceled';
+    isOnline && (order?.payment_status === 'paid' || partlyPaid) && !closed;
   // "Cancelled, not charged" is about the ORDER being cancelled — never about
   // payment_status alone: an order the store revived (or confirmed by phone)
   // can carry a failed/unpaid payment while it is being fulfilled.
@@ -83,6 +87,7 @@ export function orderPaymentState(order: OrderResponse | null) {
     !moneyCaptured &&
     !!order &&
     order.status !== 'canceled' &&
+    order.status !== 'returned' &&
     order.status !== 'delivered' &&
     !awaitingPayment;
 
@@ -627,11 +632,13 @@ export function OrderStatusPage({
                 <X className="h-7 w-7" strokeWidth={3} />
               </div>
               <div>
-                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">Order cancelled — payment received</h1>
+                <h1 className="text-xl font-bold text-slate-900 sm:text-2xl">
+                  {order.status === 'returned' ? 'Order returned — payment received' : 'Order cancelled — payment received'}
+                </h1>
                 <p className="mt-0.5 text-sm text-slate-500">
                   {order.payment_status === 'refunded'
-                    ? 'This order was cancelled and your payment has been refunded.'
-                    : 'This order was cancelled, and your payment for it was received. The store will refund you — contact them with your order number if you haven’t heard from them.'}
+                    ? `This order was ${order.status === 'returned' ? 'returned' : 'cancelled'} and your payment has been refunded.`
+                    : `This order was ${order.status === 'returned' ? 'returned to the store' : 'cancelled'}, and your payment for it was received. The store will refund you — contact them with your order number if you haven’t heard from them.`}
                 </p>
               </div>
             </div>
