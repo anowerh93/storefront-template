@@ -56,10 +56,14 @@ const meta = gate.meta;
 // The ad's query string (utm_*, fbclid: the pixel and attribution need them)
 // goes along. A link change forwards with a 302 (browsers keep a 301 for
 // good); a redirect the owner added by hand keeps its own status. Skipped on
-// a closed shop: the honest render there is Base's ShopClosed.
+// a closed shop: the honest render there is Base's ShopClosed. The API strips
+// a query from every stored path; should one ever carry its own, the ad's
+// query is appended with "&", never a second "?".
 const to = forward?.to;
 if (!funnel && !gate.closed && to && /^\/(?![/\\])/.test(to) && to !== `/${slug}`) {
-  return Astro.redirect(`${to}${Astro.url.search}`, forward?.status === 301 ? 301 : 302);
+  const query = Astro.url.search.slice(1);
+  const target = query ? `${to}${to.includes('?') ? '&' : '?'}${query}` : to;
+  return Astro.redirect(target, forward?.status === 301 ? 301 : 302);
 }
 
 // Closed shop: the missing funnel is the plan gate 402ing — an ad click
