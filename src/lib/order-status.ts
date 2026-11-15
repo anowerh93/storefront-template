@@ -25,6 +25,8 @@ const STATUS_MAP: Record<string, { label: string; variant: OrderStatusVariant }>
   shipped:               { label: 'Shipped',    variant: 'brand' },
   delivered:             { label: 'Delivered',  variant: 'success' },
   canceled:              { label: 'Canceled',   variant: 'default' },
+  // The parcel came back to the shop (refused, or a product returned).
+  returned:              { label: 'Returned',   variant: 'default' },
 };
 
 /** Humanize an unknown status string ("foo_bar" → "Foo Bar"). */

@@ -787,7 +787,7 @@ export type PaymentMethod = 'cod' | 'online' | 'online_advance';
 
 export type OrderResponse = {
   order_number: string;
-  status: string;            // 'pending' | 'on_hold' | 'confirmed' | 'shipped' | 'delivered' | 'cancelled'
+  status: string;            // 'pending' | 'on_hold' | 'confirmed' | 'shipped' | 'delivered' | 'canceled' | 'returned'
   status_label?: string;
   subtotal: number;
   shipping_fee: number;

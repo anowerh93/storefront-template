@@ -1,4 +1,4 @@
-import { BadgeCheck, ClipboardList, PackageCheck, Truck, X } from 'lucide-react';
+import { BadgeCheck, ClipboardList, PackageCheck, Truck, Undo2, X } from 'lucide-react';
 import type { OrderResponse } from '../../lib/types';
 
 /**
@@ -10,7 +10,8 @@ import type { OrderResponse } from '../../lib/types';
  * the mapping can be read (and checked) without rendering.
  *
  * The API's `timeline` carries the recorded fulfilment events (confirmed /
- * shipped / delivered / canceled, latest per status — Order::customerTimeline);
+ * shipped / delivered / canceled / returned, latest per status —
+ * Order::customerTimeline);
  * placement is `placed_at`. The steps follow the order's STATUS, the timeline
  * only dates them: a store that moved an order back (shipped → confirmed)
  * shows Shipped as upcoming again, whatever the events say.
@@ -19,7 +20,7 @@ import type { OrderResponse } from '../../lib/types';
 export type StepState = 'done' | 'current' | 'upcoming' | 'canceled';
 
 export type ProgressStep = {
-  key: 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'canceled';
+  key: 'placed' | 'confirmed' | 'shipped' | 'delivered' | 'canceled' | 'returned';
   title: string;
   /** What the step means right now; '' for an upcoming one (title only). */
   description: string;
@@ -61,6 +62,13 @@ const TITLES: Record<ProgressStep['key'], string> = {
   shipped: 'Shipped',
   delivered: 'Delivered',
   canceled: 'Canceled',
+  returned: 'Returned',
+};
+
+/** The two end states a shopper sees in red: what each one says. */
+const CLOSED_COPY: Record<'canceled' | 'returned', string> = {
+  canceled: 'Your order has been canceled.',
+  returned: 'Your parcel was returned to the shop.',
 };
 
 export function progressSteps(order: Pick<OrderResponse, 'status' | 'placed_at' | 'timeline'>): ProgressStep[] {
@@ -73,19 +81,21 @@ export function progressSteps(order: Pick<OrderResponse, 'status' | 'placed_at' 
     { key: 'placed', title: TITLES.placed, description: 'We have received your order.', at: order.placed_at, state: 'done' },
   ];
 
-  if (order.status === 'canceled') {
-    // Everything the order got to before it was canceled stays ticked (the
-    // furthest recorded milestone and the ones before it); the rest is
-    // replaced by the one red step. A canceled order never shows "upcoming".
+  if (order.status === 'canceled' || order.status === 'returned') {
+    // Everything the order got to before it was canceled (or came back) stays
+    // ticked (the furthest recorded milestone and the ones before it); the
+    // rest is replaced by the one red step. Such an order never shows
+    // "upcoming".
+    const end = order.status;
     const got = Math.max(0, ...MILESTONES.map((m, i) => (at[m] ? i + 1 : 0)));
     for (const m of MILESTONES.slice(0, got)) {
       steps.push({ key: m, title: TITLES[m], description: DONE_COPY[m], at: at[m], state: 'done' });
     }
     steps.push({
-      key: 'canceled',
-      title: TITLES.canceled,
-      description: 'Your order has been canceled.',
-      at: at.canceled,
+      key: end,
+      title: TITLES[end],
+      description: CLOSED_COPY[end],
+      at: at[end],
       state: 'canceled',
     });
     return steps;
@@ -112,6 +122,7 @@ const ICONS: Record<ProgressStep['key'], typeof Truck> = {
   shipped: Truck,
   delivered: PackageCheck,
   canceled: X,
+  returned: Undo2,
 };
 
 /** ISO → "25 Oct 2026, 1:26 PM". Empty when unusable. */
