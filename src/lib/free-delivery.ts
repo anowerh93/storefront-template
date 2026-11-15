@@ -13,13 +13,19 @@ import type { ShippingZone, StorefrontMeta } from './types';
  * its product's, the better of the two): a line on a variant reads the
  * variant's, and an API without it reads the product's.
  *
- * A cart ships free to a zone only when EVERY line is free there; one ordinary
- * line brings the ordinary charge back (the threshold included). A line with
- * no value — a cart saved before this build, or an API that does not send it
- * yet — counts as ordinary, so the checkout never shows "Free" for an order the
+ * A cart ships free to a zone by the shop's rule (meta `shipping.
+ * free_delivery_rule`, myapp's FreeDeliveryRule): 'every' (the default, and
+ * what an API without the key means) — only when EVERY line is free there,
+ * one ordinary line bringing the ordinary charge back (the threshold
+ * included); 'any' — when at least ONE line is free there. A line with no
+ * value — a cart saved before this build, or an API that does not send it yet
+ * — counts as ordinary, so the checkout never shows "Free" for an order the
  * server would charge. The server decides the order's total either way.
  */
 export type FreeDelivery = 'all' | 'inside_city' | null;
+
+/** The shop's rule for a cart mixing free-delivery and ordinary lines. */
+export type FreeDeliveryRule = 'every' | 'any';
 
 /** One product's values as the checkout re-read them (getFreeDelivery). */
 export type FreeDeliveryNow = {
@@ -61,17 +67,24 @@ export function coversZone(value: FreeDelivery | undefined, zone: string | undef
   return false;
 }
 
-/** Every line (at least one) ships free to `zone`. */
+/**
+ * The cart ships free to `zone`: every line (at least one) is free there, or —
+ * under the shop's 'any' rule — at least one is. Anything but 'any' is 'every'.
+ */
 export function cartShipsFree(
   lines: { free_delivery?: FreeDelivery }[],
   zone: string | undefined,
+  rule?: FreeDeliveryRule | string | null,
 ): boolean {
-  return lines.length > 0 && lines.every((l) => coversZone(l.free_delivery, zone));
+  if (lines.length === 0) return false;
+  return rule === 'any'
+    ? lines.some((l) => coversZone(l.free_delivery, zone))
+    : lines.every((l) => coversZone(l.free_delivery, zone));
 }
 
 /**
  * The delivery charge for these lines to `zone`: nothing when the shop charges
- * none or every line is free there, else the zone's fee unless the subtotal
+ * none or the cart ships free there (its rule), else the zone's fee unless the subtotal
  * reaches the free-shipping threshold. No zone picked = no fee yet.
  */
 export function deliveryFee(
@@ -81,7 +94,7 @@ export function deliveryFee(
   subtotal: number,
 ): number {
   if (!shipping?.enabled || !zone) return 0;
-  if (cartShipsFree(lines, zone.code)) return 0;
+  if (cartShipsFree(lines, zone.code, shipping.free_delivery_rule)) return 0;
   const threshold = shipping.free_shipping_threshold ?? null;
   if (threshold && subtotal >= threshold) return 0;
   return zone.fee ?? 0;

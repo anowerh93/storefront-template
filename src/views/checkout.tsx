@@ -1084,7 +1084,7 @@ export function CheckoutPage({
                         <label key={z.code} className={`flex items-center gap-2 rounded-xl border px-3 py-2.5 cursor-pointer transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                           <RadioGroupItem value={z.code} />
                           <span className="text-sm font-medium text-slate-900">{z.label}</span>
-                          {cartShipsFree(freeLines, z.code) && (
+                          {cartShipsFree(freeLines, z.code, meta?.shipping?.free_delivery_rule) && (
                             <span data-free-zone className="ml-auto text-xs font-semibold text-brand-600">Free</span>
                           )}
                         </label>

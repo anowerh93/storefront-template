@@ -1610,7 +1610,7 @@ function OrderForm({ config, product, meta, btn, visitorCountry }: { config: Fun
                 <label key={z.code} className={`flex cursor-pointer items-center gap-2 rounded-xl border px-3 py-2.5 transition ${selectedZone === z.code ? 'border-brand-500 bg-brand-50' : 'border-slate-200 hover:border-slate-300'}`}>
                   <RadioGroupItem value={z.code} />
                   <span className="text-sm font-medium text-slate-900">{z.label}</span>
-                  {cartShipsFree(freeLines, z.code) && (
+                  {cartShipsFree(freeLines, z.code, meta?.shipping?.free_delivery_rule) && (
                     <span data-free-zone className="ml-auto text-xs font-semibold text-brand-600">Free</span>
                   )}
                 </label>
