@@ -16,6 +16,7 @@ import ShopClosed from '../components/layout/shop-closed.astro';
 import { brandCssVars } from '../lib/theme';
 import { CDN_HOST } from '../lib/img';
 import { isMirrorHost, MIRROR_HOST_SUFFIXES } from '../lib/mirror';
+import { FUNNELS_ONLY_ROOT_ROUTE } from '../lib/funnels-only';
 import type { StorefrontMeta } from '../lib/types';
 
 export interface Props {
@@ -170,7 +171,11 @@ if (mirror) {
   } catch { /* prerendered context — the meta tag / runtime check covers it */ }
 }
 
-const canonicalPath = Astro.url.pathname === '/' ? '/' : Astro.url.pathname.replace(/\/+$/, '');
+// A landing-pages-only build serves "/" from FUNNELS_ONLY_ROOT_ROUTE
+// (src/middleware.ts rewrites it), and a rewrite changes Astro.url: that
+// page's address is "/".
+const requestPath = Astro.url.pathname === FUNNELS_ONLY_ROOT_ROUTE ? '/' : Astro.url.pathname;
+const canonicalPath = requestPath === '/' ? '/' : requestPath.replace(/\/+$/, '');
 const canonical =
   canonicalBase && !hideFromSearch && !meta?.seo?.discourage && !mirror
     ? canonicalBase + canonicalPath

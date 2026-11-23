@@ -1,0 +1,33 @@
+---
+/**
+ * "/" on a landing-pages-only build (src/lib/funnels-only.ts).
+ *
+ * Such a store has no homepage, but "/" must still answer 200 with the
+ * page head the shop configured: Google and Bing verify a domain by
+ * fetching "/" and reading the verification meta tag, and the shop's own
+ * custom head code (another verification tag, a pixel) lands there too.
+ * Base renders both. The page shows the shop's name and nothing else: no
+ * links, no catalogue, no API call beyond the store's meta. It is never
+ * indexed.
+ *
+ * Lives outside src/pages: astro.config.mjs injects it, as
+ * FUNNELS_ONLY_ROOT_ROUTE, only into a flagged build, and src/middleware.ts
+ * rewrites "/" to it. A full website build never sees this file.
+ */
+import Base from '../layouts/Base.astro';
+import { getStorefrontGated } from '../lib/api';
+import { FunnelsOnlyFooter, FunnelsOnlyHeader } from '../components/layout/funnels-only-chrome';
+
+const gate = await getStorefrontGated();
+const meta = gate.meta;
+---
+
+<Base title={meta?.name} gate={gate} noindex={true}>
+  {meta && (
+    <div class="flex flex-col bg-white">
+      <FunnelsOnlyHeader meta={meta} />
+      <main class="flex-1"></main>
+      <FunnelsOnlyFooter meta={meta} />
+    </div>
+  )}
+</Base>
