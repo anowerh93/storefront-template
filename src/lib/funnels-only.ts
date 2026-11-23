@@ -8,7 +8,9 @@
  * so this build serves the same set of pages and nothing more:
  *   - the funnel at /{slug}, and the /f/{slug} redirect to it;
  *   - the order page /order/{number} (thank-you, tracking, payment return);
- *   - robots.txt and the favicon.
+ *   - robots.txt and the favicon;
+ *   - "/", as a page with the shop's name and the head it configured
+ *     (src/funnels-only/root.astro): Google and Bing verify a domain there.
  * Every other route answers a plain 404 (src/middleware.ts). The catalogue
  * pages are never prerendered either (astro.config.mjs), so a build makes no
  * catalogue call.
@@ -16,6 +18,13 @@
  * A full website build leaves the variable unset, and none of this runs.
  */
 export const FUNNELS_ONLY: boolean = import.meta.env.PUBLIC_FUNNELS_ONLY === '1';
+
+/**
+ * The route "/" is rewritten to on such a build (src/middleware.ts). It is
+ * injected by astro.config.mjs, which spells the same path: keep the two
+ * equal.
+ */
+export const FUNNELS_ONLY_ROOT_ROUTE = '/__landing-root';
 
 /**
  * Astro route patterns (context.routePattern) a landing-pages-only build
@@ -29,6 +38,7 @@ export const FUNNELS_ONLY_ROUTES: readonly string[] = [
   '/robots.txt',
   '/favicon.ico',
   '/404',
+  FUNNELS_ONLY_ROOT_ROUTE,
 ];
 
 export function funnelsOnlyServes(routePattern: string): boolean {

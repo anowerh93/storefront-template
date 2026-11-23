@@ -1,5 +1,5 @@
 import { defineMiddleware } from 'astro:middleware';
-import { FUNNELS_ONLY, funnelsOnlyServes } from './lib/funnels-only';
+import { FUNNELS_ONLY, FUNNELS_ONLY_ROOT_ROUTE, funnelsOnlyServes } from './lib/funnels-only';
 
 /**
  * A landing-pages-only build (src/lib/funnels-only.ts) serves the funnel,
@@ -13,6 +13,12 @@ import { FUNNELS_ONLY, funnelsOnlyServes } from './lib/funnels-only';
 export const onRequest = defineMiddleware((context, next) => {
   if (!FUNNELS_ONLY || funnelsOnlyServes(context.routePattern)) {
     return next();
+  }
+
+  // "/" answers with the shop's name and its configured head (the domain
+  // verification tags), never the homepage, which calls the catalogue.
+  if (context.routePattern === '/') {
+    return next(FUNNELS_ONLY_ROOT_ROUTE);
   }
 
   return new Response('Not found\n', {

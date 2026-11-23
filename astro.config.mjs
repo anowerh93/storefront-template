@@ -21,6 +21,19 @@ function funnelsOnlyRendersOnRequest() {
   return {
     name: 'replybd-funnels-only',
     hooks: {
+      // "/" of such a store (src/funnels-only/root.astro): the shop's name
+      // and its configured head, where Google and Bing verify a domain.
+      // src/middleware.ts rewrites "/" here; the path is
+      // FUNNELS_ONLY_ROOT_ROUTE in src/lib/funnels-only.ts.
+      'astro:config:setup': ({ injectRoute }) => {
+        if (on) {
+          injectRoute({
+            pattern: '/__landing-root',
+            entrypoint: './src/funnels-only/root.astro',
+            prerender: false,
+          });
+        }
+      },
       'astro:route:setup': ({ route }) => {
         if (on) {
           route.prerender = false;
