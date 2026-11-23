@@ -21,6 +21,7 @@ import Base from '../../layouts/Base.astro';
 import type { Category } from '../../lib/types';
 import { getCategories, getStorefrontGated } from '../../lib/api';
 import { OrderStatusPage } from '../../views/order-status';
+import { FUNNELS_ONLY } from '../../lib/funnels-only';
 
 const orderNumber = Astro.params.number ?? '';
 const phone = Astro.url.searchParams.get('phone') ?? undefined;
@@ -36,7 +37,8 @@ const accountExists = Astro.url.searchParams.get('account_exists') === '1';
 // catalogue's. Fetched in parallel; a failure is an empty menu, never the page.
 const [gate, categories] = await Promise.all([
   getStorefrontGated(),
-  getCategories().catch((): Category[] => []),
+  // A landing-pages-only build has no header menus (and no categories API).
+  FUNNELS_ONLY ? Promise.resolve([] as Category[]) : getCategories().catch((): Category[] => []),
 ]);
 const meta = gate.meta;
 ---

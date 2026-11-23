@@ -1,4 +1,5 @@
 import { Button } from '../components/ui/button';
+import { FUNNELS_ONLY } from '../lib/funnels-only';
 
 export function NotFoundPage() {
   return (
@@ -8,10 +9,13 @@ export function NotFoundPage() {
       <p className="text-sm text-slate-600 mb-6 max-w-md">
         The page you're looking for doesn't exist or may have been moved.
       </p>
-      <div className="flex gap-3">
-        <a href="/"><Button variant="brand">Go home</Button></a>
-        <a href="/products"><Button variant="outline">Browse products</Button></a>
-      </div>
+      {/* A landing-pages-only build has no home or catalogue to send them to. */}
+      {!FUNNELS_ONLY && (
+        <div className="flex gap-3">
+          <a href="/"><Button variant="brand">Go home</Button></a>
+          <a href="/products"><Button variant="outline">Browse products</Button></a>
+        </div>
+      )}
     </div>
   );
 }

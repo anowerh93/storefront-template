@@ -1,6 +1,7 @@
 import type { APIRoute } from 'astro';
 import { getStorefront } from '../lib/api';
 import { isMirrorHost } from '../lib/mirror';
+import { FUNNELS_ONLY } from '../lib/funnels-only';
 
 /**
  * Per-tenant robots.txt — SSR so it follows the dashboard's WordPress-style
@@ -22,7 +23,8 @@ export const GET: APIRoute = async ({ url }) => {
   try {
     const meta = await getStorefront();
     discourage = !!meta?.seo?.discourage;
-    advertiseSitemap = !discourage && !isMirrorHost(url.hostname, meta?.public_url);
+    // A landing-pages-only build has no sitemap: its pages are noindex funnels.
+    advertiseSitemap = !FUNNELS_ONLY && !discourage && !isMirrorHost(url.hostname, meta?.public_url);
   } catch {
     // API unreachable — fail open on crawl, closed on the Sitemap line.
   }
