@@ -5,6 +5,8 @@ import { pixel } from '../lib/pixel';
 import { useCart } from '../stores/cart';
 import { Header } from '../components/layout/header';
 import { Footer } from '../components/layout/footer';
+import { FunnelsOnlyFooter, FunnelsOnlyHeader } from '../components/layout/funnels-only-chrome';
+import { FUNNELS_ONLY } from '../lib/funnels-only';
 import { MessengerCTA } from '../components/layout/messenger-cta';
 import { Button, buttonVariants } from '../components/ui/button';
 import { OrderLookupForm } from '../components/order/order-lookup-form';
@@ -123,6 +125,11 @@ export function paymentReceivedLine(o: {
     ? `Thank you. Your advance of ${o.paid} is confirmed — ${o.due} is due on delivery.`
     : 'Thank you. Your advance is confirmed — the rest is due on delivery.';
 }
+
+// A landing-pages-only build has no catalogue, cart or account to link to:
+// its order page carries the shop's name and nothing else around the order.
+const PageHeader = FUNNELS_ONLY ? FunnelsOnlyHeader : Header;
+const PageFooter = FUNNELS_ONLY ? FunnelsOnlyFooter : Footer;
 
 /**
  * Astro+CF port: previously did its own `await getStorefront()` +
@@ -259,7 +266,9 @@ export function OrderStatusPage({
         /* storage blocked — the lookup form asks for the last-4 */
       }
     }
-    const hasToken = Boolean(getToken());
+    // A landing-pages-only store has no customer accounts: a token left from
+    // a website plan would ask the account API, which refuses it.
+    const hasToken = !FUNNELS_ONLY && Boolean(getToken());
     if (stashedPhone) setPhoneKey(stashedPhone);
     if (hasToken) setAuthed(true);
     if (stashedPhone || hasToken) setLoading(true);
@@ -563,7 +572,7 @@ export function OrderStatusPage({
   if (ready && !phoneKey && !authed) {
     return (
       <>
-        <Header meta={meta} categories={categories} />
+        <PageHeader meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-10">
           <h1 className="text-2xl font-bold text-slate-900 mb-2">Track order #{orderNumber}</h1>
           <p className="text-sm text-slate-500 mb-6">Enter the last 4 digits of the phone number you used to place the order.</p>
@@ -574,7 +583,7 @@ export function OrderStatusPage({
               still start the late-payment check on a cancelled order. */}
           <OrderLookupForm orderNumber={orderNumber} paymentHint={returnHint} />
         </main>
-        <Footer meta={meta} />
+        <PageFooter meta={meta} />
       </>
     );
   }
@@ -582,12 +591,12 @@ export function OrderStatusPage({
   if (!ready || loading) {
     return (
       <>
-        <Header meta={meta} categories={categories} />
+        <PageHeader meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-20 text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto text-slate-400" />
           <p className="mt-4 text-sm text-slate-500">Looking up your order…</p>
         </main>
-        <Footer meta={meta} />
+        <PageFooter meta={meta} />
       </>
     );
   }
@@ -597,7 +606,7 @@ export function OrderStatusPage({
   if (loadFailed && !order) {
     return (
       <>
-        <Header meta={meta} categories={categories} />
+        <PageHeader meta={meta} categories={categories} />
         <main className="mx-auto max-w-md px-4 sm:px-6 py-20 text-center">
           <Loader2 className="mx-auto h-8 w-8 text-slate-400" />
           <h1 className="mt-4 text-xl font-bold text-slate-900">We couldn't load your order right now</h1>
@@ -612,7 +621,7 @@ export function OrderStatusPage({
             Try again
           </Button>
         </main>
-        <Footer meta={meta} />
+        <PageFooter meta={meta} />
       </>
     );
   }
@@ -623,7 +632,7 @@ export function OrderStatusPage({
 
   return (
     <>
-      <Header meta={meta} categories={categories} />
+      <PageHeader meta={meta} categories={categories} />
 
       <main className="bg-slate-50">
         <div className="mx-auto max-w-4xl px-4 sm:px-6 py-8 sm:py-12 space-y-6">
@@ -793,7 +802,7 @@ export function OrderStatusPage({
             <h1 className="text-2xl font-bold text-slate-900">Order #{order.order_number}</h1>
           )}
 
-          {acctNudge && (
+          {acctNudge && !FUNNELS_ONLY && (
             <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-600">
               You already have an account —{' '}
               <a href="/login" className="font-semibold text-brand-600 hover:underline">log in</a>{' '}
@@ -830,10 +839,12 @@ export function OrderStatusPage({
                   )}
                 </a>
               )}
-              <a href="/products">
-                <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
-              </a>
-              {authed ? (
+              {!FUNNELS_ONLY && (
+                <a href="/products">
+                  <Button variant={retryOffer === 'failed' ? 'outline' : 'brand'} className="w-full sm:w-auto">Continue Shopping</Button>
+                </a>
+              )}
+              {FUNNELS_ONLY ? null : authed ? (
                 <a href="/account">
                   <Button variant="outline" className="w-full sm:w-auto">My Orders</Button>
                 </a>
@@ -847,7 +858,7 @@ export function OrderStatusPage({
         </div>
       </main>
 
-      <Footer meta={meta} />
+      <PageFooter meta={meta} />
       <MessengerCTA href={meta.messenger?.url ?? null} whatsapp={meta.whatsapp} />
     </>
   );

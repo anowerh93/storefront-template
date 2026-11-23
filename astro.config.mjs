@@ -5,6 +5,32 @@ import cloudflare from '@astrojs/cloudflare';
 import tailwindcss from '@tailwindcss/vite';
 
 /**
+ * A landing-pages-only build (PUBLIC_FUNNELS_ONLY=1, set by reply.bd for a
+ * plan with funnels and no website; see src/lib/funnels-only.ts) prerenders
+ * nothing. Its static pages (home, about, contact, categories, order lookup)
+ * would call the catalogue API at build time, which refuses such a store.
+ * Every route is rendered on request instead, so src/middleware.ts can
+ * answer 404 for the routes such a store does not serve. A full website
+ * build is untouched.
+ *
+ * @returns {import('astro').AstroIntegration}
+ */
+function funnelsOnlyRendersOnRequest() {
+  const on = process.env.PUBLIC_FUNNELS_ONLY === '1';
+
+  return {
+    name: 'replybd-funnels-only',
+    hooks: {
+      'astro:route:setup': ({ route }) => {
+        if (on) {
+          route.prerender = false;
+        }
+      },
+    },
+  };
+}
+
+/**
  * Reply.BD storefront — Astro on Cloudflare Pages.
  *
  * Output mode: 'static' (Astro 5 default — 'hybrid' was removed since it
@@ -23,6 +49,7 @@ export default defineConfig({
   }),
   integrations: [
     react(),
+    funnelsOnlyRendersOnRequest(),
   ],
   vite: {
     plugins: [tailwindcss()],

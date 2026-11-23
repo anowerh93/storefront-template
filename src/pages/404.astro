@@ -5,6 +5,8 @@
  * 404.html, which Cloudflare Pages serves on not-found.)
  */
 import Base from '../layouts/Base.astro';
+// A landing-pages-only build has no homepage to send them to.
+import { FUNNELS_ONLY } from '../lib/funnels-only';
 ---
 
 <Base title="Page not found" noindex={true}>
@@ -12,8 +14,10 @@ import Base from '../layouts/Base.astro';
     <p class="text-5xl font-extrabold text-slate-300">404</p>
     <h1 class="mt-3 text-xl font-bold text-slate-900">Page not found</h1>
     <p class="mt-2 text-slate-600">This page doesn't exist or has been moved.</p>
-    <a href="/" class="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700">
-      Go to homepage
-    </a>
+    {!FUNNELS_ONLY && (
+      <a href="/" class="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white transition hover:bg-brand-700">
+        Go to homepage
+      </a>
+    )}
   </main>
 </Base>

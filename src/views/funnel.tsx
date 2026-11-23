@@ -65,6 +65,7 @@ import {
   type PlacedOrder,
 } from '../components/order/checkout-extras';
 import { WHATSAPP_INVALID, isBlankWhatsApp, normalizeWhatsApp } from '../lib/whatsapp';
+import { FUNNELS_ONLY } from '../lib/funnels-only';
 
 /**
  * Ad funnel landing page (/{slug}). Renders the tenant's block config in
@@ -1737,7 +1738,7 @@ function NotFound({ meta }: { meta: StorefrontMeta | null }) {
     <main className="mx-auto max-w-md px-4 py-24 text-center">
       <h1 className="text-2xl font-bold text-slate-900">Page not found</h1>
       <p className="mt-2 text-slate-600">This page doesn't exist or is no longer available.</p>
-      <a href="/" className="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white">Go home</a>
+      {!FUNNELS_ONLY && <a href="/" className="mt-6 inline-block rounded-xl bg-brand-600 px-6 py-3 font-semibold text-white">Go home</a>}
     </main>
   );
 }
