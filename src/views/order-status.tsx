@@ -126,6 +126,11 @@ export function paymentReceivedLine(o: {
     : 'Thank you. Your advance is confirmed — the rest is due on delivery.';
 }
 
+// A landing-pages-only build has no catalogue, cart or account to link to:
+// its order page carries the shop's name and nothing else around the order.
+const PageHeader = FUNNELS_ONLY ? FunnelsOnlyHeader : Header;
+const PageFooter = FUNNELS_ONLY ? FunnelsOnlyFooter : Footer;
+
 /**
  * Astro+CF port: previously did its own `await getStorefront()` +
  * `await lookupOrder()`. Storefront meta now comes from the Astro page
@@ -139,11 +144,6 @@ export function paymentReceivedLine(o: {
  * the logged-in account view (which fetches via the bearer-token endpoint)
  * shows the exact same UI.
  */
-// A landing-pages-only build has no catalogue, cart or account to link to:
-// its order page carries the shop's name and nothing else around the order.
-const PageHeader = FUNNELS_ONLY ? FunnelsOnlyHeader : Header;
-const PageFooter = FUNNELS_ONLY ? FunnelsOnlyFooter : Footer;
-
 export function OrderStatusPage({
   orderNumber,
   phone,
@@ -266,7 +266,9 @@ export function OrderStatusPage({
         /* storage blocked — the lookup form asks for the last-4 */
       }
     }
-    const hasToken = Boolean(getToken());
+    // A landing-pages-only store has no customer accounts: a token left from
+    // a website plan would ask the account API, which refuses it.
+    const hasToken = !FUNNELS_ONLY && Boolean(getToken());
     if (stashedPhone) setPhoneKey(stashedPhone);
     if (hasToken) setAuthed(true);
     if (stashedPhone || hasToken) setLoading(true);
