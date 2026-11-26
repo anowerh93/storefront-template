@@ -485,6 +485,8 @@ export type ProductDetail = ProductCard & {
   /** Customer / lifestyle photos (shown in the Galleries tab). */
   customer_gallery_urls: string[];
   variants: ProductVariant[];
+  /** The shop's names for the variant axes ("flavor" for color). */
+  variant_axis_labels?: VariantAxisLabels | null;
   /** Parent stock for SIMPLE products (PDP qty clamp). Null = untracked /
    *  unlimited; products with variants clamp per-variant instead. */
   stock?: number | null;
@@ -516,6 +518,15 @@ export type ProductDetail = ProductCard & {
     noindex?: boolean;
   };
 };
+
+/**
+ * The shop's own names for the three variant axes, resolved by the API
+ * (myapp Product::variantAxisLabels()), e.g. {color: "flavor", size: "Size",
+ * weight: "Weight"}. Display only: the variant keys stay color / size /
+ * weight. Absent / null on an API older than renamed axes, and any axis may
+ * be blank: read it through lib/variants axisName(), which falls back.
+ */
+export type VariantAxisLabels = { color?: string; size?: string; weight?: string };
 
 // Matches the storefront API's variant shape exactly (StorefrontController::
 // variants()). The API keys each variant by its array `index` (used as the
@@ -601,6 +612,8 @@ export type FunnelProduct = {
   image_url: string | null;
   gallery_urls: string[];
   variants: ProductVariant[];
+  /** The shop's names for the variant axes ("flavor" for color). */
+  variant_axis_labels?: VariantAxisLabels | null;
   in_stock: boolean;
   stock_badge?: string | null;
   /** Free delivery ('all' / 'inside_city'); null/absent = the ordinary charge. */

@@ -11,7 +11,7 @@ import { ProductReviews } from '../components/product/product-reviews';
 import { cdnImage, cdnSrcSet, DETAIL_WIDTHS, DETAIL_SIZES } from '../lib/img';
 import { NotFoundPage } from './not-found';
 import { useCart, lineCeiling } from '../stores/cart';
-import { sizeOptions, lineLabel, optionNames } from '../lib/variants';
+import { sizeOptions, lineLabel, optionNames, variantPickerHeading, sizePickerHeading } from '../lib/variants';
 import { pixel } from '../lib/pixel';
 import type { Category, ProductDetail, StorefrontMeta } from '../lib/types';
 
@@ -234,7 +234,7 @@ function BuyBox({
         image_url: selected?.image_url ?? product.image_url ?? product.gallery_urls?.[0] ?? null,
         variant_index: selected ? selected.index : null,
         variant_choice: sizeOpts.length > 0 && sizeChoice ? { size: sizeChoice } : null,
-        variant_label: selected ? lineLabel(selected, sizeOpts.length > 0 ? sizeChoice : null) : null,
+        variant_label: selected ? lineLabel(selected, sizeOpts.length > 0 ? sizeChoice : null, product.variant_axis_labels) : null,
         unit_price: unitPrice,
         max_stock: maxStock,
         currency: product.currency,
@@ -351,7 +351,7 @@ function BuyBox({
       {product.variants.length > 0 && (
         <div className="space-y-2">
           <p className="text-sm font-medium text-slate-700">
-            {product.variants.every((v) => !!v.color?.trim()) ? 'Choose colour' : 'Choose option'}
+            {variantPickerHeading(product.variants, product.variant_axis_labels)}
           </p>
           <div className="flex flex-wrap gap-2">
             {product.variants.map((v, i) => (
@@ -389,7 +389,7 @@ function BuyBox({
           order can't record it. */}
       {sizeOpts.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-slate-700">Choose size</p>
+          <p className="text-sm font-medium text-slate-700">{sizePickerHeading(product.variant_axis_labels)}</p>
           <div className="flex flex-wrap gap-2">
             {sizeOpts.map((s) => (
               <button
