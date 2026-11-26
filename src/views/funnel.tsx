@@ -14,7 +14,7 @@ import {
 import type { CreateOrderInput, FunnelData, FunnelBlockConfig, FunnelProduct, PaymentMethod, ProductCard, StorefrontMeta } from '../lib/types';
 import { ApiError, orderIdempotencyKey, refreshPaymentMeta, submitOrder } from '../lib/api';
 import { BD_PHONE_RE, getCartKey, useAbandonedCapture } from '../lib/abandoned';
-import { sizeOptions, optionNames } from '../lib/variants';
+import { sizeOptions, optionNames, sizePickerHeading } from '../lib/variants';
 import { formatBDT, discountPct } from '../lib/format';
 import { cartShipsFree, deliveryFee, variantFreeDelivery } from '../lib/free-delivery';
 import { mintEventId, pixel } from '../lib/pixel';
@@ -1550,7 +1550,7 @@ function OrderForm({ config, product, meta, btn, visitorCountry }: { config: Fun
             order can't record it. */}
         {sizeOpts.length > 0 && (
           <div>
-            <Label>Choose size</Label>
+            <Label>{sizePickerHeading(product.variant_axis_labels)}</Label>
             <div className="mt-1.5 flex flex-wrap gap-2">
               {sizeOpts.map((s) => (
                 <button
